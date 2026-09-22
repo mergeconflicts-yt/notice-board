@@ -1,197 +1,71 @@
-import { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { useMemo, useState } from 'react';
+import { View, Pressable, StyleSheet, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, fonts } from '../../../../theme';
+import { colors } from '../../../../theme';
 import { NotePaper } from '../../../../components/NotePaper';
-import { Avatar } from '../../../../components/Avatar';
-import { Button } from '../../../../components/Button';
-import { AddNoteSheet, NoteSheetInput } from '../../../../components/AddNoteSheet';
 import { useNotes } from '../../../../hooks/useBoard';
-import { useSession } from '../../../../store/session';
-import { getBackend } from '../../../../services';
-import { relativeTime, clockTime } from '../../../../utils/time';
-import { parseListItems } from '../../../../utils/note';
+import { REF_W, computeBoardLayout, widthFracForNote } from '../../../../utils/layout';
 
+/** Cap so a tiny note never balloons past this when scaled up. */
+const MAX_SCALE = 2.8;
+
+/**
+ * A read-only zoom of a single post. The note is rendered exactly as it sits
+ * on the board (same width and tilt) and then scaled up to fill a centred
+ * popup. Tapping anywhere dismisses it.
+ */
 export default function NoteDetailScreen() {
   const { id, noteId } = useLocalSearchParams<{ id: string; noteId: string }>();
   const boardId = id as string;
-  const { notes, updateNote, deleteNote } = useNotes(boardId);
-  const me = useSession((s) => s.user);
+  const { notes } = useNotes(boardId);
+  const { width: screenW, height: screenH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [noteH, setNoteH] = useState(0);
 
+  const layout = useMemo(() => computeBoardLayout(notes ?? []), [notes]);
   const note = notes?.find((n) => n.id === noteId);
 
   if (!note) {
     return (
-      <View style={styles.scrim}>
+      <View style={styles.container}>
         <ActivityIndicator color={colors.accent} />
       </View>
     );
   }
 
-  const isCreator = !!me && me.id === note.authorId;
-  const isList =
-    note.kind === 'list' || parseListItems(note.text).items.length > 0;
+  // Match the board exactly: same paper width and same tilt.
+  const placement = layout.get(note.id);
+  const naturalW = (placement?.w ?? widthFracForNote(note)) * REF_W;
+  const rotation = placement?.rotation ?? note.rotation;
 
-  const toggleDone = async () => {
-    if (!isCreator) return;
-    await updateNote(note.id, {
-      completedAt: note.completedAt ? null : new Date().toISOString(),
-    });
-  };
-
-  const toggleListItem = async (index: number) => {
-    const { title, items } = parseListItems(note.text);
-    const target = items[index];
-    if (!target) return;
-    const next = items.map((it, i) =>
-      i === index ? { ...it, done: !it.done } : it,
-    );
-    const lines = [
-      ...(title ? [title] : []),
-      ...next.map((it) => `${it.done ? '☑' : '☐'} ${it.text}`),
-    ];
-    await updateNote(note.id, {
-      text: lines.join('\n'),
-      data: { ...((note.data as Record<string, unknown> | null) ?? {}), items: next },
-    });
-  };
-
-  // Deletion is undoable, so it goes through immediately and the toast
-  // offers a way back instead of blocking on a confirmation dialog.
-  const handleDelete = () => {
-    if (!isCreator) return;
-    router.back();
-    deleteNote(note.id);
-  };
-
-  const handleEdit = async (input: NoteSheetInput) => {
-    if (!isCreator) return;
-    setSaving(true);
-    try {
-      let imageUrl = input.imageUrl;
-      if (imageUrl && !imageUrl.startsWith('http')) {
-        imageUrl = await getBackend().uploadImage(imageUrl);
-      }
-      // Keep the hand-placed flag so editing never sends a note back to the
-      // automatic layout.
-      const data: Record<string, unknown> = { ...(input.data ?? {}) };
-      if ((note.data as { manual?: unknown } | null)?.manual === true) data.manual = true;
-      await updateNote(note.id, {
-        text: input.text.trim(),
-        imageUrl,
-        expiresAt: input.expiresAt,
-        kind: input.kind,
-        data: Object.keys(data).length > 0 ? data : null,
-        color: input.color,
-      });
-      setEditing(false);
-    } catch (e) {
-      console.error('edit failed', e);
-    } finally {
-      setSaving(false);
-    }
-  };
+  const maxW = Math.min(screenW - 48, 340);
+  const maxH = screenH - insets.top - insets.bottom - 140;
+  const scale = Math.min(maxW / naturalW, noteH > 0 ? maxH / noteH : MAX_SCALE, MAX_SCALE);
 
   return (
-    <View style={styles.container}>
-      <Pressable style={styles.scrim} onPress={() => router.back()} />
-
-      <View style={[styles.content, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 }]}>
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          bounces={false}
-          showsVerticalScrollIndicator={false}
+    <Pressable style={styles.container} onPress={() => router.back()}>
+      <View style={styles.center} pointerEvents="none">
+        <View
+          style={{ width: naturalW, transform: [{ scale }, { rotate: `${rotation}deg` }] }}
+          onLayout={(e) => setNoteH(e.nativeEvent.layout.height)}
         >
-          <View style={{ transform: [{ rotate: `${note.rotation * 0.4}deg` }] }}>
-            <NotePaper note={note} large onToggleItem={isList ? toggleListItem : undefined} />
-          </View>
-
-          <View style={styles.meta}>
-            {note.author ? (
-              <View style={styles.authorRow}>
-                <Avatar name={note.author.displayName} emoji={note.author.avatar} size={30} />
-                <Text style={styles.authorName}>{note.author.displayName}</Text>
-              </View>
-            ) : null}
-            <Text style={styles.metaText}>
-              Created {relativeTime(note.createdAt)} · {clockTime(note.createdAt)}
-            </Text>
-          </View>
-
-          {isCreator ? (
-            <View style={styles.actions}>
-              <Button
-                label={note.completedAt ? 'Undo' : 'Mark done'}
-                variant={note.completedAt ? 'primary' : 'soft'}
-                onPress={toggleDone}
-              />
-              <Button label="Edit" variant="soft" onPress={() => setEditing(true)} />
-              <Button label="Delete" variant="ghost" onPress={handleDelete} textStyle={styles.deleteText} />
-            </View>
-          ) : null}
-        </ScrollView>
+          <NotePaper note={note} />
+        </View>
       </View>
-
-      <AddNoteSheet
-        visible={editing && isCreator}
-        submitting={saving}
-        submitLabel="Save note"
-        initial={{ text: note.text, imageUrl: note.imageUrl, expiresAt: note.expiresAt, kind: note.kind, data: note.data, color: note.color }}
-        onClose={() => setEditing(false)}
-        onSubmit={handleEdit}
-      />
-    </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'flex-end' },
-  scrim: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(62, 54, 46, 0.5)',
-  },
-  content: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    maxHeight: '88%',
-  },
-  scroll: {
-    paddingHorizontal: 24,
-    paddingBottom: 8,
-  },
-  meta: {
-    marginTop: 18,
-    gap: 8,
-  },
-  authorRow: {
-    flexDirection: 'row',
+  container: {
+    flex: 1,
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
-  authorName: {
-    fontFamily: fonts.ui.bold,
-    fontSize: 16,
-    color: colors.ink,
-  },
-  metaText: {
-    fontFamily: fonts.ui.regular,
-    fontSize: 13,
-    color: colors.inkSoft,
-  },
-  actions: {
-    gap: 12,
-    marginTop: 24,
-  },
-  deleteText: {
-    color: colors.danger,
+  center: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -52,6 +52,7 @@ export function BoardNote({
   const [enter] = useState(() => new Animated.Value(animateIn ? 0 : 1));
   const [lift] = useState(() => new Animated.Value(0));
   const [press] = useState(() => new Animated.Value(0));
+  const [shake] = useState(() => new Animated.Value(0));
   const [dragging, setDragging] = useState(false);
 
   const draggingRef = useRef(false);
@@ -70,13 +71,23 @@ export function BoardNote({
 
   useEffect(() => {
     if (!animateIn) return;
-    Animated.spring(enter, {
-      toValue: 1,
-      friction: 7,
-      tension: 80,
-      useNativeDriver: false,
-    }).start();
-  }, [animateIn, enter]);
+    // Drop the paper onto the board, then give it a quick damped wobble so a
+    // fresh note catches the eye.
+    Animated.sequence([
+      Animated.spring(enter, {
+        toValue: 1,
+        friction: 7,
+        tension: 80,
+        useNativeDriver: false,
+      }),
+      Animated.timing(shake, { toValue: 1, duration: 55, useNativeDriver: false }),
+      Animated.timing(shake, { toValue: -1, duration: 55, useNativeDriver: false }),
+      Animated.timing(shake, { toValue: 0.65, duration: 50, useNativeDriver: false }),
+      Animated.timing(shake, { toValue: -0.45, duration: 50, useNativeDriver: false }),
+      Animated.timing(shake, { toValue: 0.25, duration: 45, useNativeDriver: false }),
+      Animated.timing(shake, { toValue: 0, duration: 45, useNativeDriver: false }),
+    ]).start();
+  }, [animateIn, enter, shake]);
 
   const pan = Gesture.Pan()
     .activateAfterLongPress(LIFT_MS)
@@ -132,6 +143,11 @@ export function BoardNote({
 
   const settleY = enter.interpolate({ inputRange: [0, 1], outputRange: [-18, 0] });
   const settleScale = enter.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] });
+  const shakeX = shake.interpolate({ inputRange: [-1, 1], outputRange: [-7, 7] });
+  const shakeRotate = shake.interpolate({
+    inputRange: [-1, 1],
+    outputRange: ['-2.4deg', '2.4deg'],
+  });
   const pressScale = press.interpolate({ inputRange: [0, 1], outputRange: [1, 0.985] });
   const liftScale = lift.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
   const liftRotate = lift.interpolate({
@@ -148,7 +164,16 @@ export function BoardNote({
       onLayout={(e) => onMeasure?.(note.id, e.nativeEvent.layout.height)}
     >
       <GestureDetector gesture={gesture}>
-        <Animated.View style={{ transform: [{ translateY: settleY }, { scale: settleScale }] }}>
+        <Animated.View
+          style={{
+            transform: [
+              { translateX: shakeX },
+              { translateY: settleY },
+              { scale: settleScale },
+              { rotate: shakeRotate },
+            ],
+          }}
+        >
           <Animated.View style={{ transform: [{ scale: pressScale }] }}>
             <Animated.View style={{ transform: [{ scale: liftScale }, { rotate: liftRotate }] }}>
               <NotePaper note={note} minHeight={minHeight} />

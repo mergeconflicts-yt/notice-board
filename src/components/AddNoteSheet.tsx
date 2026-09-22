@@ -249,7 +249,12 @@ export function AddNoteSheet({
         mediaTypes: ['images'],
         quality: 0.8,
       });
-      if (!res.canceled && res.assets[0]) setImage(res.assets[0].uri);
+      if (!res.canceled && res.assets[0]) {
+        setImage(res.assets[0].uri);
+        // Attaching a photo from the Note composer turns it into a photo note.
+        setTab('photo');
+        setExpiryOpen(false);
+      }
     } finally {
       setPicking(false);
     }
@@ -762,7 +767,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     paddingHorizontal: 20,
     paddingTop: 18,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 20,
+    paddingBottom: Platform.OS === 'ios' ? 22 : 14,
     maxHeight: '92%',
   },
   header: {
@@ -1170,10 +1175,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 12,
+    marginTop: 8,
   },
   cancelBtn: {
-    paddingVertical: 14,
+    paddingVertical: 10,
     paddingRight: 16,
   },
   cancelText: {
@@ -1184,8 +1189,8 @@ const styles = StyleSheet.create({
   postBtn: {
     backgroundColor: colors.ink,
     borderRadius: 999,
-    paddingHorizontal: 30,
-    paddingVertical: 15,
+    paddingHorizontal: 26,
+    paddingVertical: 12,
   },
   postDisabled: {
     opacity: 0.5,

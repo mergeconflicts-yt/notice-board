@@ -48,7 +48,11 @@ export default function RootLayout() {
         <Stack.Screen name="board/[id]/settings" options={{ presentation: 'card' }} />
         <Stack.Screen
           name="board/[id]/note/[noteId]"
-          options={{ presentation: 'transparentModal', animation: 'fade' }}
+          options={{
+            presentation: 'transparentModal',
+            animation: 'fade',
+            contentStyle: { backgroundColor: 'transparent' },
+          }}
         />
       </Stack>
       <ToastHost />
