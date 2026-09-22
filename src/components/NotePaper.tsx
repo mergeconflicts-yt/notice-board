@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { NoteWithAuthor } from '../types';
 import { colors, noteColors, fonts } from '../theme';
 import { Avatar } from './Avatar';
@@ -16,6 +16,8 @@ type Props = {
   note: NoteWithAuthor;
   large?: boolean;
   showAttribution?: boolean;
+  /** When provided (detail screen), list checkboxes become tappable for everyone. */
+  onToggleItem?: (index: number) => void;
 };
 
 const RADIUS: Record<PinVariant, number> = {
@@ -72,7 +74,7 @@ function useImageRatio(uri: string | null): number | null {
   return ratio;
 }
 
-export function NotePaper({ note, large = false, showAttribution = true }: Props) {
+export function NotePaper({ note, large = false, showAttribution = true, onToggleItem }: Props) {
   const variant = pinVariantForNote(note);
   const palette = noteColors[note.color];
   const done = Boolean(note.completedAt);
@@ -130,12 +132,6 @@ export function NotePaper({ note, large = false, showAttribution = true }: Props
       ]}
     >
       <FastenerView fastener={fastenerForNote(note.id, variant)} />
-      {isSticky ? (
-        <View pointerEvents="none">
-          <View style={styles.curlShadow} />
-          <View style={[styles.curl, { borderBottomColor: cardBg }]} />
-        </View>
-      ) : null}
 
       {isList ? (
         <View style={styles.holes} pointerEvents="none">
@@ -157,7 +153,7 @@ export function NotePaper({ note, large = false, showAttribution = true }: Props
       ) : null}
 
       {variant === 'list' ? (
-        <ListBody note={note} large={large} ink={ink} done={done} />
+        <ListBody note={note} large={large} ink={ink} done={done} onToggleItem={onToggleItem} />
       ) : variant === 'appointment' ? (
         <View>
           <Text
@@ -256,11 +252,13 @@ function ListBody({
   large,
   ink,
   done,
+  onToggleItem,
 }: {
   note: NoteWithAuthor;
   large: boolean;
   ink: string;
   done: boolean;
+  onToggleItem?: (index: number) => void;
 }) {
   const { title, items } = parseListItems(note.text);
   const visible = large ? items : items.slice(0, 6);
@@ -273,32 +271,51 @@ function ListBody({
         </Text>
       ) : null}
       <View style={styles.listItems}>
-        {visible.map((item, i) => (
-          <View key={`${item.text}-${i}`} style={styles.listRow}>
-            <View
-              style={[
-                styles.checkbox,
-                { borderColor: ink },
-                (item.done || done) && { backgroundColor: ink, borderColor: ink },
-              ]}
+        {visible.map((item, i) => {
+          const checked = item.done || done;
+          const rowBody = (
+            <>
+              <View
+                style={[
+                  styles.checkbox,
+                  { borderColor: ink },
+                  checked && { backgroundColor: ink, borderColor: ink },
+                ]}
+              >
+                {checked && <Text style={styles.checkmark}>✓</Text>}
+              </View>
+              <Text
+                style={[
+                  styles.listText,
+                  {
+                    color: ink,
+                    textDecorationLine: checked ? 'line-through' : 'none',
+                    opacity: checked ? 0.55 : 1,
+                  },
+                ]}
+                numberOfLines={2}
+              >
+                {item.text}
+              </Text>
+            </>
+          );
+          return onToggleItem ? (
+            <Pressable
+              key={`${item.text}-${i}`}
+              style={styles.listRow}
+              onPress={() => onToggleItem(i)}
+              hitSlop={4}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked }}
             >
-              {(item.done || done) && <Text style={styles.checkmark}>✓</Text>}
+              {rowBody}
+            </Pressable>
+          ) : (
+            <View key={`${item.text}-${i}`} style={styles.listRow}>
+              {rowBody}
             </View>
-            <Text
-              style={[
-                styles.listText,
-                {
-                  color: ink,
-                  textDecorationLine: item.done || done ? 'line-through' : 'none',
-                  opacity: item.done || done ? 0.55 : 1,
-                },
-              ]}
-              numberOfLines={2}
-            >
-              {item.text}
-            </Text>
-          </View>
-        ))}
+          );
+        })}
       </View>
       {!large && truncated ? (
         <Text style={[styles.listMore, { color: ink }]}>+{items.length - visible.length} more</Text>
@@ -314,37 +331,6 @@ const styles = StyleSheet.create({
     shadowRadius: 7,
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
-  },
-  curlShadow: {
-    position: 'absolute',
-    right: 0,
-    bottom: 0,
-    width: 0,
-    height: 0,
-    borderStyle: 'solid',
-    borderTopWidth: 0,
-    borderLeftWidth: 0,
-    borderRightWidth: 18,
-    borderBottomWidth: 18,
-    borderTopColor: 'transparent',
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: 'rgba(62, 54, 46, 0.14)',
-  },
-  curl: {
-    position: 'absolute',
-    right: 0,
-    bottom: 0,
-    width: 0,
-    height: 0,
-    borderStyle: 'solid',
-    borderTopWidth: 0,
-    borderLeftWidth: 0,
-    borderRightWidth: 14,
-    borderBottomWidth: 14,
-    borderTopColor: 'transparent',
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
   },
   holes: {
     position: 'absolute',

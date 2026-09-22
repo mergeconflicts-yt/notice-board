@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
   View,
@@ -193,6 +193,21 @@ export function AddNoteSheet({
   const [expiryOpen, setExpiryOpen] = useState(false);
   const [picking, setPicking] = useState(false);
   const [wasOpen, setWasOpen] = useState(false);
+  const scrollRef = useRef<ScrollView | null>(null);
+  const rowInputRefs = useRef(new Map<string, TextInput | null>());
+  const pendingFocusRowId = useRef<string | null>(null);
+
+  useEffect(() => {
+    const id = pendingFocusRowId.current;
+    if (!id) return;
+    pendingFocusRowId.current = null;
+    // Wait a tick so the new row has mounted, then focus + ensure visible.
+    const t = setTimeout(() => {
+      rowInputRefs.current.get(id)?.focus();
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, 60);
+    return () => clearTimeout(t);
+  }, [rows]);
 
   if (visible !== wasOpen) {
     setWasOpen(visible);
@@ -246,8 +261,30 @@ export function AddNoteSheet({
 
   const newRow = (): ListRow => ({ id: randomId(), text: '', done: false });
 
+  const focusRow = (id: string) => {
+    rowInputRefs.current.get(id)?.focus();
+  };
+
+  const submitRow = (index: number) => {
+    if (index < rows.length - 1) {
+      const next = rows[index + 1];
+      if (next) focusRow(next.id);
+      return;
+    }
+    const row = newRow();
+    pendingFocusRowId.current = row.id;
+    setRows((prev) => [...prev, row]);
+  };
+
+  const addRowAndFocus = () => {
+    const row = newRow();
+    pendingFocusRowId.current = row.id;
+    setRows((prev) => [...prev, row]);
+  };
+
   const selectTab = (next: ComposerTab) => {
     setTab(next);
+    setExpiryOpen(false);
     if (next === 'list') {
       setRows((prev) => (prev.length === 0 ? [newRow(), newRow(), newRow()] : prev));
     }
@@ -361,7 +398,13 @@ export function AddNoteSheet({
             })}
           </View>
 
-          <ScrollView keyboardShouldPersistTaps="handled" bounces={false}>
+          <ScrollView
+            ref={scrollRef}
+            keyboardShouldPersistTaps="handled"
+            bounces={false}
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+          >
             {tab === 'note' ? (
               <View style={[styles.sticky, { backgroundColor: palette.bg }]}>
                 <TextInput
@@ -473,9 +516,15 @@ export function AddNoteSheet({
                   placeholderTextColor={colors.inkFaint}
                   value={listTitle}
                   onChangeText={setListTitle}
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => {
+                    if (rows.length > 0) focusRow(rows[0].id);
+                    else addRowAndFocus();
+                  }}
                 />
                 <View style={styles.rows}>
-                  {rows.map((row) => (
+                  {rows.map((row, index) => (
                     <View key={row.id} style={styles.npRow}>
                       <Pressable
                         hitSlop={8}
@@ -490,8 +539,13 @@ export function AddNoteSheet({
                         placeholderTextColor={colors.inkFaint}
                         value={row.text}
                         onChangeText={(v) => updateRow(row.id, { text: v })}
-                        onSubmitEditing={() => setRows((prev) => [...prev, newRow()])}
+                        onSubmitEditing={() => submitRow(index)}
+                        returnKeyType="next"
                         blurOnSubmit={false}
+                        ref={(el) => {
+                          if (el) rowInputRefs.current.set(row.id, el);
+                          else rowInputRefs.current.delete(row.id);
+                        }}
                       />
                       <Pressable hitSlop={8} onPress={() => removeRow(row.id)}>
                         <Text style={styles.rowRemove}>✕</Text>
@@ -499,7 +553,7 @@ export function AddNoteSheet({
                     </View>
                   ))}
                 </View>
-                <Pressable onPress={() => setRows((prev) => [...prev, newRow()])} style={styles.addRow}>
+                <Pressable onPress={addRowAndFocus} style={styles.addRow}>
                   <Text style={styles.addRowText}>＋ Add item</Text>
                 </Pressable>
               </View>
@@ -621,50 +675,55 @@ export function AddNoteSheet({
                 <Text style={styles.whenSummary}>📌 {formatEventAt(eventAt.toISOString())}</Text>
               </View>
             ) : null}
-
-            {showExpiry ? (
-              <View style={styles.expiryCard}>
-                <Pressable style={styles.expiryRow} onPress={() => setExpiryOpen((v) => !v)}>
-                  <MaterialCommunityIcons name="clock-outline" size={22} color={colors.inkSoft} />
-                  <Text style={styles.expiryText}>{expiryRowLabel(expiryIdx)}</Text>
-                  <View style={styles.expirySpacer} />
-                  <MaterialCommunityIcons
-                    name={expiryOpen ? 'chevron-down' : 'chevron-right'}
-                    size={22}
-                    color={colors.inkFaint}
-                  />
-                </Pressable>
-                {expiryOpen
-                  ? EXPIRY_OPTIONS.map((opt, i) => (
-                      <Pressable
-                        key={opt.label}
-                        style={styles.expiryOption}
-                        onPress={() => {
-                          setExpiryIdx(i);
-                          setExpiryOpen(false);
-                        }}
-                      >
-                        <Text
-                          style={[
-                            styles.expiryOptionText,
-                            i === expiryIdx && styles.expiryOptionTextActive,
-                          ]}
-                        >
-                          {opt.label}
-                        </Text>
-                        {i === expiryIdx ? (
-                          <MaterialCommunityIcons
-                            name="check"
-                            size={20}
-                            color={colors.accentDeep}
-                          />
-                        ) : null}
-                      </Pressable>
-                    ))
-                  : null}
-              </View>
-            ) : null}
           </ScrollView>
+
+          {showExpiry ? (
+            <View style={styles.expiryWrap}>
+              {expiryOpen ? (
+                <View style={styles.expiryDropdown}>
+                  {EXPIRY_OPTIONS.map((opt, i) => (
+                    <Pressable
+                      key={opt.label}
+                      style={[styles.expiryOption, i > 0 && styles.expiryOptionBorder]}
+                      onPress={() => {
+                        setExpiryIdx(i);
+                        setExpiryOpen(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.expiryOptionText,
+                          i === expiryIdx && styles.expiryOptionTextActive,
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                      {i === expiryIdx ? (
+                        <MaterialCommunityIcons
+                          name="check"
+                          size={20}
+                          color={colors.accentDeep}
+                        />
+                      ) : null}
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+              <Pressable
+                style={[styles.expiryRow, expiryOpen && styles.expiryRowOpen]}
+                onPress={() => setExpiryOpen((v) => !v)}
+              >
+                <MaterialCommunityIcons name="clock-outline" size={22} color={colors.inkSoft} />
+                <Text style={styles.expiryText}>{expiryRowLabel(expiryIdx)}</Text>
+                <View style={styles.expirySpacer} />
+                <MaterialCommunityIcons
+                    name={expiryOpen ? 'chevron-up' : 'chevron-right'}
+                  size={22}
+                  color={colors.inkFaint}
+                />
+              </Pressable>
+            </View>
+          ) : null}
 
           <View style={styles.actions}>
             <Pressable onPress={onClose} style={styles.cancelBtn}>
@@ -745,6 +804,13 @@ const styles = StyleSheet.create({
   },
   tabLabelActive: {
     color: colors.ink,
+  },
+  scroll: {
+    flexGrow: 0,
+    flexShrink: 1,
+  },
+  scrollContent: {
+    paddingBottom: 4,
   },
   sticky: {
     borderRadius: 8,
@@ -927,6 +993,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
     fontFamily: fonts.hand.regular,
     fontSize: 26,
+    lineHeight: 30,
     color: colors.ink,
     borderBottomWidth: 1,
     borderColor: 'rgba(62, 54, 46, 0.14)',
@@ -967,6 +1034,7 @@ const styles = StyleSheet.create({
     minHeight: 44,
     fontFamily: fonts.hand.semibold,
     fontSize: 20,
+    lineHeight: 24,
     color: colors.ink,
   },
   rowRemove: {
@@ -1031,13 +1099,10 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
     marginTop: 10,
   },
-  expiryCard: {
+  expiryWrap: {
     marginTop: 14,
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
+    position: 'relative',
+    zIndex: 10,
   },
   expiryRow: {
     flexDirection: 'row',
@@ -1045,6 +1110,31 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 16,
     paddingVertical: 14,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  expiryRowOpen: {
+    borderColor: colors.accentDeep,
+  },
+  expiryDropdown: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: '100%',
+    marginBottom: 8,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+    zIndex: 20,
+    elevation: 8,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: -4 },
   },
   expiryText: {
     fontFamily: fonts.ui.semibold,
@@ -1060,6 +1150,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  expiryOptionBorder: {
     borderTopWidth: 1,
     borderColor: colors.border,
   },
@@ -1076,7 +1168,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 18,
+    marginTop: 12,
   },
   cancelBtn: {
     paddingVertical: 14,

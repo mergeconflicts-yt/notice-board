@@ -8,13 +8,16 @@ import { Avatar } from '../../../../components/Avatar';
 import { Button } from '../../../../components/Button';
 import { AddNoteSheet, NoteSheetInput } from '../../../../components/AddNoteSheet';
 import { useNotes } from '../../../../hooks/useBoard';
+import { useSession } from '../../../../store/session';
 import { getBackend } from '../../../../services';
 import { relativeTime, clockTime } from '../../../../utils/time';
+import { parseListItems } from '../../../../utils/note';
 
 export default function NoteDetailScreen() {
   const { id, noteId } = useLocalSearchParams<{ id: string; noteId: string }>();
   const boardId = id as string;
   const { notes, updateNote, deleteNote } = useNotes(boardId);
+  const me = useSession((s) => s.user);
   const insets = useSafeAreaInsets();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -29,13 +32,36 @@ export default function NoteDetailScreen() {
     );
   }
 
+  const isCreator = !!me && me.id === note.authorId;
+  const isList =
+    note.kind === 'list' || parseListItems(note.text).items.length > 0;
+
   const toggleDone = async () => {
+    if (!isCreator) return;
     await updateNote(note.id, {
       completedAt: note.completedAt ? null : new Date().toISOString(),
     });
   };
 
+  const toggleListItem = async (index: number) => {
+    const { title, items } = parseListItems(note.text);
+    const target = items[index];
+    if (!target) return;
+    const next = items.map((it, i) =>
+      i === index ? { ...it, done: !it.done } : it,
+    );
+    const lines = [
+      ...(title ? [title] : []),
+      ...next.map((it) => `${it.done ? '☑' : '☐'} ${it.text}`),
+    ];
+    await updateNote(note.id, {
+      text: lines.join('\n'),
+      data: { ...((note.data as Record<string, unknown> | null) ?? {}), items: next },
+    });
+  };
+
   const handleDelete = () => {
+    if (!isCreator) return;
     Alert.alert('Delete this note?', 'It will disappear from the board for everyone.', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -50,6 +76,7 @@ export default function NoteDetailScreen() {
   };
 
   const handleEdit = async (input: NoteSheetInput) => {
+    if (!isCreator) return;
     setSaving(true);
     try {
       let imageUrl = input.imageUrl;
@@ -83,7 +110,7 @@ export default function NoteDetailScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={{ transform: [{ rotate: `${note.rotation * 0.4}deg` }] }}>
-            <NotePaper note={note} large />
+            <NotePaper note={note} large onToggleItem={isList ? toggleListItem : undefined} />
           </View>
 
           <View style={styles.meta}>
@@ -98,20 +125,22 @@ export default function NoteDetailScreen() {
             </Text>
           </View>
 
-          <View style={styles.actions}>
-            <Button
-              label={note.completedAt ? 'Undo' : 'Mark done'}
-              variant={note.completedAt ? 'primary' : 'soft'}
-              onPress={toggleDone}
-            />
-            <Button label="Edit" variant="soft" onPress={() => setEditing(true)} />
-            <Button label="Delete" variant="ghost" onPress={handleDelete} textStyle={styles.deleteText} />
-          </View>
+          {isCreator ? (
+            <View style={styles.actions}>
+              <Button
+                label={note.completedAt ? 'Undo' : 'Mark done'}
+                variant={note.completedAt ? 'primary' : 'soft'}
+                onPress={toggleDone}
+              />
+              <Button label="Edit" variant="soft" onPress={() => setEditing(true)} />
+              <Button label="Delete" variant="ghost" onPress={handleDelete} textStyle={styles.deleteText} />
+            </View>
+          ) : null}
         </ScrollView>
       </View>
 
       <AddNoteSheet
-        visible={editing}
+        visible={editing && isCreator}
         submitting={saving}
         submitLabel="Save note"
         initial={{ text: note.text, imageUrl: note.imageUrl, expiresAt: note.expiresAt, kind: note.kind, data: note.data, color: note.color }}
