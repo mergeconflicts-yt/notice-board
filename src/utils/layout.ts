@@ -116,6 +116,11 @@ export type BoardPlacement = PlacedNote & { rotation: number };
 /** Deterministic, per-device placement for every note on a board. */
 export type BoardLayout = Map<string, BoardPlacement>;
 
+/** Actual rendered note heights (ref points) keyed by id, reported by
+ *  onLayout. When present these replace the rough height estimate, so a long
+ *  note can never be given too little room and cover its neighbour. */
+export type MeasuredHeights = Record<string, number>;
+
 /**
  * A note that has been dragged by hand keeps its spot in positionX (0-1 of
  * board width) and positionY (reference points), flagged with `data.manual`
@@ -207,6 +212,7 @@ function placeAtTop(
 export function insertAtTop(
   placed: (PlacedNote & { id: string })[],
   input: DimsInput,
+  hOverride?: number,
 ): TopInsert {
   const wFrac = widthFracForNote(input);
   const probe = {
@@ -217,7 +223,7 @@ export function insertAtTop(
     expiresAt: input.expiresAt ?? null,
     data: input.data ?? null,
   } as NoteWithAuthor;
-  const h = noteRefHeight(probe, wFrac);
+  const h = hOverride ?? noteRefHeight(probe, wFrac);
 
   let best: TopInsert | null = null;
   let bestCost = Infinity;
@@ -259,22 +265,26 @@ function rotationForColumn(column: number, noteId: string): number {
  * device-local randomness — every phone renders the exact same board.
  * Editing a note keeps its createdAt, so it never jumps back to the top.
  */
-function foldLayout(ordered: NoteWithAuthor[]): BoardLayout {
+function foldLayout(ordered: NoteWithAuthor[], measured: MeasuredHeights): BoardLayout {
   const placed: (PlacedNote & { id: string })[] = [];
   const byId = new Map<string, PlacedNote & { id: string }>();
   const rotations = new Map<string, number>();
 
   for (const note of ordered) {
     const w = widthFracForNote(note);
-    const h = noteRefHeight(note, w);
-    const insert = insertAtTop(placed, {
-      text: note.text,
-      imageUrl: note.imageUrl,
-      kind: note.kind,
-      authorId: note.authorId,
-      expiresAt: note.expiresAt,
-      data: note.data,
-    });
+    const h = measured[note.id] ?? noteRefHeight(note, w);
+    const insert = insertAtTop(
+      placed,
+      {
+        text: note.text,
+        imageUrl: note.imageUrl,
+        kind: note.kind,
+        authorId: note.authorId,
+        expiresAt: note.expiresAt,
+        data: note.data,
+      },
+      h,
+    );
     for (const m of insert.moves) {
       const p = byId.get(m.id);
       if (p) p.y = m.y;
@@ -306,14 +316,14 @@ function foldLayout(ordered: NoteWithAuthor[]): BoardLayout {
  * instead of clustering in a corner. Notes are balanced between the two
  * sections, stacked with a gap, and never overlap.
  */
-function twoColumnLayout(ordered: NoteWithAuthor[]): BoardLayout {
+function twoColumnLayout(ordered: NoteWithAuthor[], measured: MeasuredHeights): BoardLayout {
   type ColumnNote = PlacedNote & { id: string; rotation: number };
   const columns: ColumnNote[][] = [[], []];
   const bottoms = [TOP_Y, TOP_Y];
 
   for (const note of ordered) {
     const w = Math.max(twoColWidthFrac(note), TWO_COL_MIN_W);
-    const h = Math.max(noteRefHeight(note, w), TWO_COL_MIN_H);
+    const h = Math.max(measured[note.id] ?? noteRefHeight(note, w), TWO_COL_MIN_H);
     const column = bottoms[0] <= bottoms[1] ? 0 : 1;
 
     // Newest note lands on top; the rest of the section settles below it.
@@ -344,12 +354,17 @@ function twoColumnLayout(ordered: NoteWithAuthor[]): BoardLayout {
  * and the underlying layout still runs for them so their neighbours never
  * shift.
  */
-export function computeBoardLayout(notes: NoteWithAuthor[]): BoardLayout {
+export function computeBoardLayout(
+  notes: NoteWithAuthor[],
+  measured: MeasuredHeights = {},
+): BoardLayout {
   const ordered = [...notes].sort(
     (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
   );
   const base =
-    ordered.length <= TWO_COLUMN_MAX ? twoColumnLayout(ordered) : foldLayout(ordered);
+    ordered.length <= TWO_COLUMN_MAX
+      ? twoColumnLayout(ordered, measured)
+      : foldLayout(ordered, measured);
 
   const byIdNote = new Map(ordered.map((n) => [n.id, n]));
   const layout: BoardLayout = new Map();

@@ -51,6 +51,7 @@ export default function BoardScreen() {
   const [chipVisible, setChipVisible] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [overDelete, setOverDelete] = useState(false);
+  const [measuredHeights, setMeasuredHeights] = useState<Record<string, number>>({});
 
   const scrollRef = useRef<ScrollView>(null);
   const nearTopRef = useRef(true);
@@ -58,13 +59,20 @@ export default function BoardScreen() {
   const firstLoadRef = useRef(true);
   const chipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const overDeleteRef = useRef(false);
+  const lastBoardWRef = useRef(0);
+  const lastTwoColRef = useRef<boolean | null>(null);
 
   const openNote = (note: NoteWithAuthor) => {
     router.push(`/board/${boardId}/note/${note.id}`);
   };
 
-  // Every device derives the identical board from note metadata alone.
-  const layout = useMemo(() => computeBoardLayout(notes ?? []), [notes]);
+  // Every device derives the identical board from note metadata alone; once
+  // notes have rendered, their real heights replace the estimates so long
+  // notes reserve the space they actually need.
+  const layout = useMemo(
+    () => computeBoardLayout(notes ?? [], measuredHeights),
+    [notes, measuredHeights],
+  );
   const ordered = useMemo(
     () => [...(notes ?? [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
     [notes],
@@ -162,9 +170,32 @@ export default function BoardScreen() {
   };
 
   const scale = boardW > 0 ? boardW / REF_W : 1;
+  const twoColMode = (notes?.length ?? 0) <= TWO_COLUMN_MAX;
   // In the roomy two-column mode, papers are given a minimum height so short
   // notes still fill their section.
-  const minNoteH = (notes?.length ?? 0) <= TWO_COLUMN_MAX ? TWO_COL_MIN_H * scale : 0;
+  const minNoteH = twoColMode ? TWO_COL_MIN_H * scale : 0;
+
+  // Feed each note's real rendered height back to the layout (in ref points).
+  const handleMeasure = (id: string, heightPx: number) => {
+    if (boardW <= 0 || heightPx <= 0) return;
+    const refH = (heightPx * REF_W) / boardW;
+    setMeasuredHeights((prev) =>
+      Math.abs((prev[id] ?? -1) - refH) < 1 ? prev : { ...prev, [id]: refH },
+    );
+  };
+
+  // Measurements only hold for the width and layout mode they were taken in.
+  useEffect(() => {
+    if (boardW <= 0 || boardW === lastBoardWRef.current) return;
+    lastBoardWRef.current = boardW;
+    setMeasuredHeights({});
+  }, [boardW]);
+
+  useEffect(() => {
+    if (lastTwoColRef.current === twoColMode) return;
+    lastTwoColRef.current = twoColMode;
+    setMeasuredHeights({});
+  }, [twoColMode]);
   const canvasH = useMemo(() => {
     let bottom = 0;
     layout.forEach((p) => {
@@ -280,6 +311,7 @@ export default function BoardScreen() {
                       onDragStart={handleDragStart}
                       onDragUpdate={handleDragUpdate}
                       onMove={handleMove}
+                      onMeasure={handleMeasure}
                     />
                   );
                 })

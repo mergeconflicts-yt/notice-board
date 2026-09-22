@@ -21,6 +21,8 @@ type Props = {
   onDragUpdate?: (note: NoteWithAuthor, screenY: number) => void;
   /** Called when a held note is dropped, with its new canvas position (px). */
   onMove?: (note: NoteWithAuthor, x: number, y: number) => void;
+  /** Reports the paper's rendered height so the layout can reserve enough room. */
+  onMeasure?: (id: string, height: number) => void;
 };
 
 /** How long a note must be held before it can be picked up and dragged. */
@@ -43,6 +45,7 @@ export function BoardNote({
   onDragStart,
   onDragUpdate,
   onMove,
+  onMeasure,
 }: Props) {
   const [posX] = useState(() => new Animated.Value(left));
   const [posY] = useState(() => new Animated.Value(top));
@@ -142,6 +145,7 @@ export function BoardNote({
         styles.pin,
         { left: posX, top: posY, width, opacity: enter, zIndex: dragging ? 20 : 0 },
       ]}
+      onLayout={(e) => onMeasure?.(note.id, e.nativeEvent.layout.height)}
     >
       <GestureDetector gesture={gesture}>
         <Animated.View style={{ transform: [{ translateY: settleY }, { scale: settleScale }] }}>
