@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { colors, fonts } from '../../../theme';
-import { StickyNote } from '../../../components/StickyNote';
+import { DraggableNote } from '../../../components/DraggableNote';
 import { Avatar } from '../../../components/Avatar';
 import { AddNoteSheet, NoteSheetInput } from '../../../components/AddNoteSheet';
 import { useBoard, useNotes, useMembers } from '../../../hooks/useBoard';
-import { splitIntoColumns } from '../../../utils/layout';
+import { useSession } from '../../../store/session';
+import { REF_W, findSpot, noteRefHeight, placedDims, widthFracForNote } from '../../../utils/layout';
 import { getBackend } from '../../../services';
 import { NoteWithAuthor } from '../../../types';
 
@@ -16,14 +17,28 @@ export default function BoardScreen() {
   const boardId = id as string;
   const insets = useSafeAreaInsets();
   const { board, loading: boardLoading, missing } = useBoard(boardId);
-  const { notes, loading: notesLoading, addNote } = useNotes(boardId);
+  const { notes, loading: notesLoading, addNote, updateNote } = useNotes(boardId);
   const { members } = useMembers(boardId);
+  const user = useSession((s) => s.user);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [boardW, setBoardW] = useState(0);
+  const [scrollEnabled, setScrollEnabled] = useState(true);
 
   const openNote = (note: NoteWithAuthor) => {
     router.push(`/board/${boardId}/note/${note.id}`);
   };
+
+  const handleDrop = useCallback(
+    async (id: string, x: number, y: number) => {
+      try {
+        await updateNote(id, { positionX: x, positionY: y });
+      } catch (e) {
+        console.error('move note failed', e);
+      }
+    },
+    [updateNote],
+  );
 
   const handleAdd = async (input: NoteSheetInput) => {
     setSubmitting(true);
@@ -32,7 +47,14 @@ export default function BoardScreen() {
       if (imageUrl && !imageUrl.startsWith('http')) {
         imageUrl = await getBackend().uploadImage(imageUrl);
       }
-      await addNote({ ...input, imageUrl });
+      const authorId = user?.id ?? '';
+      const spot = findSpot(placedDims(notes ?? []), {
+        text: input.text,
+        imageUrl,
+        kind: input.kind,
+        authorId,
+      });
+      await addNote({ ...input, imageUrl, positionX: spot.x, positionY: spot.y });
       setSheetOpen(false);
     } catch (e) {
       console.error('add note failed', e);
@@ -40,6 +62,20 @@ export default function BoardScreen() {
       setSubmitting(false);
     }
   };
+
+  const scale = boardW > 0 ? boardW / REF_W : 1;
+  const ordered = useMemo(
+    () => [...(notes ?? [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    [notes],
+  );
+  const canvasH = useMemo(() => {
+    let bottom = 0;
+    for (const n of ordered) {
+      const f = widthFracForNote(n);
+      bottom = Math.max(bottom, n.positionY + noteRefHeight(n, f));
+    }
+    return Math.max(1100 * scale, bottom * scale + 90);
+  }, [ordered, scale]);
 
   if (boardLoading) {
     return (
@@ -65,7 +101,6 @@ export default function BoardScreen() {
     );
   }
 
-  const [left, right] = notes ? splitIntoColumns(notes) : [[], []];
   const isLoading = notesLoading;
   const isEmpty = notes && notes.length === 0;
 
@@ -120,10 +155,35 @@ export default function BoardScreen() {
           </Pressable>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.boardContent} showsVerticalScrollIndicator={false}>
-          <View style={styles.columns}>
-            <View style={styles.column}>{left.map((n) => <StickyNote key={n.id} note={n} onPress={openNote} />)}</View>
-            <View style={styles.column}>{right.map((n) => <StickyNote key={n.id} note={n} onPress={openNote} />)}</View>
+        <ScrollView
+          contentContainerStyle={styles.boardContent}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={scrollEnabled}
+        >
+          <View
+            style={[styles.canvas, { minHeight: 1100 * scale, height: canvasH }]}
+            onLayout={(e) => setBoardW(e.nativeEvent.layout.width)}
+          >
+            {boardW > 0
+              ? ordered.map((n) => {
+                  const frac = widthFracForNote(n);
+                  return (
+                    <DraggableNote
+                      key={n.id}
+                      note={n}
+                      left={n.positionX * boardW}
+                      top={n.positionY * scale}
+                      width={frac * boardW}
+                      frac={frac}
+                      boardW={boardW}
+                      scale={scale}
+                      onPress={openNote}
+                      onDrop={handleDrop}
+                      onDragStateChange={(dragging) => setScrollEnabled(!dragging)}
+                    />
+                  );
+                })
+              : null}
           </View>
         </ScrollView>
       )}
@@ -218,12 +278,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingBottom: 120,
   },
-  columns: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  column: {
-    flex: 1,
+  canvas: {
+    position: 'relative',
   },
   empty: {
     flex: 1,

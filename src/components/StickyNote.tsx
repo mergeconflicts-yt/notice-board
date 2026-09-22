@@ -5,11 +5,13 @@ import { NotePaper } from './NotePaper';
 type Props = {
   note: NoteWithAuthor;
   onPress: (note: NoteWithAuthor) => void;
+  /** Canvas mode: no outer margins so absolute placement is exact. */
+  flat?: boolean;
 };
 
-export function StickyNote({ note, onPress }: Props) {
+export function StickyNote({ note, onPress, flat = false }: Props) {
   return (
-    <View style={[styles.wrap, { transform: [{ rotate: `${note.rotation}deg` }] }]}>
+    <View style={[!flat && styles.wrap, { transform: [{ rotate: `${note.rotation}deg` }] }]}>
       <Pressable
         onPress={() => onPress(note)}
         style={({ pressed }) => [

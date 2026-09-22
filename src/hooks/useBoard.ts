@@ -58,6 +58,8 @@ export type NewNoteInput = {
   kind?: NoteWithAuthor['kind'];
   data?: Record<string, unknown> | null;
   color?: NoteWithAuthor['color'];
+  positionX?: number;
+  positionY?: number;
 };
 
 export function useNotes(boardId: string) {
@@ -95,8 +97,8 @@ export function useNotes(boardId: string) {
         imageUrl: input.imageUrl ?? null,
         color: input.color ?? colorForNote(seed),
         rotation: rotationForNote(seed),
-        positionX: 0.5,
-        positionY: 0.5,
+        positionX: input.positionX ?? 0.5,
+        positionY: input.positionY ?? 0.5,
         kind: input.kind ?? 'note',
         data: input.data ?? null,
         expiresAt: input.expiresAt ?? null,
