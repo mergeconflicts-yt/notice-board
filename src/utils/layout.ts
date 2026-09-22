@@ -18,11 +18,15 @@ const PUSH_GAP = 8;
 export const TWO_COLUMN_MAX = 10;
 
 /** Two-column layout metrics (fractions of board width / ref points). */
-const TWO_COL_EDGE = 0.035;
-const TWO_COL_GUTTER = 0.03;
+const TWO_COL_EDGE = 0.03;
+/** Negative gutter: the two sections overlap a touch in the middle so the
+ *  board reads as layered paper instead of two tidy table columns. */
+const TWO_COL_GUTTER = -0.03;
 const TWO_COL_W = (1 - 2 * TWO_COL_EDGE - TWO_COL_GUTTER) / 2;
 const TWO_COL_ROW_GAP = 14;
-const TWO_COL_ROTATION = [-1.6, 1.4] as const;
+const TWO_COL_ROTATION = [-3.2, 2.8] as const;
+/** Total horizontal wobble applied to a note's column edge. */
+const TWO_COL_X_JITTER = 0.03;
 
 /** Floors for notes in the roomy two-column layout, so short or small papers
  *  still read big: width as a fraction of the board, height in ref points. */
@@ -95,12 +99,12 @@ function twoColWidthFrac(input: DimsInput): number {
   const r = seeded(widthSeed(input))();
   const fill =
     variant === 'mini'
-      ? 0.78 + r * 0.1
+      ? 0.84 + r * 0.08
       : variant === 'receipt'
-        ? 0.8 + r * 0.1
+        ? 0.86 + r * 0.08
         : variant === 'announcement'
           ? 1
-          : 0.9 + r * 0.1;
+          : 0.94 + r * 0.06;
   return TWO_COL_W * fill;
 }
 
@@ -251,10 +255,10 @@ function rotationForZone(zone: number, noteId: string): number {
   return Math.round((base + jitter) * 10) / 10;
 }
 
-/** Slight, stable rotation; the left column leans one way, the right the other. */
+/** Stable rotation; the left column leans one way, the right the other. */
 function rotationForColumn(column: number, noteId: string): number {
   const base = TWO_COL_ROTATION[column] ?? 0;
-  const jitter = (seeded(`${noteId}:rot`)() - 0.5) * 1.4;
+  const jitter = (seeded(`${noteId}:rot`)() - 0.5) * 2.6;
   return Math.round((base + jitter) * 10) / 10;
 }
 
@@ -329,9 +333,13 @@ function twoColumnLayout(ordered: NoteWithAuthor[], measured: MeasuredHeights): 
     // Newest note lands on top; the rest of the section settles below it.
     for (const placed of columns[column]) placed.y += h + TWO_COL_ROW_GAP;
 
+    const edge = column === 0 ? TWO_COL_EDGE : 1 - TWO_COL_EDGE - w;
+    const wobble = (seeded(`${note.id}:x`)() - 0.5) * TWO_COL_X_JITTER;
+    const x = Math.max(0.012, Math.min(1 - w - 0.012, edge + wobble));
+
     columns[column].unshift({
       id: note.id,
-      x: column === 0 ? TWO_COL_EDGE : 1 - TWO_COL_EDGE - w,
+      x,
       y: TOP_Y,
       w,
       h,
