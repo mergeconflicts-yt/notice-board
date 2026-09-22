@@ -9,6 +9,8 @@ type Props = {
   left: number;
   top: number;
   width: number;
+  /** Floor for the paper's rendered height, so short notes still read big. */
+  minHeight?: number;
   rotation: number;
   /** Play the "settling onto the board" entrance (only for freshly added notes). */
   animateIn?: boolean;
@@ -34,6 +36,7 @@ export function BoardNote({
   left,
   top,
   width,
+  minHeight,
   rotation,
   animateIn = false,
   onPress,
@@ -144,7 +147,7 @@ export function BoardNote({
         <Animated.View style={{ transform: [{ translateY: settleY }, { scale: settleScale }] }}>
           <Animated.View style={{ transform: [{ scale: pressScale }] }}>
             <Animated.View style={{ transform: [{ scale: liftScale }, { rotate: liftRotate }] }}>
-              <NotePaper note={note} />
+              <NotePaper note={note} minHeight={minHeight} />
             </Animated.View>
           </Animated.View>
         </Animated.View>

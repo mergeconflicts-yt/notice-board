@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { NoteWithAuthor } from '../types';
 import { colors, noteColors, fonts } from '../theme';
-import { Avatar } from './Avatar';
 import { FastenerView, fastenerForNote } from './Pin';
 import { expiresShort, clockTime } from '../utils/time';
 import {
@@ -16,6 +15,8 @@ type Props = {
   note: NoteWithAuthor;
   large?: boolean;
   showAttribution?: boolean;
+  /** Floor for the rendered height, so small papers still fill their slot. */
+  minHeight?: number;
   /** When provided (detail screen), list checkboxes become tappable for everyone. */
   onToggleItem?: (index: number) => void;
 };
@@ -74,7 +75,13 @@ function useImageRatio(uri: string | null): number | null {
   return ratio;
 }
 
-export function NotePaper({ note, large = false, showAttribution = true, onToggleItem }: Props) {
+export function NotePaper({
+  note,
+  large = false,
+  showAttribution = true,
+  minHeight,
+  onToggleItem,
+}: Props) {
   const variant = pinVariantForNote(note);
   const palette = noteColors[note.color];
   const done = Boolean(note.completedAt);
@@ -124,6 +131,7 @@ export function NotePaper({ note, large = false, showAttribution = true, onToggl
           elevation: isSticky ? 5 : 4,
           borderRadius: RADIUS[variant],
           borderTopWidth: isList ? 0 : undefined,
+          minHeight: minHeight ?? undefined,
           padding: large ? 22 : variant === 'mini' ? 12 : variant === 'receipt' ? 14 : 16,
           paddingTop: isList ? (large ? 36 : 32) : undefined,
           paddingLeft: undefined,
@@ -144,6 +152,7 @@ export function NotePaper({ note, large = false, showAttribution = true, onToggl
         </View>
       ) : null}
 
+      <View style={styles.body}>
       {isPhoto && note.imageUrl ? (
         <Image
           source={{ uri: note.imageUrl }}
@@ -225,18 +234,17 @@ export function NotePaper({ note, large = false, showAttribution = true, onToggl
           {note.text}
         </Text>
       ) : null}
+      </View>
 
       {showAttribution && (note.author || expiry) ? (
         <View style={[styles.attribution, isPhoto && styles.photoAttribution]}>
           {note.author ? (
-            <>
-              <Avatar
-                name={note.author.displayName}
-                emoji={note.author.avatar}
-                size={large ? 28 : 22}
-              />
-              <Text style={[styles.authorName, { color: ink }]}>{note.author.displayName}</Text>
-            </>
+            <Text
+              numberOfLines={1}
+              style={[styles.signature, { color: ink, fontSize: large ? 26 : 21 }]}
+            >
+              - {note.author.displayName}
+            </Text>
           ) : null}
           {expiry ? (
             <Text style={[styles.expiryInline, { color: ink }]}>· ⏳ {expiry}</Text>
@@ -331,6 +339,12 @@ const styles = StyleSheet.create({
     shadowRadius: 7,
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
+  },
+  // Grows to fill any spare height (from minHeight) so the text sits centred
+  // and the attribution is pushed to the bottom edge.
+  body: {
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   holes: {
     position: 'absolute',
@@ -465,14 +479,16 @@ const styles = StyleSheet.create({
   },
   attribution: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'baseline',
+    justifyContent: 'flex-end',
     marginTop: 12,
     gap: 6,
   },
-  authorName: {
-    fontFamily: fonts.ui.semibold,
-    fontSize: 12,
-    opacity: 0.8,
+  // Signed like a paper note: a dash and a handwritten name.
+  signature: {
+    flexShrink: 1,
+    fontFamily: fonts.hand.semibold,
+    opacity: 0.85,
   },
   expiryInline: {
     fontFamily: fonts.ui.semibold,

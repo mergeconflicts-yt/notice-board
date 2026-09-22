@@ -19,7 +19,12 @@ import { AddNoteSheet, NoteSheetInput } from '../../../components/AddNoteSheet';
 import { useBoard, useNotes, useMembers } from '../../../hooks/useBoard';
 import { useSession } from '../../../store/session';
 import { useToast } from '../../../store/toast';
-import { REF_W, computeBoardLayout } from '../../../utils/layout';
+import {
+  REF_W,
+  TWO_COLUMN_MAX,
+  TWO_COL_MIN_H,
+  computeBoardLayout,
+} from '../../../utils/layout';
 import { getBackend } from '../../../services';
 import { NoteWithAuthor } from '../../../types';
 
@@ -157,6 +162,9 @@ export default function BoardScreen() {
   };
 
   const scale = boardW > 0 ? boardW / REF_W : 1;
+  // In the roomy two-column mode, papers are given a minimum height so short
+  // notes still fill their section.
+  const minNoteH = (notes?.length ?? 0) <= TWO_COLUMN_MAX ? TWO_COL_MIN_H * scale : 0;
   const canvasH = useMemo(() => {
     let bottom = 0;
     layout.forEach((p) => {
@@ -265,6 +273,7 @@ export default function BoardScreen() {
                       left={p.x * boardW}
                       top={p.y * scale}
                       width={p.w * boardW}
+                      minHeight={minNoteH}
                       rotation={p.rotation}
                       animateIn={entering.has(n.id)}
                       onPress={openNote}

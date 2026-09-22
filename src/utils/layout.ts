@@ -13,6 +13,22 @@ const TOP_Y = 12;
 /** Gap left below a freshly dropped note before older notes resume. */
 const PUSH_GAP = 8;
 
+/** Boards with at most this many notes use the roomier two-column layout;
+ *  beyond it the denser landing-zone fold takes over. */
+export const TWO_COLUMN_MAX = 10;
+
+/** Two-column layout metrics (fractions of board width / ref points). */
+const TWO_COL_EDGE = 0.035;
+const TWO_COL_GUTTER = 0.03;
+const TWO_COL_W = (1 - 2 * TWO_COL_EDGE - TWO_COL_GUTTER) / 2;
+const TWO_COL_ROW_GAP = 14;
+const TWO_COL_ROTATION = [-1.6, 1.4] as const;
+
+/** Floors for notes in the roomy two-column layout, so short or small papers
+ *  still read big: width as a fraction of the board, height in ref points. */
+export const TWO_COL_MIN_W = 0.43;
+export const TWO_COL_MIN_H = 140;
+
 /** Stable width seed shared by creation-time packing and render. */
 function widthSeed(input: { text: string; kind: string; authorId: string }): string {
   return `${input.text}|${input.kind}|${input.authorId}`;
@@ -64,6 +80,30 @@ export function widthFracForNote(input: DimsInput): number {
   return px / REF_W;
 }
 
+/**
+ * Width fraction for the two-column layout. With only a couple of sections
+ * to fill, papers stretch to cover most of their column so the board reads
+ * big; the smaller formats keep a little breathing room.
+ */
+function twoColWidthFrac(input: DimsInput): number {
+  const variant = pinVariantForNote({
+    text: input.text,
+    imageUrl: input.imageUrl,
+    kind: input.kind,
+    expiresAt: null,
+  });
+  const r = seeded(widthSeed(input))();
+  const fill =
+    variant === 'mini'
+      ? 0.78 + r * 0.1
+      : variant === 'receipt'
+        ? 0.8 + r * 0.1
+        : variant === 'announcement'
+          ? 1
+          : 0.9 + r * 0.1;
+  return TWO_COL_W * fill;
+}
+
 /** Reference-space height for a note at the given width fraction. */
 export function noteRefHeight(note: NoteWithAuthor, frac: number): number {
   return estimateNoteHeight(note, frac * REF_W);
@@ -88,8 +128,9 @@ export function manualPlacement(note: NoteWithAuthor): { x: number; y: number } 
   return { x: note.positionX, y: note.positionY };
 }
 
-/** Max share of a note (by the smaller of the two areas) that another note may cover. */
-export const MAX_OVERLAP_FRAC = 0.2;
+/** Max share of a note (by the smaller of the two areas) that another note
+ *  may cover. Kept low so the dense board barely overlaps. */
+export const MAX_OVERLAP_FRAC = 0.05;
 
 /**
  * Push a rect straight down the minimum needed so it overlaps no other rect
@@ -204,19 +245,21 @@ function rotationForZone(zone: number, noteId: string): number {
   return Math.round((base + jitter) * 10) / 10;
 }
 
+/** Slight, stable rotation; the left column leans one way, the right the other. */
+function rotationForColumn(column: number, noteId: string): number {
+  const base = TWO_COL_ROTATION[column] ?? 0;
+  const jitter = (seeded(`${noteId}:rot`)() - 0.5) * 1.4;
+  return Math.round((base + jitter) * 10) / 10;
+}
+
 /**
- * Derive the whole board deterministically from note metadata alone.
- *
- * Notes are replayed oldest → newest, each one dropped at the top and
- * settling older notes downward. Because the fold only depends on
- * id/createdAt/format/width/rotation — never on device-local randomness —
- * every phone renders the exact same board. Editing a note keeps its
- * createdAt, so it never jumps back to the top.
+ * The dense layout for busier boards. Notes are replayed oldest → newest,
+ * each one dropped at the top and settling older notes downward. Because the
+ * fold only depends on id/createdAt/format/width/rotation — never on
+ * device-local randomness — every phone renders the exact same board.
+ * Editing a note keeps its createdAt, so it never jumps back to the top.
  */
-export function computeBoardLayout(notes: NoteWithAuthor[]): BoardLayout {
-  const ordered = [...notes].sort(
-    (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
-  );
+function foldLayout(ordered: NoteWithAuthor[]): BoardLayout {
   const placed: (PlacedNote & { id: string })[] = [];
   const byId = new Map<string, PlacedNote & { id: string }>();
   const rotations = new Map<string, number>();
@@ -243,21 +286,77 @@ export function computeBoardLayout(notes: NoteWithAuthor[]): BoardLayout {
   }
 
   // Read positions only after the full fold, so notes pushed down by later
-  // arrivals report their settled y rather than their original slot. Notes
-  // that were dragged by hand keep the spot they were dropped in; the fold
-  // still runs for them, so the notes around them never shift.
-  const byIdNote = new Map(ordered.map((n) => [n.id, n]));
+  // arrivals report their settled y rather than their original slot.
   const layout: BoardLayout = new Map();
   for (const p of placed) {
-    const note = byIdNote.get(p.id);
-    const manual = note ? manualPlacement(note) : null;
     layout.set(p.id, {
-      x: manual ? manual.x : p.x,
-      y: manual ? manual.y : p.y,
+      x: p.x,
+      y: p.y,
       w: p.w,
       h: p.h,
       rotation: rotations.get(p.id) ?? 0,
     });
+  }
+  return layout;
+}
+
+/**
+ * The roomy layout for small boards. Two sections split the width evenly and
+ * papers stretch to cover their section, so a handful of notes fill the board
+ * instead of clustering in a corner. Notes are balanced between the two
+ * sections, stacked with a gap, and never overlap.
+ */
+function twoColumnLayout(ordered: NoteWithAuthor[]): BoardLayout {
+  type ColumnNote = PlacedNote & { id: string; rotation: number };
+  const columns: ColumnNote[][] = [[], []];
+  const bottoms = [TOP_Y, TOP_Y];
+
+  for (const note of ordered) {
+    const w = Math.max(twoColWidthFrac(note), TWO_COL_MIN_W);
+    const h = Math.max(noteRefHeight(note, w), TWO_COL_MIN_H);
+    const column = bottoms[0] <= bottoms[1] ? 0 : 1;
+
+    // Newest note lands on top; the rest of the section settles below it.
+    for (const placed of columns[column]) placed.y += h + TWO_COL_ROW_GAP;
+
+    columns[column].unshift({
+      id: note.id,
+      x: column === 0 ? TWO_COL_EDGE : 1 - TWO_COL_EDGE - w,
+      y: TOP_Y,
+      w,
+      h,
+      rotation: rotationForColumn(column, note.id),
+    });
+    bottoms[column] += h + TWO_COL_ROW_GAP;
+  }
+
+  const layout: BoardLayout = new Map();
+  for (const column of columns) {
+    for (const p of column) layout.set(p.id, p);
+  }
+  return layout;
+}
+
+/**
+ * Derive the whole board deterministically from note metadata alone. Small
+ * boards get two roomy sections; busier ones fall back to the denser fold.
+ * Notes dragged by hand keep the spot they were dropped in for either mode,
+ * and the underlying layout still runs for them so their neighbours never
+ * shift.
+ */
+export function computeBoardLayout(notes: NoteWithAuthor[]): BoardLayout {
+  const ordered = [...notes].sort(
+    (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+  );
+  const base =
+    ordered.length <= TWO_COLUMN_MAX ? twoColumnLayout(ordered) : foldLayout(ordered);
+
+  const byIdNote = new Map(ordered.map((n) => [n.id, n]));
+  const layout: BoardLayout = new Map();
+  for (const [id, p] of base) {
+    const note = byIdNote.get(id);
+    const manual = note ? manualPlacement(note) : null;
+    layout.set(id, manual ? { ...p, x: manual.x, y: manual.y } : p);
   }
   return layout;
 }
