@@ -31,7 +31,7 @@ const TWO_COL_X_JITTER = 0.05;
 
 /** Floors for notes in the roomy two-column layout, so short or small papers
  *  still read big: width as a fraction of the board, height in ref points. */
-export const TWO_COL_MIN_W = 0.45;
+export const TWO_COL_MIN_W = 0.41;
 export const TWO_COL_MIN_H = 140;
 
 /** Stable width seed shared by creation-time packing and render. */
@@ -100,12 +100,12 @@ function twoColWidthFrac(input: DimsInput): number {
   const r = seeded(widthSeed(input))();
   const fill =
     variant === 'mini'
-      ? 0.9 + r * 0.08
+      ? 0.86 + r * 0.1
       : variant === 'receipt'
-        ? 0.92 + r * 0.08
+        ? 0.88 + r * 0.1
         : variant === 'announcement'
           ? 1
-          : 0.94 + r * 0.06;
+          : 0.9 + r * 0.1;
   return TWO_COL_W * fill;
 }
 
