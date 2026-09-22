@@ -25,7 +25,8 @@ const TWO_COL_GUTTER = -0.05;
 const TWO_COL_W = (1 - 2 * TWO_COL_EDGE - TWO_COL_GUTTER) / 2;
 /** Negative: each paper laps a little over the one above it. */
 const TWO_COL_ROW_GAP = -10;
-const TWO_COL_ROTATION = [-1.6, 1.4] as const;
+/** Total tilt spread applied to a note, either direction. */
+const TWO_COL_ROTATION_SPREAD = 14;
 /** Total horizontal drift applied to a note, so the sides aren't aligned. */
 const TWO_COL_X_JITTER = 0.05;
 
@@ -256,11 +257,10 @@ function rotationForZone(zone: number, noteId: string): number {
   return Math.round((base + jitter) * 10) / 10;
 }
 
-/** Stable rotation; the left column leans one way, the right the other. */
-function rotationForColumn(column: number, noteId: string): number {
-  const base = TWO_COL_ROTATION[column] ?? 0;
-  const jitter = (seeded(`${noteId}:rot`)() - 0.5) * 2.6;
-  return Math.round((base + jitter) * 10) / 10;
+/** Stable tilt with no side bias, so a note leans either way at random. */
+function rotationForNote(noteId: string): number {
+  const tilt = (seeded(`${noteId}:rot`)() - 0.5) * TWO_COL_ROTATION_SPREAD;
+  return Math.round(tilt * 10) / 10;
 }
 
 /**
@@ -344,7 +344,7 @@ function twoColumnLayout(ordered: NoteWithAuthor[], measured: MeasuredHeights): 
       y: TOP_Y,
       w,
       h,
-      rotation: rotationForColumn(column, note.id),
+      rotation: rotationForNote(note.id),
     });
     bottoms[column] += h + TWO_COL_ROW_GAP;
   }
