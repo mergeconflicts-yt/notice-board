@@ -16,8 +16,9 @@ type Props = {
   boardW: number;
   scale: number;
   onPress: (note: NoteWithAuthor) => void;
-  onDrop: (id: string, x: number, y: number) => void;
+  onDrop: (id: string, x: number, y: number, page: TouchPt) => void;
   onDragStateChange: (dragging: boolean) => void;
+  onDragMove?: (pageX: number, pageY: number) => void;
 };
 
 type TouchPt = { x: number; y: number };
@@ -42,6 +43,7 @@ export function DraggableNote({
   onPress,
   onDrop,
   onDragStateChange,
+  onDragMove,
 }: Props) {
   const [pan] = useState(() => new Animated.ValueXY());
   const [lift] = useState(() => new Animated.Value(0));
@@ -55,12 +57,14 @@ export function DraggableNote({
   const geomRef = useRef({ left, top, frac, boardW, scale });
   const dropRef = useRef(onDrop);
   const dragCbRef = useRef(onDragStateChange);
+  const moveCbRef = useRef(onDragMove);
 
   useEffect(() => {
     geomRef.current = { left, top, frac, boardW, scale };
     dropRef.current = onDrop;
     dragCbRef.current = onDragStateChange;
-  }, [left, top, frac, boardW, scale, onDrop, onDragStateChange]);
+    moveCbRef.current = onDragMove;
+  }, [left, top, frac, boardW, scale, onDrop, onDragStateChange, onDragMove]);
 
   // Snap to the authoritative spot once the drop persists.
   useEffect(() => {
@@ -116,6 +120,7 @@ export function DraggableNote({
     }
     if (activeRef.current) {
       pan.setValue({ x: p.x - s.x, y: p.y - s.y });
+      moveCbRef.current?.(p.x, p.y);
     }
   };
 
@@ -134,7 +139,7 @@ export function DraggableNote({
     const pos = geomRef.current;
     const x = Math.min(Math.max((pos.left + (p.x - s.x)) / pos.boardW, 0), Math.max(0, 1 - pos.frac));
     const y = Math.max(8, (pos.top + (p.y - s.y)) / pos.scale);
-    dropRef.current(note.id, x, y);
+    dropRef.current(note.id, x, y, { x: p.x, y: p.y });
   };
 
   const handleGrant = () => {

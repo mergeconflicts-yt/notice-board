@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, fonts } from '../../../theme';
 import { DraggableNote } from '../../../components/DraggableNote';
 import { Avatar } from '../../../components/Avatar';
@@ -17,27 +18,50 @@ export default function BoardScreen() {
   const boardId = id as string;
   const insets = useSafeAreaInsets();
   const { board, loading: boardLoading, missing } = useBoard(boardId);
-  const { notes, loading: notesLoading, addNote, updateNote } = useNotes(boardId);
+  const { notes, loading: notesLoading, addNote, updateNote, deleteNote } = useNotes(boardId);
   const { members } = useMembers(boardId);
   const user = useSession((s) => s.user);
+  const { height: windowH } = useWindowDimensions();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [boardW, setBoardW] = useState(0);
   const [scrollEnabled, setScrollEnabled] = useState(true);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [overBin, setOverBin] = useState(false);
+
+  // Finger Y (screen coords) above which a drop counts as "into the bin".
+  const binThresholdY = windowH - 150;
 
   const openNote = (note: NoteWithAuthor) => {
     router.push(`/board/${boardId}/note/${note.id}`);
   };
 
   const handleDrop = useCallback(
-    async (id: string, x: number, y: number) => {
+    async (id: string, x: number, y: number, page: { x: number; y: number }) => {
+      setDraggingId(null);
+      setOverBin(false);
       try {
+        const target = (notes ?? []).find((n) => n.id === id);
+        if (page.y >= binThresholdY && target && target.authorId === user?.id) {
+          await deleteNote(id);
+          return;
+        }
         await updateNote(id, { positionX: x, positionY: y });
       } catch (e) {
         console.error('move note failed', e);
       }
     },
-    [updateNote],
+    [updateNote, deleteNote, notes, user, binThresholdY],
+  );
+
+  const handleDragMove = useCallback(
+    (pageY: number) => {
+      setOverBin((prev) => {
+        const next = pageY >= binThresholdY;
+        return prev === next ? prev : next;
+      });
+    },
+    [binThresholdY],
   );
 
   const handleAdd = async (input: NoteSheetInput) => {
@@ -103,6 +127,8 @@ export default function BoardScreen() {
 
   const isLoading = notesLoading;
   const isEmpty = notes && notes.length === 0;
+  const draggingNote = (notes ?? []).find((n) => n.id === draggingId) ?? null;
+  const showBin = !!draggingNote && !!user && draggingNote.authorId === user.id;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -179,7 +205,12 @@ export default function BoardScreen() {
                       scale={scale}
                       onPress={openNote}
                       onDrop={handleDrop}
-                      onDragStateChange={(dragging) => setScrollEnabled(!dragging)}
+                      onDragStateChange={(dragging) => {
+                        setScrollEnabled(!dragging);
+                        setDraggingId(dragging ? n.id : null);
+                        if (!dragging) setOverBin(false);
+                      }}
+                      onDragMove={(_x, pageY) => handleDragMove(pageY)}
                     />
                   );
                 })
@@ -188,7 +219,7 @@ export default function BoardScreen() {
         </ScrollView>
       )}
 
-      {!isEmpty && (
+      {!isEmpty && !draggingId && (
         <Pressable
           onPress={() => setSheetOpen(true)}
           style={({ pressed }) => [
@@ -199,6 +230,26 @@ export default function BoardScreen() {
         >
           <Text style={styles.fabGlyph}>+</Text>
         </Pressable>
+      )}
+
+      {showBin && (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.bin,
+            { bottom: insets.bottom + 20 },
+            overBin && styles.binHot,
+          ]}
+        >
+          <MaterialCommunityIcons
+            name={overBin ? 'trash-can' : 'trash-can-outline'}
+            size={28}
+            color={overBin ? '#fff' : colors.danger}
+          />
+          <Text style={[styles.binText, overBin && styles.binTextHot]}>
+            {overBin ? 'Release to delete' : 'Drag here to delete'}
+          </Text>
+        </View>
       )}
 
       <AddNoteSheet
@@ -334,6 +385,39 @@ const styles = StyleSheet.create({
     lineHeight: 38,
     color: '#fff',
     marginTop: -2,
+  },
+  bin: {
+    position: 'absolute',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 22,
+    paddingVertical: 14,
+    borderRadius: 999,
+    backgroundColor: colors.surface,
+    borderWidth: 1.5,
+    borderColor: colors.danger,
+    borderStyle: 'dashed',
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  binHot: {
+    backgroundColor: colors.danger,
+    borderStyle: 'solid',
+    borderColor: colors.danger,
+    transform: [{ scale: 1.08 }],
+  },
+  binText: {
+    fontFamily: fonts.ui.bold,
+    fontSize: 15,
+    color: colors.danger,
+  },
+  binTextHot: {
+    color: '#fff',
   },
   missingTitle: {
     fontFamily: fonts.hand.bold,
