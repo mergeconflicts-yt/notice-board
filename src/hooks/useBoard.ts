@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Board, MemberWithUser, NotePatch, NoteWithAuthor } from '../types';
 import { getBackend } from '../services';
 import { useSession } from '../store/session';
+import { useDeletions } from '../store/deletions';
 import { colorForNote, rotationForNote } from '../utils/note';
 import { randomId } from '../utils/id';
 
@@ -66,6 +67,7 @@ export function useNotes(boardId: string) {
   const [notes, setNotes] = useState<NoteWithAuthor[] | null>(null);
   const [loading, setLoading] = useState(true);
   const user = useSession((s) => s.user);
+  const pendingDeletes = useDeletions((s) => s.pending);
 
   useEffect(() => {
     let alive = true;
@@ -110,16 +112,31 @@ export function useNotes(boardId: string) {
 
   const updateNote = useCallback(
     async (id: string, patch: NotePatch) => {
+      // Apply locally first so a dragged note stays where it was dropped
+      // instead of snapping back until the backend echoes the change.
+      setNotes((prev) =>
+        prev ? prev.map((n) => (n.id === id ? { ...n, ...patch } : n)) : prev,
+      );
       await getBackend().updateNote(id, patch);
     },
     [],
   );
 
-  const deleteNote = useCallback(async (id: string) => {
-    await getBackend().deleteNote(id);
-  }, []);
+  // Deleting is optimistic: the note vanishes now and is only removed from
+  // the backend once the undo window lapses (see store/deletions).
+  const deleteNote = useCallback(
+    (id: string) => {
+      useDeletions.getState().schedule(id, boardId);
+    },
+    [boardId],
+  );
 
-  return { notes, loading, addNote, updateNote, deleteNote };
+  const visibleNotes = useMemo(
+    () => (notes ? notes.filter((n) => !pendingDeletes[n.id]) : notes),
+    [notes, pendingDeletes],
+  );
+
+  return { notes: visibleNotes, loading, addNote, updateNote, deleteNote };
 }
 
 export function useBoards() {

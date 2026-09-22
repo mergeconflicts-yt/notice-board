@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts } from '../../../../theme';
@@ -60,19 +60,12 @@ export default function NoteDetailScreen() {
     });
   };
 
+  // Deletion is undoable, so it goes through immediately and the toast
+  // offers a way back instead of blocking on a confirmation dialog.
   const handleDelete = () => {
     if (!isCreator) return;
-    Alert.alert('Delete this note?', 'It will disappear from the board for everyone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteNote(note.id);
-          router.back();
-        },
-      },
-    ]);
+    router.back();
+    deleteNote(note.id);
   };
 
   const handleEdit = async (input: NoteSheetInput) => {
@@ -83,12 +76,16 @@ export default function NoteDetailScreen() {
       if (imageUrl && !imageUrl.startsWith('http')) {
         imageUrl = await getBackend().uploadImage(imageUrl);
       }
+      // Keep the hand-placed flag so editing never sends a note back to the
+      // automatic layout.
+      const data: Record<string, unknown> = { ...(input.data ?? {}) };
+      if ((note.data as { manual?: unknown } | null)?.manual === true) data.manual = true;
       await updateNote(note.id, {
         text: input.text.trim(),
         imageUrl,
         expiresAt: input.expiresAt,
         kind: input.kind,
-        data: input.data,
+        data: Object.keys(data).length > 0 ? data : null,
         color: input.color,
       });
       setEditing(false);

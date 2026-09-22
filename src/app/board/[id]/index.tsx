@@ -2,13 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   Pressable,
   StyleSheet,
   ActivityIndicator,
+  useWindowDimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { colors, fonts } from '../../../theme';
@@ -17,6 +18,7 @@ import { Avatar } from '../../../components/Avatar';
 import { AddNoteSheet, NoteSheetInput } from '../../../components/AddNoteSheet';
 import { useBoard, useNotes, useMembers } from '../../../hooks/useBoard';
 import { useSession } from '../../../store/session';
+import { useToast } from '../../../store/toast';
 import { REF_W, computeBoardLayout } from '../../../utils/layout';
 import { getBackend } from '../../../services';
 import { NoteWithAuthor } from '../../../types';
@@ -24,25 +26,33 @@ import { NoteWithAuthor } from '../../../types';
 /** Scroll distance below which the viewer counts as "already at the top". */
 const NEAR_TOP_Y = 140;
 
+/** Height of the drag-to-delete target at the bottom of the screen. */
+const DELETE_ZONE_HEIGHT = 96;
+
 export default function BoardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const boardId = id as string;
   const insets = useSafeAreaInsets();
+  const { height: windowH } = useWindowDimensions();
   const { board, loading: boardLoading, missing } = useBoard(boardId);
-  const { notes, loading: notesLoading, addNote } = useNotes(boardId);
+  const { notes, loading: notesLoading, addNote, updateNote, deleteNote } = useNotes(boardId);
   const { members } = useMembers(boardId);
   const user = useSession((s) => s.user);
+  const toastVisible = useToast((s) => s.message !== null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [boardW, setBoardW] = useState(0);
   const [entering, setEntering] = useState<Set<string>>(() => new Set());
   const [chipVisible, setChipVisible] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const [overDelete, setOverDelete] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
   const nearTopRef = useRef(true);
   const seenIdsRef = useRef<Set<string>>(new Set());
   const firstLoadRef = useRef(true);
   const chipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const overDeleteRef = useRef(false);
 
   const openNote = (note: NoteWithAuthor) => {
     router.push(`/board/${boardId}/note/${note.id}`);
@@ -108,6 +118,42 @@ export default function BoardScreen() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleDragStart = () => {
+    overDeleteRef.current = false;
+    setOverDelete(false);
+    setDragActive(true);
+  };
+
+  // The finger counts as "over delete" once it reaches the bottom zone.
+  const handleDragUpdate = (_note: NoteWithAuthor, screenY: number) => {
+    const over = screenY >= windowH - insets.bottom - DELETE_ZONE_HEIGHT;
+    if (over !== overDeleteRef.current) {
+      overDeleteRef.current = over;
+      setOverDelete(over);
+    }
+  };
+
+  // A held note was dropped: delete it if it landed in the zone, otherwise
+  // remember the spot it was dropped in.
+  const handleMove = (note: NoteWithAuthor, x: number, y: number) => {
+    const shouldDelete = overDeleteRef.current;
+    overDeleteRef.current = false;
+    setOverDelete(false);
+    setDragActive(false);
+
+    if (shouldDelete) {
+      deleteNote(note.id);
+      return;
+    }
+    if (boardW <= 0) return;
+    const refScale = boardW / REF_W;
+    updateNote(note.id, {
+      positionX: Math.max(0, Math.min(1, x / boardW)),
+      positionY: Math.max(0, y / refScale),
+      data: { ...((note.data as Record<string, unknown> | null) ?? {}), manual: true },
+    }).catch((e) => console.error('move note failed', e));
   };
 
   const scale = boardW > 0 ? boardW / REF_W : 1;
@@ -222,6 +268,9 @@ export default function BoardScreen() {
                       rotation={p.rotation}
                       animateIn={entering.has(n.id)}
                       onPress={openNote}
+                      onDragStart={handleDragStart}
+                      onDragUpdate={handleDragUpdate}
+                      onMove={handleMove}
                     />
                   );
                 })
@@ -242,7 +291,22 @@ export default function BoardScreen() {
         </Pressable>
       )}
 
-      {!isEmpty && (
+      {dragActive && (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.deleteZone,
+            { bottom: insets.bottom + 24 },
+            overDelete && styles.deleteZoneOver,
+          ]}
+        >
+          <Text style={[styles.deleteZoneText, overDelete && styles.deleteZoneTextOver]}>
+            {overDelete ? 'Release to delete' : 'Put here to delete'}
+          </Text>
+        </View>
+      )}
+
+      {!isEmpty && !dragActive && !toastVisible && (
         <Pressable
           onPress={() => setSheetOpen(true)}
           style={({ pressed }) => [
@@ -406,6 +470,33 @@ const styles = StyleSheet.create({
     fontFamily: fonts.ui.bold,
     fontSize: 13,
     color: colors.background,
+  },
+  deleteZone: {
+    position: 'absolute',
+    alignSelf: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 999,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  deleteZoneOver: {
+    backgroundColor: colors.danger,
+    borderColor: colors.danger,
+  },
+  deleteZoneText: {
+    fontFamily: fonts.ui.bold,
+    fontSize: 15,
+    color: colors.inkSoft,
+  },
+  deleteZoneTextOver: {
+    color: colors.white,
   },
   missingTitle: {
     fontFamily: fonts.hand.bold,

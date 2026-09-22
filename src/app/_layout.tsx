@@ -2,10 +2,12 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useFonts, Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold } from '@expo-google-fonts/nunito';
 import { Caveat_400Regular, Caveat_600SemiBold, Caveat_700Bold } from '@expo-google-fonts/caveat';
 import { colors } from '../theme';
 import { useSession } from '../store/session';
+import { ToastHost } from '../components/Toast';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -27,7 +29,7 @@ export default function RootLayout() {
   }
 
   return (
-    <View style={styles.root}>
+    <GestureHandlerRootView style={styles.root}>
       <StatusBar style="dark" />
       <Stack
         screenOptions={{
@@ -49,7 +51,8 @@ export default function RootLayout() {
           options={{ presentation: 'transparentModal', animation: 'fade' }}
         />
       </Stack>
-    </View>
+      <ToastHost />
+    </GestureHandlerRootView>
   );
 }
 

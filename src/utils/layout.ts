@@ -76,6 +76,18 @@ export type BoardPlacement = PlacedNote & { rotation: number };
 /** Deterministic, per-device placement for every note on a board. */
 export type BoardLayout = Map<string, BoardPlacement>;
 
+/**
+ * A note that has been dragged by hand keeps its spot in positionX (0-1 of
+ * board width) and positionY (reference points), flagged with `data.manual`
+ * so it can be told apart from the automatic layout.
+ */
+export function manualPlacement(note: NoteWithAuthor): { x: number; y: number } | null {
+  const data = note.data as { manual?: unknown } | null;
+  if (!data || data.manual !== true) return null;
+  if (typeof note.positionX !== 'number' || typeof note.positionY !== 'number') return null;
+  return { x: note.positionX, y: note.positionY };
+}
+
 /** Max share of a note (by the smaller of the two areas) that another note may cover. */
 export const MAX_OVERLAP_FRAC = 0.2;
 
@@ -231,12 +243,17 @@ export function computeBoardLayout(notes: NoteWithAuthor[]): BoardLayout {
   }
 
   // Read positions only after the full fold, so notes pushed down by later
-  // arrivals report their settled y rather than their original slot.
+  // arrivals report their settled y rather than their original slot. Notes
+  // that were dragged by hand keep the spot they were dropped in; the fold
+  // still runs for them, so the notes around them never shift.
+  const byIdNote = new Map(ordered.map((n) => [n.id, n]));
   const layout: BoardLayout = new Map();
   for (const p of placed) {
+    const note = byIdNote.get(p.id);
+    const manual = note ? manualPlacement(note) : null;
     layout.set(p.id, {
-      x: p.x,
-      y: p.y,
+      x: manual ? manual.x : p.x,
+      y: manual ? manual.y : p.y,
       w: p.w,
       h: p.h,
       rotation: rotations.get(p.id) ?? 0,

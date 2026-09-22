@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Shell(ls -la design-images assets 2>/dev/null; git show --stat HEAD; git diff HEAD~3 --stat | tail -20)",
+      "Shell(cd \"$COMMANDCODE_SCRATCHPAD\" && sips -Z 900 -s format jpeg \"/Users/theone/Documents/repos/notice/design-images/Screenshot 2026-09-22 at 12.10.10 PM.png\" --out d1.jpg >/dev/null 2>&1; sips -Z 900 -s format jpeg \"/Users/theone/Documents/repos/notice/design-images/Screenshot 2026-09-22 at 12.10.20 PM.png\" --out d2.jpg >/dev/null 2>&1; ls -la \"$COMMANDCODE_SCRATCHPAD\")",
+      "Shell(sips:*)",
+      "Shell(npx tsc --noEmit)",
+      "Shell(npx expo lint 2 >& 1)",
+      "Shell(npm:*)",
+      "Shell(npx tsc src/utils/layout.ts --outDir /out --module commonjs --target es2020 --moduleResolution node --skipLibCheck --noEmitOnError false 2 >& 1)",
+      "Shell(npx tsc src/utils/layout.ts --ignoreConfig --outDir /out --module commonjs --target es2020 --moduleResolution node --skipLibCheck 2 >& 1)",
+      "Shell(node check-layout.js)",
+      "Shell(cd \"$COMMANDCODE_SCRATCHPAD\" && cp -R out out-base && sed -i '' 's/NOTE_SCALE = 1.2/NOTE_SCALE = 1;/' out-base/utils/note.js && sed \"s|'./out/|'./out-base/|g\" check-layout.js > check-base.js && node check-base.js)"
+    ],
+    "deny": [],
+    "defaultMode": "default"
+  }
+}
