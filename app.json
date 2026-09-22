@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "Notice Board",
+    "slug": "notice-board",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "noticeboard",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.noticeboard.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#FBF4E4",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "com.noticeboard.app",
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Notice Board to access your photos so you can pin pictures to the board."
+        }
+      ],
+      "@react-native-community/datetimepicker"
+    ]
+  }
+}
