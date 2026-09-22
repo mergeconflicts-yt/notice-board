@@ -18,19 +18,20 @@ const PUSH_GAP = 8;
 export const TWO_COLUMN_MAX = 10;
 
 /** Two-column layout metrics (fractions of board width / ref points). */
-const TWO_COL_EDGE = 0.03;
-/** Negative gutter: the two sections overlap a touch in the middle so the
- *  board reads as layered paper instead of two tidy table columns. */
-const TWO_COL_GUTTER = -0.03;
+const TWO_COL_EDGE = 0.045;
+/** Negative gutter: the two sides overlap a touch in the middle so the board
+ *  reads as layered paper instead of two tidy table columns. */
+const TWO_COL_GUTTER = -0.05;
 const TWO_COL_W = (1 - 2 * TWO_COL_EDGE - TWO_COL_GUTTER) / 2;
-const TWO_COL_ROW_GAP = 14;
-const TWO_COL_ROTATION = [-3.2, 2.8] as const;
-/** Total horizontal wobble applied to a note's column edge. */
-const TWO_COL_X_JITTER = 0.03;
+/** Negative: each paper laps a little over the one above it. */
+const TWO_COL_ROW_GAP = -10;
+const TWO_COL_ROTATION = [-1.6, 1.4] as const;
+/** Total horizontal drift applied to a note, so the sides aren't aligned. */
+const TWO_COL_X_JITTER = 0.05;
 
 /** Floors for notes in the roomy two-column layout, so short or small papers
  *  still read big: width as a fraction of the board, height in ref points. */
-export const TWO_COL_MIN_W = 0.43;
+export const TWO_COL_MIN_W = 0.45;
 export const TWO_COL_MIN_H = 140;
 
 /** Stable width seed shared by creation-time packing and render. */
@@ -99,9 +100,9 @@ function twoColWidthFrac(input: DimsInput): number {
   const r = seeded(widthSeed(input))();
   const fill =
     variant === 'mini'
-      ? 0.84 + r * 0.08
+      ? 0.9 + r * 0.08
       : variant === 'receipt'
-        ? 0.86 + r * 0.08
+        ? 0.92 + r * 0.08
         : variant === 'announcement'
           ? 1
           : 0.94 + r * 0.06;

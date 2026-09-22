@@ -73,10 +73,15 @@ export default function BoardScreen() {
     () => computeBoardLayout(notes ?? [], measuredHeights),
     [notes, measuredHeights],
   );
-  const ordered = useMemo(
-    () => [...(notes ?? [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
-    [notes],
-  );
+  // Stacking order: notes lower on the board paint last (on top), so a paper
+  // can be lapped over at its bottom but its pinned top edge always shows.
+  const ordered = useMemo(() => {
+    return [...(notes ?? [])].sort((a, b) => {
+      const ya = layout.get(a.id)?.y ?? 0;
+      const yb = layout.get(b.id)?.y ?? 0;
+      return ya - yb || a.createdAt.localeCompare(b.createdAt);
+    });
+  }, [notes, layout]);
 
   // React to realtime arrivals: animate fresh papers, and only hijack the
   // viewport when the viewer is already near the top.
