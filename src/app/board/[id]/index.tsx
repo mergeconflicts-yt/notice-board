@@ -9,7 +9,7 @@ import { Avatar } from '../../../components/Avatar';
 import { AddNoteSheet, NoteSheetInput } from '../../../components/AddNoteSheet';
 import { useBoard, useNotes, useMembers } from '../../../hooks/useBoard';
 import { useSession } from '../../../store/session';
-import { REF_W, findSpot, noteRefHeight, placedDims, widthFracForNote } from '../../../utils/layout';
+import { REF_W, insertAtTop, noteRefHeight, placedDims, widthFracForNote } from '../../../utils/layout';
 import { getBackend } from '../../../services';
 import { NoteWithAuthor } from '../../../types';
 
@@ -72,13 +72,18 @@ export default function BoardScreen() {
         imageUrl = await getBackend().uploadImage(imageUrl);
       }
       const authorId = user?.id ?? '';
-      const spot = findSpot(placedDims(notes ?? []), {
+      // Pin the new note at the very top; only notes it actually overlaps
+      // get nudged down, so the top row stays densely packed.
+      const spot = insertAtTop(placedDims(notes ?? []), {
         text: input.text,
         imageUrl,
         kind: input.kind,
         authorId,
       });
       await addNote({ ...input, imageUrl, positionX: spot.x, positionY: spot.y });
+      await Promise.all(
+        spot.moves.map((m) => updateNote(m.id, { positionY: m.y })),
+      );
       setSheetOpen(false);
     } catch (e) {
       console.error('add note failed', e);

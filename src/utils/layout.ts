@@ -100,6 +100,82 @@ export function placedDims(notes: NoteWithAuthor[]): (PlacedNote & { id: string 
   });
 }
 
+export type TopInsertMove = { id: string; y: number };
+export type TopInsert = { x: number; y: number; moves: TopInsertMove[] };
+
+function clashesWith(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  rects: PlacedNote[],
+): PlacedNote[] {
+  const ovX = OVERLAP / REF_W;
+  return rects.filter(
+    (p) =>
+      x < p.x + p.w - ovX &&
+      x + w - ovX > p.x &&
+      y < p.y + p.h - OVERLAP &&
+      y + h - OVERLAP > p.y,
+  );
+}
+
+/**
+ * Pin a new note at the very top without wasting space: try each horizontal
+ * slot and settle only the notes that actually collide downwards (keeping
+ * their x), then keep the slot with the least total movement. Notes beside
+ * the new note stay put, so the top row stays densely packed.
+ */
+export function insertAtTop(
+  placed: (PlacedNote & { id: string })[],
+  input: DimsInput,
+): TopInsert {
+  const wFrac = widthFracForNote(input);
+  const probe = {
+    text: input.text,
+    imageUrl: input.imageUrl,
+    kind: input.kind,
+    authorId: input.authorId,
+  } as NoteWithAuthor;
+  const h = noteRefHeight(probe, wFrac);
+  const y0 = 12;
+  const slots = Array.from({ length: 9 }, (_, i) => 0.03 + i * 0.1);
+  const order = slots.map((_, i) => i).sort(() => Math.random() - 0.5);
+
+  let best: TopInsert | null = null;
+  let bestCost = Infinity;
+
+  for (const si of order) {
+    const x = Math.min(slots[si], 1 - wFrac - 0.03);
+    if (x < 0.02) continue;
+    const rects: PlacedNote[] = [{ x, y: y0, w: wFrac, h }];
+    const moves: TopInsertMove[] = [];
+    let cost = 0;
+    const sorted = [...placed].sort((a, b) => a.y - b.y || a.x - b.x);
+    for (const p of sorted) {
+      let y = p.y;
+      for (let guard = 0; guard < 50; guard++) {
+        const hits = clashesWith(p.x, y, p.w, p.h, rects);
+        if (hits.length === 0) break;
+        y = Math.max(...hits.map((q) => q.y + q.h - OVERLAP));
+      }
+      rects.push({ x: p.x, y, w: p.w, h: p.h });
+      if (y !== p.y) {
+        moves.push({ id: p.id, y });
+        cost += y - p.y;
+      }
+      if (cost >= bestCost) break;
+    }
+    if (cost < bestCost) {
+      bestCost = cost;
+      best = { x, y: y0, moves };
+    }
+  }
+  if (best) return best;
+  const maxY = placed.reduce((m, p) => Math.max(m, p.y + p.h), 0);
+  return { x: 0.05, y: maxY + 20, moves: [] };
+}
+
 /** Rough visual height estimate, tuned to the real rendered papers. */
 export function estimateNoteHeight(note: NoteWithAuthor, widthPx = 175): number {
   const variant = pinVariantForNote(note);
