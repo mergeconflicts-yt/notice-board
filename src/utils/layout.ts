@@ -10,6 +10,9 @@ export const REF_W = 390;
 /** Breathing room at the very top of the board (ref points). */
 const TOP_Y = 12;
 
+/** Gap left below a freshly dropped note before older notes resume. */
+const PUSH_GAP = 8;
+
 /** Stable width seed shared by creation-time packing and render. */
 function widthSeed(input: { text: string; kind: string; authorId: string }): string {
   return `${input.text}|${input.kind}|${input.authorId}`;
@@ -104,9 +107,47 @@ export function settleBelow(rect: PlacedNote, others: PlacedNote[]): number {
 export type TopInsertMove = { id: string; y: number };
 export type TopInsert = { x: number; y: number; zone: number; moves: TopInsertMove[] };
 
+function horizontalOverlap(a: PlacedNote, b: PlacedNote): number {
+  return Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x));
+}
+
+/**
+ * Make room for a note dropped at the top. Any existing note the new paper
+ * would cover is shoved down by the new note's full height (not just enough
+ * to clear the overlap), so the new note lands on clean space. Notes in
+ * other zones stay put; the pushed ones then cascade to avoid new clashes.
+ */
+function placeAtTop(
+  placed: (PlacedNote & { id: string })[],
+  x: number,
+  w: number,
+  h: number,
+): { moves: TopInsertMove[]; cost: number } {
+  const newRect: PlacedNote = { x, y: TOP_Y, w, h };
+  const bottom = TOP_Y + h;
+  const sorted = [...placed].sort((a, b) => a.y - b.y || a.x - b.x);
+  const rects: PlacedNote[] = [newRect];
+  const moves: TopInsertMove[] = [];
+  let cost = 0;
+
+  for (const p of sorted) {
+    let y = p.y;
+    if (horizontalOverlap(newRect, p) > 0 && p.y < bottom) {
+      y = p.y + h + PUSH_GAP;
+    }
+    y = settleBelow({ x: p.x, y, w: p.w, h: p.h }, rects);
+    rects.push({ x: p.x, y, w: p.w, h: p.h });
+    if (y !== p.y) {
+      moves.push({ id: p.id, y });
+      cost += y - p.y;
+    }
+  }
+  return { moves, cost };
+}
+
 /**
  * Drop a note at the very top without wasting space: try each landing zone
- * and settle only the notes that actually collide downwards (keeping their
+ * and push only the notes that actually collide downwards (keeping their
  * x), then keep the zone with the least total movement — ties break toward
  * the leftmost zone. No randomness, so every device computes the same spot.
  */
@@ -131,19 +172,7 @@ export function insertAtTop(
   for (let zone = 0; zone < LANDING_ZONES.length; zone++) {
     const x = Math.min(LANDING_ZONES[zone].x, Math.max(0, 1 - wFrac - 0.03));
     if (x < 0.02) continue;
-    const rects: PlacedNote[] = [{ x, y: TOP_Y, w: wFrac, h }];
-    const moves: TopInsertMove[] = [];
-    let cost = 0;
-    const sorted = [...placed].sort((a, b) => a.y - b.y || a.x - b.x);
-    for (const p of sorted) {
-      const y = settleBelow({ x: p.x, y: p.y, w: p.w, h: p.h }, rects);
-      rects.push({ x: p.x, y, w: p.w, h: p.h });
-      if (y !== p.y) {
-        moves.push({ id: p.id, y });
-        cost += y - p.y;
-      }
-      if (cost > bestCost) break;
-    }
+    const { moves, cost } = placeAtTop(placed, x, wFrac, h);
     // Nudge the score by zone so equal-cost zones prefer left → right.
     const score = cost + zone * 1e-4;
     if (score < bestCost) {
