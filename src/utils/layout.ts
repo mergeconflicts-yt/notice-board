@@ -7,8 +7,8 @@ import { seeded } from './id';
  *  so placement scales across phone sizes. */
 export const REF_W = 390;
 
-/** Small intentional overlap so pins feel casually assembled (ref points). */
-const OVERLAP = 10;
+/** Breathing room at the very top of the board (ref points). */
+const TOP_Y = 12;
 
 /** Stable width seed shared by creation-time packing and render. */
 function widthSeed(input: { text: string; kind: string; authorId: string }): string {
@@ -20,7 +20,20 @@ type DimsInput = {
   imageUrl: string | null;
   kind: string;
   authorId: string;
+  expiresAt?: string | null;
+  data?: Record<string, unknown> | null;
 };
+
+/**
+ * Approximate landing columns. A note drops into the first zone with room at
+ * the top; large notes span the width and push smaller ones downward. The
+ * rotations are intentionally slight so the board never reads as a grid.
+ */
+export const LANDING_ZONES = [
+  { x: 0.04, rotation: -1.8 },
+  { x: 0.38, rotation: 1.2 },
+  { x: 0.62, rotation: -0.8 },
+] as const;
 
 /** Normalized (0-1) width fraction per paper format, with stable jitter. */
 export function widthFracForNote(input: DimsInput): number {
@@ -55,76 +68,47 @@ export function noteRefHeight(note: NoteWithAuthor, frac: number): number {
 
 export type PlacedNote = { x: number; y: number; w: number; h: number };
 
-function dimsFor(note: NoteWithAuthor): { w: number; h: number } {
-  const w = widthFracForNote(note);
-  return { w, h: noteRefHeight(note, w) };
-}
+export type BoardPlacement = PlacedNote & { rotation: number };
 
-/** Find a free, slightly irregular — and slightly overlapping — spot. */
-export function findSpot(placed: PlacedNote[], input: DimsInput): { x: number; y: number } {
-  const r = seeded(`${widthSeed(input)}:spot`);
-  const wFrac = widthFracForNote(input);
-  const probe = {
-    text: input.text,
-    imageUrl: input.imageUrl,
-    kind: input.kind,
-    authorId: input.authorId,
-  } as NoteWithAuthor;
-  const h = noteRefHeight(probe, wFrac);
-  const maxY = placed.reduce((m, p) => Math.max(m, p.y + p.h), 0);
-  const slots = Array.from({ length: 9 }, (_, i) => 0.03 + i * 0.1);
-  const start = Math.floor(r() * slots.length);
-  for (let y = 12; y < maxY + 500; y += 16) {
-    for (let k = 0; k < slots.length; k++) {
-      const rawX = slots[(start + k) % slots.length];
-      const x = Math.min(rawX, 1 - wFrac - 0.03);
-      if (x < 0.02) continue;
-      const clash = placed.some(
-        (p) =>
-          x < p.x + p.w - OVERLAP / REF_W &&
-          x + wFrac - OVERLAP / REF_W > p.x &&
-          y < p.y + p.h - OVERLAP &&
-          y + h - OVERLAP > p.y,
-      );
-      if (!clash) return { x, y };
+/** Deterministic, per-device placement for every note on a board. */
+export type BoardLayout = Map<string, BoardPlacement>;
+
+/** Max share of a note (by the smaller of the two areas) that another note may cover. */
+export const MAX_OVERLAP_FRAC = 0.2;
+
+/**
+ * Push a rect straight down the minimum needed so it overlaps no other rect
+ * by more than MAX_OVERLAP_FRAC. Small overlaps stay as-is.
+ */
+export function settleBelow(rect: PlacedNote, others: PlacedNote[]): number {
+  let y = rect.y;
+  for (let guard = 0; guard < 50; guard++) {
+    let target = y;
+    for (const q of others) {
+      const ix = Math.max(0, Math.min(rect.x + rect.w, q.x + q.w) - Math.max(rect.x, q.x));
+      if (ix <= 0) continue;
+      const minArea = Math.min(rect.w * rect.h, q.w * q.h);
+      if (minArea <= 0) continue;
+      // Tolerable intersection height for this x-overlap.
+      const cap = (MAX_OVERLAP_FRAC * minArea) / ix;
+      if (rect.h <= cap) continue;
+      const bottom = Math.min(y + rect.h, q.y + q.h);
+      if (bottom - y > cap) target = Math.max(target, q.y + q.h - cap);
     }
+    if (target === y) return y;
+    y = target;
   }
-  return { x: 0.05 + r() * Math.max(0.05, 0.9 - wFrac), y: maxY + 20 };
-}
-
-/** Packing dims for notes that already have persisted positions. */
-export function placedDims(notes: NoteWithAuthor[]): (PlacedNote & { id: string })[] {
-  return notes.map((n) => {
-    const { w, h } = dimsFor(n);
-    return { id: n.id, x: n.positionX, y: n.positionY, w, h };
-  });
+  return y;
 }
 
 export type TopInsertMove = { id: string; y: number };
-export type TopInsert = { x: number; y: number; moves: TopInsertMove[] };
-
-function clashesWith(
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  rects: PlacedNote[],
-): PlacedNote[] {
-  const ovX = OVERLAP / REF_W;
-  return rects.filter(
-    (p) =>
-      x < p.x + p.w - ovX &&
-      x + w - ovX > p.x &&
-      y < p.y + p.h - OVERLAP &&
-      y + h - OVERLAP > p.y,
-  );
-}
+export type TopInsert = { x: number; y: number; zone: number; moves: TopInsertMove[] };
 
 /**
- * Pin a new note at the very top without wasting space: try each horizontal
- * slot and settle only the notes that actually collide downwards (keeping
- * their x), then keep the slot with the least total movement. Notes beside
- * the new note stay put, so the top row stays densely packed.
+ * Drop a note at the very top without wasting space: try each landing zone
+ * and settle only the notes that actually collide downwards (keeping their
+ * x), then keep the zone with the least total movement — ties break toward
+ * the leftmost zone. No randomness, so every device computes the same spot.
  */
 export function insertAtTop(
   placed: (PlacedNote & { id: string })[],
@@ -136,44 +120,100 @@ export function insertAtTop(
     imageUrl: input.imageUrl,
     kind: input.kind,
     authorId: input.authorId,
+    expiresAt: input.expiresAt ?? null,
+    data: input.data ?? null,
   } as NoteWithAuthor;
   const h = noteRefHeight(probe, wFrac);
-  const y0 = 12;
-  const slots = Array.from({ length: 9 }, (_, i) => 0.03 + i * 0.1);
-  const order = slots.map((_, i) => i).sort(() => Math.random() - 0.5);
 
   let best: TopInsert | null = null;
   let bestCost = Infinity;
 
-  for (const si of order) {
-    const x = Math.min(slots[si], 1 - wFrac - 0.03);
+  for (let zone = 0; zone < LANDING_ZONES.length; zone++) {
+    const x = Math.min(LANDING_ZONES[zone].x, Math.max(0, 1 - wFrac - 0.03));
     if (x < 0.02) continue;
-    const rects: PlacedNote[] = [{ x, y: y0, w: wFrac, h }];
+    const rects: PlacedNote[] = [{ x, y: TOP_Y, w: wFrac, h }];
     const moves: TopInsertMove[] = [];
     let cost = 0;
     const sorted = [...placed].sort((a, b) => a.y - b.y || a.x - b.x);
     for (const p of sorted) {
-      let y = p.y;
-      for (let guard = 0; guard < 50; guard++) {
-        const hits = clashesWith(p.x, y, p.w, p.h, rects);
-        if (hits.length === 0) break;
-        y = Math.max(...hits.map((q) => q.y + q.h - OVERLAP));
-      }
+      const y = settleBelow({ x: p.x, y: p.y, w: p.w, h: p.h }, rects);
       rects.push({ x: p.x, y, w: p.w, h: p.h });
       if (y !== p.y) {
         moves.push({ id: p.id, y });
         cost += y - p.y;
       }
-      if (cost >= bestCost) break;
+      if (cost > bestCost) break;
     }
-    if (cost < bestCost) {
-      bestCost = cost;
-      best = { x, y: y0, moves };
+    // Nudge the score by zone so equal-cost zones prefer left → right.
+    const score = cost + zone * 1e-4;
+    if (score < bestCost) {
+      bestCost = score;
+      best = { x, y: TOP_Y, zone, moves };
     }
   }
   if (best) return best;
   const maxY = placed.reduce((m, p) => Math.max(m, p.y + p.h), 0);
-  return { x: 0.05, y: maxY + 20, moves: [] };
+  return { x: 0.05, y: maxY + 20, zone: 0, moves: [] };
+}
+
+/** Slight, stable rotation biased by the note's landing zone. */
+function rotationForZone(zone: number, noteId: string): number {
+  const base = LANDING_ZONES[zone]?.rotation ?? 0;
+  const jitter = (seeded(`${noteId}:rot`)() - 0.5) * 1.4;
+  return Math.round((base + jitter) * 10) / 10;
+}
+
+/**
+ * Derive the whole board deterministically from note metadata alone.
+ *
+ * Notes are replayed oldest → newest, each one dropped at the top and
+ * settling older notes downward. Because the fold only depends on
+ * id/createdAt/format/width/rotation — never on device-local randomness —
+ * every phone renders the exact same board. Editing a note keeps its
+ * createdAt, so it never jumps back to the top.
+ */
+export function computeBoardLayout(notes: NoteWithAuthor[]): BoardLayout {
+  const ordered = [...notes].sort(
+    (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+  );
+  const placed: (PlacedNote & { id: string })[] = [];
+  const byId = new Map<string, PlacedNote & { id: string }>();
+  const rotations = new Map<string, number>();
+
+  for (const note of ordered) {
+    const w = widthFracForNote(note);
+    const h = noteRefHeight(note, w);
+    const insert = insertAtTop(placed, {
+      text: note.text,
+      imageUrl: note.imageUrl,
+      kind: note.kind,
+      authorId: note.authorId,
+      expiresAt: note.expiresAt,
+      data: note.data,
+    });
+    for (const m of insert.moves) {
+      const p = byId.get(m.id);
+      if (p) p.y = m.y;
+    }
+    const rect = { id: note.id, x: insert.x, y: insert.y, w, h };
+    placed.push(rect);
+    byId.set(note.id, rect);
+    rotations.set(note.id, rotationForZone(insert.zone, note.id));
+  }
+
+  // Read positions only after the full fold, so notes pushed down by later
+  // arrivals report their settled y rather than their original slot.
+  const layout: BoardLayout = new Map();
+  for (const p of placed) {
+    layout.set(p.id, {
+      x: p.x,
+      y: p.y,
+      w: p.w,
+      h: p.h,
+      rotation: rotations.get(p.id) ?? 0,
+    });
+  }
+  return layout;
 }
 
 /** Rough visual height estimate, tuned to the real rendered papers. */
@@ -214,27 +254,4 @@ export function estimateNoteHeight(note: NoteWithAuthor, widthPx = 175): number 
       return 32 + linesFor(note.text.length, fs, fs * 1.25, 6) + attrH + (note.expiresAt ? 24 : 0);
     }
   }
-}
-
-/**
- * Distribute notes into two balanced columns (greedy by estimated height).
- * Notes are expected to already be in display order.
- */
-export function splitIntoColumns(notes: NoteWithAuthor[]): [NoteWithAuthor[], NoteWithAuthor[]] {
-  const left: NoteWithAuthor[] = [];
-  const right: NoteWithAuthor[] = [];
-  let leftH = 0;
-  let rightH = 0;
-
-  for (const note of notes) {
-    const h = estimateNoteHeight(note);
-    if (leftH <= rightH) {
-      left.push(note);
-      leftH += h;
-    } else {
-      right.push(note);
-      rightH += h;
-    }
-  }
-  return [left, right];
 }

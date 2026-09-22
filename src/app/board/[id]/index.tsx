@@ -1,68 +1,97 @@
-import { useCallback, useMemo, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, useWindowDimensions } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  StyleSheet,
+  ActivityIndicator,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, fonts } from '../../../theme';
-import { DraggableNote } from '../../../components/DraggableNote';
+import { BoardNote } from '../../../components/BoardNote';
 import { Avatar } from '../../../components/Avatar';
 import { AddNoteSheet, NoteSheetInput } from '../../../components/AddNoteSheet';
 import { useBoard, useNotes, useMembers } from '../../../hooks/useBoard';
 import { useSession } from '../../../store/session';
-import { REF_W, insertAtTop, noteRefHeight, placedDims, widthFracForNote } from '../../../utils/layout';
+import { REF_W, computeBoardLayout } from '../../../utils/layout';
 import { getBackend } from '../../../services';
 import { NoteWithAuthor } from '../../../types';
+
+/** Scroll distance below which the viewer counts as "already at the top". */
+const NEAR_TOP_Y = 140;
 
 export default function BoardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const boardId = id as string;
   const insets = useSafeAreaInsets();
   const { board, loading: boardLoading, missing } = useBoard(boardId);
-  const { notes, loading: notesLoading, addNote, updateNote, deleteNote } = useNotes(boardId);
+  const { notes, loading: notesLoading, addNote } = useNotes(boardId);
   const { members } = useMembers(boardId);
   const user = useSession((s) => s.user);
-  const { height: windowH } = useWindowDimensions();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [boardW, setBoardW] = useState(0);
-  const [scrollEnabled, setScrollEnabled] = useState(true);
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [overBin, setOverBin] = useState(false);
+  const [entering, setEntering] = useState<Set<string>>(() => new Set());
+  const [chipVisible, setChipVisible] = useState(false);
 
-  // Finger Y (screen coords) above which a drop counts as "into the bin".
-  const binThresholdY = windowH - 150;
+  const scrollRef = useRef<ScrollView>(null);
+  const nearTopRef = useRef(true);
+  const seenIdsRef = useRef<Set<string>>(new Set());
+  const firstLoadRef = useRef(true);
+  const chipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const openNote = (note: NoteWithAuthor) => {
     router.push(`/board/${boardId}/note/${note.id}`);
   };
 
-  const handleDrop = useCallback(
-    async (id: string, x: number, y: number, page: { x: number; y: number }) => {
-      setDraggingId(null);
-      setOverBin(false);
-      try {
-        const target = (notes ?? []).find((n) => n.id === id);
-        if (page.y >= binThresholdY && target && target.authorId === user?.id) {
-          await deleteNote(id);
-          return;
-        }
-        await updateNote(id, { positionX: x, positionY: y });
-      } catch (e) {
-        console.error('move note failed', e);
-      }
-    },
-    [updateNote, deleteNote, notes, user, binThresholdY],
+  // Every device derives the identical board from note metadata alone.
+  const layout = useMemo(() => computeBoardLayout(notes ?? []), [notes]);
+  const ordered = useMemo(
+    () => [...(notes ?? [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    [notes],
   );
 
-  const handleDragMove = useCallback(
-    (pageY: number) => {
-      setOverBin((prev) => {
-        const next = pageY >= binThresholdY;
-        return prev === next ? prev : next;
-      });
+  // React to realtime arrivals: animate fresh papers, and only hijack the
+  // viewport when the viewer is already near the top.
+  useEffect(() => {
+    if (!notes) return;
+    const ids = new Set(notes.map((n) => n.id));
+    if (firstLoadRef.current) {
+      firstLoadRef.current = false;
+      seenIdsRef.current = ids;
+      return;
+    }
+    const added = notes.filter((n) => !seenIdsRef.current.has(n.id));
+    seenIdsRef.current = ids;
+    if (added.length === 0) return;
+
+    setEntering(new Set(added.map((n) => n.id)));
+
+    const fromOthers = added.some((n) => n.authorId !== user?.id);
+    if (!fromOthers) return;
+    if (nearTopRef.current) {
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+    } else {
+      setChipVisible(true);
+      if (chipTimerRef.current) clearTimeout(chipTimerRef.current);
+      chipTimerRef.current = setTimeout(() => setChipVisible(false), 4000);
+    }
+  }, [notes, user]);
+
+  useEffect(
+    () => () => {
+      if (chipTimerRef.current) clearTimeout(chipTimerRef.current);
     },
-    [binThresholdY],
+    [],
   );
+
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    nearTopRef.current = e.nativeEvent.contentOffset.y < NEAR_TOP_Y;
+  };
 
   const handleAdd = async (input: NoteSheetInput) => {
     setSubmitting(true);
@@ -71,20 +100,9 @@ export default function BoardScreen() {
       if (imageUrl && !imageUrl.startsWith('http')) {
         imageUrl = await getBackend().uploadImage(imageUrl);
       }
-      const authorId = user?.id ?? '';
-      // Pin the new note at the very top; only notes it actually overlaps
-      // get nudged down, so the top row stays densely packed.
-      const spot = insertAtTop(placedDims(notes ?? []), {
-        text: input.text,
-        imageUrl,
-        kind: input.kind,
-        authorId,
-      });
-      await addNote({ ...input, imageUrl, positionX: spot.x, positionY: spot.y });
-      await Promise.all(
-        spot.moves.map((m) => updateNote(m.id, { positionY: m.y })),
-      );
+      await addNote({ ...input, imageUrl });
       setSheetOpen(false);
+      requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: true }));
     } catch (e) {
       console.error('add note failed', e);
     } finally {
@@ -93,18 +111,13 @@ export default function BoardScreen() {
   };
 
   const scale = boardW > 0 ? boardW / REF_W : 1;
-  const ordered = useMemo(
-    () => [...(notes ?? [])].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
-    [notes],
-  );
   const canvasH = useMemo(() => {
     let bottom = 0;
-    for (const n of ordered) {
-      const f = widthFracForNote(n);
-      bottom = Math.max(bottom, n.positionY + noteRefHeight(n, f));
-    }
+    layout.forEach((p) => {
+      bottom = Math.max(bottom, p.y + p.h);
+    });
     return Math.max(1100 * scale, bottom * scale + 90);
-  }, [ordered, scale]);
+  }, [layout, scale]);
 
   if (boardLoading) {
     return (
@@ -132,8 +145,6 @@ export default function BoardScreen() {
 
   const isLoading = notesLoading;
   const isEmpty = notes && notes.length === 0;
-  const draggingNote = (notes ?? []).find((n) => n.id === draggingId) ?? null;
-  const showBin = !!draggingNote && !!user && draggingNote.authorId === user.id;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -187,9 +198,11 @@ export default function BoardScreen() {
         </View>
       ) : (
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.boardContent}
           showsVerticalScrollIndicator={false}
-          scrollEnabled={scrollEnabled}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
         >
           <View
             style={[styles.canvas, { minHeight: 1100 * scale, height: canvasH }]}
@@ -197,25 +210,18 @@ export default function BoardScreen() {
           >
             {boardW > 0
               ? ordered.map((n) => {
-                  const frac = widthFracForNote(n);
+                  const p = layout.get(n.id);
+                  if (!p) return null;
                   return (
-                    <DraggableNote
+                    <BoardNote
                       key={n.id}
                       note={n}
-                      left={n.positionX * boardW}
-                      top={n.positionY * scale}
-                      width={frac * boardW}
-                      frac={frac}
-                      boardW={boardW}
-                      scale={scale}
+                      left={p.x * boardW}
+                      top={p.y * scale}
+                      width={p.w * boardW}
+                      rotation={p.rotation}
+                      animateIn={entering.has(n.id)}
                       onPress={openNote}
-                      onDrop={handleDrop}
-                      onDragStateChange={(dragging) => {
-                        setScrollEnabled(!dragging);
-                        setDraggingId(dragging ? n.id : null);
-                        if (!dragging) setOverBin(false);
-                      }}
-                      onDragMove={(_x, pageY) => handleDragMove(pageY)}
                     />
                   );
                 })
@@ -224,7 +230,19 @@ export default function BoardScreen() {
         </ScrollView>
       )}
 
-      {!isEmpty && !draggingId && (
+      {chipVisible && (
+        <Pressable
+          onPress={() => {
+            setChipVisible(false);
+            scrollRef.current?.scrollTo({ y: 0, animated: true });
+          }}
+          style={[styles.chip, { top: insets.top + 60 }]}
+        >
+          <Text style={styles.chipText}>New note added ↑</Text>
+        </Pressable>
+      )}
+
+      {!isEmpty && (
         <Pressable
           onPress={() => setSheetOpen(true)}
           style={({ pressed }) => [
@@ -235,26 +253,6 @@ export default function BoardScreen() {
         >
           <Text style={styles.fabGlyph}>+</Text>
         </Pressable>
-      )}
-
-      {showBin && (
-        <View
-          pointerEvents="none"
-          style={[
-            styles.bin,
-            { bottom: insets.bottom + 20 },
-            overBin && styles.binHot,
-          ]}
-        >
-          <MaterialCommunityIcons
-            name={overBin ? 'trash-can' : 'trash-can-outline'}
-            size={28}
-            color={overBin ? '#fff' : colors.danger}
-          />
-          <Text style={[styles.binText, overBin && styles.binTextHot]}>
-            {overBin ? 'Release to delete' : 'Drag here to delete'}
-          </Text>
-        </View>
       )}
 
       <AddNoteSheet
@@ -391,38 +389,23 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginTop: -2,
   },
-  bin: {
+  chip: {
     position: 'absolute',
     alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 22,
-    paddingVertical: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
     borderRadius: 999,
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderColor: colors.danger,
-    borderStyle: 'dashed',
+    backgroundColor: colors.ink,
     shadowColor: colors.shadow,
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 5,
   },
-  binHot: {
-    backgroundColor: colors.danger,
-    borderStyle: 'solid',
-    borderColor: colors.danger,
-    transform: [{ scale: 1.08 }],
-  },
-  binText: {
+  chipText: {
     fontFamily: fonts.ui.bold,
-    fontSize: 15,
-    color: colors.danger,
-  },
-  binTextHot: {
-    color: '#fff',
+    fontSize: 13,
+    color: colors.background,
   },
   missingTitle: {
     fontFamily: fonts.hand.bold,
