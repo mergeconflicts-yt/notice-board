@@ -34,8 +34,8 @@ type DimsInput = {
  */
 export const LANDING_ZONES = [
   { x: 0.04, rotation: -1.8 },
-  { x: 0.38, rotation: 1.2 },
-  { x: 0.62, rotation: -0.8 },
+  { x: 0.36, rotation: 1.2 },
+  { x: 0.68, rotation: -0.8 },
 ] as const;
 
 /** Normalized (0-1) width fraction per paper format, with stable jitter. */
