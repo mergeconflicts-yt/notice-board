@@ -26,6 +26,7 @@ import {
   setPinned as apiSetPinned,
 } from '../lib/api';
 import { useToast } from '../store/toast';
+import { useSession } from '../store/session';
 import { Board, BoardMember, ItemWithAuthor, ListEntry } from '../types';
 
 export function randomId(): string {
@@ -115,6 +116,7 @@ export function useBoard(boardId: string) {
   const [entries, setEntries] = useState<ListEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const status = useSession((s) => s.status);
   const lastSeenRef = useRef<string | null>(null);
   const membersRef = useRef<BoardMember[]>([]);
   const itemsRef = useRef<ItemWithAuthor[]>([]);
@@ -160,6 +162,9 @@ export function useBoard(boardId: string) {
   // the setState calls only inside the async continuation, not synchronously
   // in the effect body.
   useEffect(() => {
+    // Don't query before there is a session — the gate only hides the screen,
+    // the route still mounts, and a pre-session read just errors under RLS.
+    if (status !== 'ready') return;
     let alive = true;
     void (async () => {
       try {
@@ -184,7 +189,7 @@ export function useBoard(boardId: string) {
     return () => {
       alive = false;
     };
-  }, [boardId]);
+  }, [boardId, status]);
 
   const reload = useCallback(() => {
     setLoading(true);
@@ -195,6 +200,7 @@ export function useBoard(boardId: string) {
   // (covers a missed realtime event or a change made on another device).
   useFocusEffect(
     useCallback(() => {
+      if (status !== 'ready') return;
       let alive = true;
       void getBoard(boardId).then((next) => {
         if (alive) setBoard(next);
@@ -202,13 +208,16 @@ export function useBoard(boardId: string) {
       return () => {
         alive = false;
       };
-    }, [boardId]),
+    }, [boardId, status]),
   );
 
   // Realtime: one channel per open board. Rows are applied in place; a
   // reconnect (SUBSCRIBED after a drop) triggers a delta read instead of a
   // full refetch.
   useEffect(() => {
+    // Subscribe only once signed in — otherwise realtime auth fails and the
+    // channel never recovers.
+    if (status !== 'ready') return;
     // A unique topic per subscription: `channel(topic)` returns an existing
     // (already-subscribed) channel, and adding callbacks after subscribe()
     // throws. Remounts / fast-refresh must not collide.
@@ -298,7 +307,7 @@ export function useBoard(boardId: string) {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [boardId, withAuthor]);
+  }, [boardId, status, withAuthor]);
 
   // Returning to the foreground refetches everything, catching up on posts,
   // members and deletions missed while backgrounded.
