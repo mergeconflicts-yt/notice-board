@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import { colors, fonts } from '../theme';
 import { BoardNote } from './BoardNote';
-import { boardCanvasHeight, computeBoardLayout, REF_W } from '../utils/layout';
+import { boardCanvasHeight, computeBoardLayout, REF_W, settleNoOverlap } from '../utils/layout';
 import { ItemWithAuthor, ListEntry } from '../types';
 
 type Props = {
@@ -37,18 +37,48 @@ export function BoardSection({
   emptyHint,
 }: Props) {
   const [boardW, setBoardW] = useState(0);
-  const layout = useMemo(() => computeBoardLayout(items), [items]);
+  const [measured, setMeasured] = useState<Record<string, number>>({});
+  const lastWRef = useRef(0);
+  const layout = useMemo(() => computeBoardLayout(items, measured), [items, measured]);
   const scale = boardW > 0 ? boardW / REF_W : 1;
   const canvasH = useMemo(() => boardCanvasHeight(layout, scale), [layout, scale]);
+
+  // Measurements only hold for the width they were taken at.
+  useEffect(() => {
+    if (boardW <= 0 || boardW === lastWRef.current) return;
+    lastWRef.current = boardW;
+    setMeasured({});
+  }, [boardW]);
+
+  // Feed each post's real rendered height back to the layout (in ref points),
+  // so a taller-than-guessed post pushes its neighbours down instead of
+  // overlapping them.
+  const handleMeasure = (id: string, heightPx: number) => {
+    if (boardW <= 0 || heightPx <= 0) return;
+    const refH = (heightPx * REF_W) / boardW;
+    setMeasured((prev) =>
+      Math.abs((prev[id] ?? -1) - refH) < 1 ? prev : { ...prev, [id]: refH },
+    );
+  };
 
   const handleMove = (item: ItemWithAuthor, left: number, top: number) => {
     if (boardW <= 0) return;
     const placement = layout.get(item.id);
     if (!placement) return;
     const refScale = boardW / REF_W;
-    const x = Math.max(0.02, Math.min(1 - placement.w - 0.02, left / boardW));
-    const y = Math.max(0, top / refScale);
-    onMove(item, x, y);
+    const others: { x: number; y: number; w: number; h: number }[] = [];
+    layout.forEach((q, id) => {
+      if (id !== item.id) others.push(q);
+    });
+    // Never let a drop land on top of another post.
+    const settled = settleNoOverlap(
+      left / boardW,
+      top / refScale,
+      placement.w,
+      placement.h,
+      others,
+    );
+    onMove(item, settled.x, settled.y);
   };
 
   return (
@@ -79,6 +109,7 @@ export function BoardSection({
                   onDragStart={onDragStart}
                   onDragUpdate={onDragUpdate}
                   onMove={handleMove}
+                  onMeasure={handleMeasure}
                 />
               );
             })

@@ -6,6 +6,10 @@ const BUILD = process.env.TEST_BUILD;
 if (!BUILD) throw new Error('TEST_BUILD env var is required (see scripts/run-unit-tests.cjs)');
 const { computeBoardLayout, estimateItemHeight, boardCanvasHeight } = require(`${BUILD}/utils/layout.js`);
 
+function rectsOverlap(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
 let seq = 0;
 function mk(type, extra = {}) {
   seq += 1;
@@ -64,11 +68,43 @@ describe('computeBoardLayout', () => {
     }
   });
 
-  it('honours a saved manual position', () => {
-    const placed = mk('note', { body: 'x', layout: { x: 0.6, y: 400, manual: true } });
+  it('honours a saved manual position when there is room', () => {
+    const placed = mk('note', { body: 'x', layout: { x: 0.5, y: 400, manual: true } });
     const out = computeBoardLayout([placed]);
-    assert.equal(out.get(placed.id).x, 0.6);
+    assert.equal(out.get(placed.id).x, 0.5);
     assert.equal(out.get(placed.id).y, 400);
+  });
+
+  it('settles a manual drop so it does not overlap another post', () => {
+    const a = mk('note', { body: 'first post' });
+    const b = mk('note', { body: 'second post', layout: { x: 0.04, y: 0, manual: true } });
+    const out = computeBoardLayout([a, b]);
+    assert.ok(!rectsOverlap(out.get(a.id), out.get(b.id)), 'manual drop pushed clear');
+  });
+
+  it('uses measured heights so a tall post pushes the next one down', () => {
+    const a = mk('note', { body: 'a', layout: { x: 0.04, y: 0, manual: true } });
+    const b = mk('note', { body: 'b', layout: { x: 0.04, y: 0, manual: true } });
+    const out = computeBoardLayout([a, b], { [a.id]: 600 });
+    assert.ok(!rectsOverlap(out.get(a.id), out.get(b.id)), 'tall measured post does not overlap');
+    assert.ok(out.get(b.id).y >= 600, 'next post starts below the measured tower');
+  });
+
+  it('never leaves two posts overlapping', () => {
+    const items = [
+      mk('note', { body: 'one' }),
+      mk('list', { title: 'two' }),
+      mk('note', { body: 'three', layout: { x: 0.5, y: 10, manual: true } }),
+      mk('note', { body: 'four' }),
+      mk('date', { title: 'five', eventAt: '2026-01-01T00:00:00Z' }),
+    ];
+    const out = computeBoardLayout(items);
+    const ps = items.map((i) => out.get(i.id));
+    for (let i = 0; i < ps.length; i++) {
+      for (let j = i + 1; j < ps.length; j++) {
+        assert.ok(!rectsOverlap(ps[i], ps[j]), `posts ${i} and ${j} must not overlap`);
+      }
+    }
   });
 
   it('gives each item a stable tilt within range', () => {

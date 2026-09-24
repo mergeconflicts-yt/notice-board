@@ -11,7 +11,45 @@ const MIN_H = 90;
 export type BoardPlacement = { x: number; y: number; w: number; h: number; rotation: number };
 export type BoardLayout = Map<string, BoardPlacement>;
 
+/** Minimum vertical gap kept between two posts (ref points). */
+const Y_GAP = 10;
+const EDGE = 0.02;
+
+type Rect = { x: number; y: number; w: number; h: number };
+
+function overlaps(a: Rect, b: Rect): boolean {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+/**
+ * Nudge a rect so it touches no other rect: keep it on the board horizontally,
+ * then push it straight down past everything it overlaps. Positions are in the
+ * layout's own space (x a fraction of width, y in ref points).
+ */
+export function settleNoOverlap(x: number, y: number, w: number, h: number, others: Rect[]) {
+  const nx = Math.max(EDGE, Math.min(1 - EDGE - w, x));
+  let ny = Math.max(0, y);
+  for (let guard = 0; guard < 200; guard++) {
+    let nextBottom = ny;
+    let collided = false;
+    for (const q of others) {
+      if (overlaps({ x: nx, y: ny, w, h }, q)) {
+        collided = true;
+        nextBottom = Math.max(nextBottom, q.y + q.h + Y_GAP);
+      }
+    }
+    if (!collided) break;
+    ny = nextBottom;
+  }
+  return { x: nx, y: ny };
+}
+
 type Dims = Pick<ItemWithAuthor, 'id' | 'type' | 'body' | 'title' | 'eventAt'>;
+
+/** Rendered post heights (ref points) keyed by id, reported by onLayout.
+ *  When present these replace the rough estimate, so a taller-than-guessed
+ *  post can never be given too little room and overlap its neighbour. */
+export type MeasuredHeights = Record<string, number>;
 
 /** Rough height estimate (ref points) at the given width fraction. */
 export function estimateItemHeight(item: Dims, wFrac: number): number {
@@ -32,31 +70,37 @@ export function estimateItemHeight(item: Dims, wFrac: number): number {
 }
 
 /**
- * Deterministic two-column board (docs/plan.md §9): positions come from the
- * item order and ids alone — no stored drag positions. Notes are dealt into
- * the shorter column, with a stable tilt per id.
+ * Deterministic two-column board. Auto items are dealt into the shorter
+ * column; a hand-placed item keeps its saved spot. Every post is then settled
+ * against the ones placed before it, so no two posts ever overlap — even if a
+ * dragged drop or a concurrent move would otherwise collide.
  */
-export function computeBoardLayout(items: ItemWithAuthor[]): BoardLayout {
+export function computeBoardLayout(
+  items: ItemWithAuthor[],
+  measured: MeasuredHeights = {},
+): BoardLayout {
   const ordered = [...items].sort(
     (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
   );
   const bottoms = [TOP_Y, TOP_Y];
   const layout: BoardLayout = new Map();
+  const placed: Rect[] = [];
 
   for (const item of ordered) {
     const w = COLUMN_W;
-    const h = Math.max(MIN_H, estimateItemHeight(item, w));
+    const h = Math.max(MIN_H, measured[item.id] ?? estimateItemHeight(item, w));
     const column = bottoms[0] <= bottoms[1] ? 0 : 1;
-    const x = column === 0 ? 0.04 : 0.04 + COLUMN_W + COLUMN_GAP;
-    // A hand-placed item keeps its saved spot; everything else flows.
+    const columnX = column === 0 ? 0.04 : 0.04 + COLUMN_W + COLUMN_GAP;
     const manual = item.layout?.manual ? item.layout : null;
-    layout.set(item.id, {
-      x: manual ? manual.x : x,
-      y: manual ? manual.y : bottoms[column],
+    const settled = settleNoOverlap(
+      manual ? manual.x : columnX,
+      manual ? manual.y : bottoms[column],
       w,
       h,
-      rotation: rotationForItem(item.id),
-    });
+      placed,
+    );
+    layout.set(item.id, { ...settled, w, h, rotation: rotationForItem(item.id) });
+    placed.push({ ...settled, w, h });
     bottoms[column] += h + 12;
   }
   return layout;
