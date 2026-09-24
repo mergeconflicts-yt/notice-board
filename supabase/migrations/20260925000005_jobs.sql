@@ -1,21 +1,20 @@
 -- Phase 6 (docs/plan.md §10): scheduled maintenance.
 --
--- Extensions + jobs:
---   * expire-items         every 15 min  — soft-delete keep_until lapses (pure SQL)
---   * cleanup-rate-limits  hourly        — drop stale rate-limit sequences
---   * purge-nightly        nightly       — Edge Function purge (hard delete + storage)
+--   * expire-items          every 15 min — soft-delete keep_until lapses (SQL)
+--   * cleanup-rate-limits   hourly       — delete expired rate_limits windows
+--   * purge-nightly         nightly      — Edge Function purge
 --   * cleanup-users-nightly nightly      — Edge Function cleanup-users
 --
--- The two Edge-Function jobs need the functions base URL and a service-role
--- key, which are per-environment. They are scheduled only when the settings
--- `app.functions_url` and `app.service_role_key` are present, so local resets
--- (and projects without Edge Functions) still apply cleanly.
+-- The Edge Function jobs read the functions base URL and service-role key
+-- from Vault (`functions_url`, `service_role_key`) at run time — never from a
+-- session setting, which any SQL session could read. Jobs are scheduled
+-- unconditionally; if the secrets are absent (e.g. local dev) the job is a
+-- no-op instead of never being created.
 
 create extension if not exists pg_cron with schema extensions;
 create extension if not exists pg_net with schema extensions;
 
 -- Soft-delete anything whose keep_until has passed. Returns how many lapsed.
--- Pure SQL so the schedule and tests share one implementation.
 create function public.expire_items()
 returns integer
 language sql
@@ -32,33 +31,62 @@ set search_path = '' as $$
   select count(*)::integer from updated;
 $$;
 
--- Drop rate-limit sequences for windows older than two hours. Sequence names
--- end with the window's epoch seconds (`rl_<uid>_<action>_<epoch>`).
+-- Items soft-deleted beyond the retention window — the purge job's work list.
+-- Kept in SQL so it is testable; the Edge Function calls it with the service
+-- role.
+create function public.expired_for_purge(p_limit integer default 1000)
+returns setof public.items
+language sql
+security definer
+set search_path = '' as $$
+  select * from public.items
+  where deleted_at is not null
+    and deleted_at < now() - interval '30 days'
+  order by deleted_at
+  limit p_limit;
+$$;
+
+-- Clear rate-limit windows older than two hours.
 create function public.cleanup_rate_limits()
 returns integer
 language plpgsql
 security definer
 set search_path = '' as $$
 declare
-  r record;
-  v_epoch bigint;
-  v_dropped integer := 0;
+  v_deleted integer;
 begin
-  for r in
-    select relname from pg_class where relkind = 'S' and relname like 'rl\_%'
-  loop
-    begin
-      v_epoch := (regexp_replace(r.relname, '^.*_', ''))::bigint;
-    exception when others then
-      v_epoch := null;
-    end;
-    if v_epoch is not null
-       and to_timestamp(v_epoch) < now() - interval '2 hours' then
-      execute format('drop sequence if exists public.%I', r.relname);
-      v_dropped := v_dropped + 1;
-    end if;
-  end loop;
-  return v_dropped;
+  delete from public.rate_limits
+  where window_start < now() - interval '2 hours';
+  get diagnostics v_deleted = row_count;
+  return v_deleted;
+end;
+$$;
+
+-- POST to an Edge Function with the service-role key from Vault. No-op when
+-- the secrets are not configured. Not callable by client roles.
+create function public.run_edge_job(p_path text)
+returns void
+language plpgsql
+security definer
+set search_path = '' as $$
+declare
+  v_url text;
+  v_key text;
+begin
+  select decrypted_secret into v_url from vault.decrypted_secrets where name = 'functions_url';
+  select decrypted_secret into v_key from vault.decrypted_secrets where name = 'service_role_key';
+  if v_url is null or v_key is null then
+    return;
+  end if;
+  perform net.http_post(
+    url := rtrim(v_url, '/') || p_path,
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || v_key
+    ),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 120000
+  );
 end;
 $$;
 
@@ -80,50 +108,16 @@ begin
   end;
   perform cron.schedule('cleanup-rate-limits', '0 * * * *', 'select public.cleanup_rate_limits()');
 
-  -- Edge-Function jobs, only where configured.
-  if coalesce(current_setting('app.functions_url', true), '') <> ''
-     and coalesce(current_setting('app.service_role_key', true), '') <> '' then
-    begin
-      perform cron.unschedule('purge-nightly');
-    exception when others then null;
-    end;
-    perform cron.schedule(
-      'purge-nightly',
-      '0 3 * * *',
-      format(
-        $job$select net.http_post(
-          url := %L,
-          headers := jsonb_build_object(
-            'Content-Type', 'application/json',
-            'Authorization', 'Bearer ' || current_setting('app.service_role_key')
-          ),
-          body := '{}'::jsonb,
-          timeout_milliseconds := 120000
-        )$job$,
-        current_setting('app.functions_url') || '/purge'
-      )
-    );
+  begin
+    perform cron.unschedule('purge-nightly');
+  exception when others then null;
+  end;
+  perform cron.schedule('purge-nightly', '0 3 * * *', 'select public.run_edge_job(''/purge'')');
 
-    begin
-      perform cron.unschedule('cleanup-users-nightly');
-    exception when others then null;
-    end;
-    perform cron.schedule(
-      'cleanup-users-nightly',
-      '30 3 * * *',
-      format(
-        $job$select net.http_post(
-          url := %L,
-          headers := jsonb_build_object(
-            'Content-Type', 'application/json',
-            'Authorization', 'Bearer ' || current_setting('app.service_role_key')
-          ),
-          body := '{}'::jsonb,
-          timeout_milliseconds := 120000
-        )$job$,
-        current_setting('app.functions_url') || '/cleanup-users'
-      )
-    );
-  end if;
+  begin
+    perform cron.unschedule('cleanup-users-nightly');
+  exception when others then null;
+  end;
+  perform cron.schedule('cleanup-users-nightly', '30 3 * * *', 'select public.run_edge_job(''/cleanup-users'')');
 end
 $$;

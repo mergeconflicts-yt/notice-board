@@ -1,5 +1,7 @@
 import * as Crypto from 'expo-crypto';
 import { File as ExpoFile } from 'expo-file-system';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import { supabase } from './supabase';
 import { preparePhoto } from './photos';
 import {
@@ -179,7 +181,6 @@ function mapEntry(row: any): ListEntry {
 }
 
 const ITEM_SELECT = '*, author:profiles!items_created_by_fkey(*)';
-const LIVE_ITEMS = `deleted_at.is.null,keep_until.is.null,keep_until.gt.${new Date().toISOString()}`;
 
 // ---------------------------------------------------------------------------
 // Reads
@@ -232,11 +233,16 @@ export async function getBoardContent(
   boardId: string,
   since?: string,
 ): Promise<{ items: ItemWithAuthor[]; entries: ListEntry[] }> {
+  // Live = not deleted AND (no expiry OR expiry in the future). The `now`
+  // must be evaluated per call, and the two conditions are AND-ed — an `.or()`
+  // over all three would resurrect a removed-but-unexpired post.
+  const nowIso = new Date().toISOString();
   let itemsQuery = supabase
     .from('items')
     .select(ITEM_SELECT)
     .eq('board_id', boardId)
-    .or(LIVE_ITEMS);
+    .is('deleted_at', null)
+    .or(`keep_until.is.null,keep_until.gt.${nowIso}`);
   let entriesQuery = supabase.from('list_entries').select('*').eq('board_id', boardId);
   if (since) {
     itemsQuery = itemsQuery.gt('updated_at', since);
@@ -280,8 +286,16 @@ export async function updateProfile(
 // Boards
 // ---------------------------------------------------------------------------
 
-export async function createBoard(name: string, color: BoardColor): Promise<Board> {
-  const { data, error } = await supabase.rpc('create_board', { p_name: name, p_color: color });
+export async function createBoard(
+  name: string,
+  color: BoardColor,
+  timezone: string,
+): Promise<Board> {
+  const { data, error } = await supabase.rpc('create_board', {
+    p_name: name,
+    p_color: color,
+    p_timezone: timezone,
+  });
   if (error) raise(error);
   return mapBoard(data);
 }
@@ -352,19 +366,20 @@ export type ItemEdit = {
   color?: ItemColor;
 };
 
-export async function editItem(
-  id: string,
-  expectedVersion: number,
-  patch: ItemEdit,
-): Promise<void> {
+/**
+ * edit_item overwrites every field, so merge the patch with the item first —
+ * otherwise editing just the text would blank the title/place/date and reset
+ * the colour.
+ */
+export async function editItem(current: ItemWithAuthor, patch: ItemEdit): Promise<void> {
   const { error } = await supabase.rpc('edit_item', {
-    p_id: id,
-    p_expected_version: expectedVersion,
-    p_body: patch.body ?? null,
-    p_title: patch.title ?? null,
-    p_event_at: patch.eventAt ?? null,
-    p_place: patch.place ?? null,
-    p_color: patch.color ?? 'butter',
+    p_id: current.id,
+    p_expected_version: current.version,
+    p_body: patch.body !== undefined ? patch.body : current.body,
+    p_title: patch.title !== undefined ? patch.title : current.title,
+    p_event_at: patch.eventAt !== undefined ? patch.eventAt : current.eventAt,
+    p_place: patch.place !== undefined ? patch.place : current.place,
+    p_color: patch.color ?? current.color,
   } as never);
   if (error) raise(error);
 }
@@ -414,6 +429,16 @@ export async function setEntryChecked(id: string, checked: boolean): Promise<voi
   if (error) raise(error);
 }
 
+export async function editEntry(id: string, text: string): Promise<void> {
+  const { error } = await supabase.rpc('edit_entry', { p_id: id, p_text: text });
+  if (error) raise(error);
+}
+
+export async function removeEntry(id: string): Promise<void> {
+  const { error } = await supabase.rpc('remove_entry', { p_id: id });
+  if (error) raise(error);
+}
+
 // ---------------------------------------------------------------------------
 // Invites
 // ---------------------------------------------------------------------------
@@ -424,6 +449,11 @@ export async function getInviteLink(boardId: string): Promise<InviteLink> {
   const row = data?.[0];
   if (!row) raise({ message: 'invite_invalid' });
   return { token: row!.token, code: row!.code, expiresAt: row!.expires_at };
+}
+
+export async function resetInviteLink(boardId: string): Promise<void> {
+  const { error } = await supabase.rpc('reset_invite_link', { p_board_id: boardId });
+  if (error) raise(error);
 }
 
 export async function previewInvite(tokenOrCode: string): Promise<InvitePreview | null> {
@@ -458,15 +488,35 @@ export async function acceptInvite(
 export async function deleteAccount(): Promise<void> {
   const { error } = await supabase.rpc('delete_account');
   if (error) raise(error);
-  // Board state is now tidy; remove the auth user, then drop the local session.
-  const { error: fnError } = await supabase.functions.invoke('delete-account', { method: 'POST' });
-  if (fnError) raise(fnError as { message?: string });
+  // Board state is tidy. Remove the auth user, then always drop the local
+  // session — staying signed in as a deleted user would fail every later call.
+  try {
+    await supabase.functions.invoke('delete-account', { method: 'POST' });
+  } catch {
+    // best effort; the session is cleared regardless
+  }
   await supabase.auth.signOut();
 }
 
 export async function linkProvider(provider: 'apple' | 'google'): Promise<void> {
-  const { error } = await supabase.auth.linkIdentity({ provider });
+  // In React Native linkIdentity returns the provider URL instead of
+  // redirecting; open it in an auth session so the sign-in page appears and
+  // the resulting session is captured.
+  const redirectTo = Linking.createURL('auth');
+  const { data, error } = await supabase.auth.linkIdentity({
+    provider,
+    options: { redirectTo, skipBrowserRedirect: true },
+  });
   if (error) raise(error);
+  if (!data?.url) return;
+  const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+  if (result.type === 'success' && result.url) {
+    const code = new URL(result.url).searchParams.get('code');
+    if (code) {
+      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+      if (exchangeError) raise(exchangeError);
+    }
+  }
 }
 
 export async function linkEmail(email: string): Promise<void> {

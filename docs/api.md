@@ -50,7 +50,7 @@ the brute-force cap). See `docs/backend-plan-questions.md` #6.
 ### Boards
 | Function | Access | Notes |
 |---|---|---|
-| `create_board(p_name, p_color)` | any user | owner membership; rate limit 10/h |
+| `create_board(p_name, p_color, p_timezone)` | any user | owner membership; `p_timezone` (IANA) drives date expiry; rate limit 10/h |
 | `rename_board(p_board_id, p_name, p_color)` | owner | |
 | `delete_board(p_board_id)` | owner | soft delete + revoke invite |
 | `leave_board(p_board_id)` | member | promotes longest member or soft-deletes empty board |
@@ -72,6 +72,7 @@ the brute-force cap). See `docs/backend-plan-questions.md` #6.
 | `set_pinned(p_id, p_pinned)` | member | pinned = `keep_until NULL` |
 | `set_done(p_id, p_done)` | member | notes/dates only |
 | `keep_longer(p_id)` | member | +7 days; not pinned/lists |
+| `set_item_position(p_id, p_x, p_y)` | member | hand-place a note (`items.layout`); NULL clears to auto; does **not** bump `version` |
 | `remove_item(p_id)` / `restore_item(p_id)` | member | soft delete; restore within 30 days |
 | `list_removed_items(p_board_id)` | member | last 30 days |
 
@@ -82,6 +83,9 @@ the brute-force cap). See `docs/backend-plan-questions.md` #6.
 | `set_entry_checked(p_id, p_checked)` | member | first tick wins; runs list lifetime |
 | `edit_entry(p_id, p_text)` | member | |
 | `remove_entry(p_id)` | member | hard delete; runs list lifetime |
+
+Ticking/removing an entry locks the parent list first, so two people ticking
+the last two entries can't both recompute `keep_until` from stale state.
 
 ## Realtime
 

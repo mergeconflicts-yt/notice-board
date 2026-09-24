@@ -21,18 +21,7 @@ async function hasStoredSession(): Promise<boolean> {
   return keys.some((k) => k.endsWith('-auth-token'));
 }
 
-/**
- * A fetch/refresh failure (as opposed to an invalid or missing session). Only
- * these should keep us from signing in — a stale session must be replaced.
- */
-function isNetworkError(error: unknown): boolean {
-  if (!error) return false;
-  const e = error as { name?: string; message?: string };
-  return (
-    e.name === 'AuthRetryableFetchError' ||
-    /fetch|network|timeout|internet/i.test(e.message ?? '')
-  );
-}
+
 
 async function loadProfile(id: string): Promise<User | null> {
   const { data, error } = await supabase
@@ -65,19 +54,17 @@ export const useSession = create<SessionState>((set) => ({
     try {
       const {
         data: { user },
-        error: userError,
       } = await supabase.auth.getUser();
 
       if (!user) {
-        // Only a genuine network failure with a stored session means "offline";
-        // do NOT mint a new user then. Anything else (no session, or a stale/
-        // invalid one — e.g. after the database was reset) is discarded and
-        // replaced with a fresh anonymous session.
-        if (isNetworkError(userError) && (await hasStoredSession())) {
+        // A stored session means we already have an identity. Never replace it
+        // automatically — a brand-new anonymous user would lose every board
+        // (docs/plan.md §8.3). Only a genuinely absent session starts fresh;
+        // clearing a bad session is the user's explicit choice (Sign out).
+        if (await hasStoredSession()) {
           set({ status: 'offline', error: 'Can\'t reach the board. Check your connection.' });
           return;
         }
-        await supabase.auth.signOut().catch(() => {});
         // Production needs a Turnstile token; ask the UI to collect one first.
         if (turnstileSiteKey && !captchaToken) {
           set({ status: 'needsCaptcha', error: null });
@@ -115,7 +102,9 @@ export const useSession = create<SessionState>((set) => ({
   },
 
   setDisplayName: async (displayName) => {
-    const user = await updateProfile(displayName, null);
+    // Keep the existing avatar; renaming must not clear it.
+    const current = useSession.getState().user;
+    const user = await updateProfile(displayName, current?.avatarPath ?? null);
     set({ user });
   },
 

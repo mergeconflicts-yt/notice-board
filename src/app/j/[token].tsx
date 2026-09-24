@@ -4,6 +4,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { colors, fonts } from '../../theme';
 import { Button } from '../../components/Button';
+import { IdentitySheet } from '../../components/IdentitySheet';
+import { Turnstile } from '../../components/Turnstile';
+import { turnstileSiteKey } from '../../lib/supabase';
 import { acceptInvite, friendlyMessage, previewInvite } from '../../lib/api';
 import { useSession } from '../../store/session';
 import { InvitePreview } from '../../types';
@@ -16,9 +19,30 @@ export default function JoinByLinkScreen() {
   const { token } = useLocalSearchParams<{ token: string }>();
   const user = useSession((s) => s.user);
   const status = useSession((s) => s.status);
+  const sessionError = useSession((s) => s.error);
+  const init = useSession((s) => s.init);
+  const signOut = useSession((s) => s.signOut);
+  const setDisplayName = useSession((s) => s.setDisplayName);
   const [preview, setPreview] = useState<InvitePreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
+  const [savingName, setSavingName] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+
+  // A brand-new anonymous user is "Someone"; ask for a real name before joining.
+  const needsName = !!user && user.displayName === 'Someone';
+
+  const handleName = async (name: string) => {
+    setSavingName(true);
+    setNameError(null);
+    try {
+      await setDisplayName(name);
+    } catch (e) {
+      setNameError(friendlyMessage(e));
+    } finally {
+      setSavingName(false);
+    }
+  };
 
   useEffect(() => {
     if (status !== 'ready' || !token) return;
@@ -56,6 +80,38 @@ export default function JoinByLinkScreen() {
     }
   };
 
+  // A link opened on first launch must still get through session setup —
+  // otherwise the invite spins forever.
+  if (status === 'needsCaptcha' && turnstileSiteKey) {
+    return (
+      <SafeAreaView style={[styles.safe, styles.center]}>
+        <Text style={styles.title}>One quick check</Text>
+        <Text style={styles.sub}>Confirm you’re human to join.</Text>
+        <Turnstile
+          siteKey={turnstileSiteKey}
+          onToken={(t) => void init(t)}
+          onError={() => void init()}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  if (status === 'offline') {
+    return (
+      <SafeAreaView style={[styles.safe, styles.center]}>
+        <Text style={styles.title}>Can’t reach the board</Text>
+        <Text style={styles.sub}>{sessionError ?? 'Check your connection and try again.'}</Text>
+        <Button label="Retry" onPress={() => void init()} style={styles.join} />
+        <Button
+          label="Sign out"
+          variant="soft"
+          onPress={() => void signOut().then(() => init())}
+          style={styles.join}
+        />
+      </SafeAreaView>
+    );
+  }
+
   if (status === 'loading' || (!preview && !error)) {
     return (
       <SafeAreaView style={[styles.safe, styles.center]}>
@@ -77,7 +133,12 @@ export default function JoinByLinkScreen() {
                 ? ` · ${preview.memberFirstNames.slice(0, 3).join(', ')}`
                 : ''}
             </Text>
-            <Button label={joining ? 'Joining…' : 'Join board'} onPress={join} disabled={joining} style={styles.join} />
+            <Button
+              label={joining ? 'Joining…' : 'Join board'}
+              onPress={join}
+              disabled={joining || needsName}
+              style={styles.join}
+            />
           </>
         ) : (
           <>
@@ -87,6 +148,13 @@ export default function JoinByLinkScreen() {
           </>
         )}
       </View>
+
+      <IdentitySheet
+        visible={!!preview && needsName}
+        onDone={handleName}
+        submitting={savingName}
+        error={nameError}
+      />
     </SafeAreaView>
   );
 }

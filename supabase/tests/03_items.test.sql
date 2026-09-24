@@ -1,7 +1,7 @@
 -- Phase 1d: item RPCs — validation, authorship, versions, lifetimes.
 -- Roles: O owner/author, M member, S stranger.
 begin;
-select plan(47);
+select plan(54);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000021', 'authenticated', 'authenticated'),
@@ -206,6 +206,38 @@ select lives_ok(
 select is(
   (select keep_until from public.items where id = 'c0000000-0000-0000-0000-000000000024'),
   '2026-10-06T00:00:00+00'::timestamptz, 'date edit recomputes keep_until');
+reset role;
+
+-- Pinning & done interactions.
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000021', true);
+set role authenticated;
+select lives_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-000000000091', (select id from t_b),
+    'note', 'butter', 'pin me', null, null, null, null, false, null)$$,
+  'post note for pin tests');
+select lives_ok(
+  $$select public.set_pinned('c0000000-0000-0000-0000-000000000091', true)$$,
+  'pin the note');
+select lives_ok(
+  $$select public.set_done('c0000000-0000-0000-0000-000000000091', true)$$,
+  'mark the pinned note done');
+select ok(
+  (select pinned and keep_until is null from public.items
+   where id = 'c0000000-0000-0000-0000-000000000091'),
+  'a pinned done note still stays forever');
+select lives_ok(
+  $$select public.set_pinned('c0000000-0000-0000-0000-000000000091', false)$$,
+  'unpin the done note');
+select ok(
+  (select keep_until > done_at + interval '1 day 23 hours'
+      and keep_until < done_at + interval '2 days 1 hour'
+   from public.items where id = 'c0000000-0000-0000-0000-000000000091'),
+  'unpinning a done note keeps its 2-day done window');
+select throws_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-000000000092', (select id from t_b),
+    'note', 'butter', 'sneaky', null, null, null,
+    'b0000000-0000-0000-0000-000000000099/c0000000-0000-0000-0000-000000000092/x.jpg', false, null)$$,
+  'P0001', 'invalid_input', 'a note cannot carry a photo path');
 reset role;
 
 select * from finish();

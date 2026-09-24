@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
   Pressable,
   StyleSheet,
   ActivityIndicator,
+  AppState,
   useWindowDimensions,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -73,28 +74,48 @@ export default function BoardScreen() {
     if (added.length > 0) setEntering(new Set(added.map((i) => i.id)));
   }, [items]);
 
-  // Resolve signed URLs once per photo path.
+  // Signed photo URLs expire after an hour, so re-sign on mount, every ~50
+  // minutes, and whenever the app returns to the foreground.
+  const itemsRef = useRef(items);
   useEffect(() => {
-    const missing = items
-      .filter((i) => i.photoPath && !(i.photoPath in photoUrls))
-      .map((i) => i.photoPath as string);
-    if (missing.length === 0) return;
-    let alive = true;
-    void (async () => {
-      const pairs = await Promise.all(
-        missing.map(async (path) => [path, await signedPhotoUrl(path)] as const),
-      );
-      if (!alive) return;
-      setPhotoUrls((prev) => {
-        const next = { ...prev };
-        for (const [path, url] of pairs) if (url) next[path] = url;
-        return next;
-      });
-    })();
+    itemsRef.current = items;
+  }, [items]);
+
+  const refreshPhotos = useCallback(async () => {
+    const paths = [
+      ...new Set(
+        itemsRef.current
+          .filter((i) => i.photoPath)
+          .map((i) => i.photoPath as string),
+      ),
+    ];
+    if (paths.length === 0) return;
+    const pairs = await Promise.all(
+      paths.map(async (path) => [path, await signedPhotoUrl(path)] as const),
+    );
+    setPhotoUrls((prev) => {
+      const next = { ...prev };
+      for (const [path, url] of pairs) if (url) next[path] = url;
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    void refreshPhotos();
+    const timer = setInterval(() => void refreshPhotos(), 50 * 60 * 1000);
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') void refreshPhotos();
+    });
     return () => {
-      alive = false;
+      clearInterval(timer);
+      sub.remove();
     };
-  }, [items, photoUrls]);
+  }, [refreshPhotos]);
+
+  // Sign any newly-arrived photo as soon as it appears.
+  useEffect(() => {
+    void refreshPhotos();
+  }, [items, refreshPhotos]);
 
   const handleDragStart = () => {
     overDeleteRef.current = false;

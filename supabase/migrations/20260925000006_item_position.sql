@@ -38,12 +38,13 @@ begin
     raise exception 'not_found';
   end if;
 
+  -- Position is presentation metadata: bump updated_at but NOT version, so a
+  -- member dragging a note never invalidates the author's in-flight edit.
   if p_x is null or p_y is null then
     update public.items
     set layout = null,
         updated_by = auth.uid(),
-        updated_at = now(),
-        version = v_row.version + 1
+        updated_at = now()
     where id = p_id;
     return;
   end if;
@@ -55,8 +56,7 @@ begin
         'manual', true
       ),
       updated_by = auth.uid(),
-      updated_at = now(),
-      version = v_row.version + 1
+      updated_at = now()
   where id = p_id;
 end;
 $$;

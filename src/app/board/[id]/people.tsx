@@ -8,7 +8,7 @@ import { Avatar } from '../../../components/Avatar';
 import { useBoard } from '../../../hooks/useBoard';
 import { useSession } from '../../../store/session';
 import { useToast } from '../../../store/toast';
-import { friendlyMessage, getInviteLink, removeMember } from '../../../lib/api';
+import { friendlyMessage, getInviteLink, removeMember, resetInviteLink } from '../../../lib/api';
 import { inviteCodeMessage, inviteMessage } from '../../../lib/inviteLinks';
 
 export default function PeopleScreen() {
@@ -42,6 +42,26 @@ export default function PeopleScreen() {
   const shareCode = async () => {
     if (!board || !invite) return;
     await Share.share({ message: inviteCodeMessage(board.name, invite.code) });
+  };
+
+  const resetLink = async () => {
+    if (!board) return;
+    Alert.alert('Reset the invite link?', 'The current link and code stop working immediately.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Reset',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await resetInviteLink(boardId);
+            setInvite(null);
+            await loadInvite();
+          } catch (e) {
+            useToast.getState().show(friendlyMessage(e));
+          }
+        },
+      },
+    ]);
   };
 
   const confirmRemove = (userId: string, name: string) => {
@@ -98,6 +118,11 @@ export default function PeopleScreen() {
               <Pressable onPress={shareCode} style={styles.shareBtnGhost}>
                 <Text style={styles.shareText}>Share code</Text>
               </Pressable>
+              {isOwner ? (
+                <Pressable onPress={resetLink} style={styles.shareBtnGhost}>
+                  <Text style={styles.resetText}>Reset link</Text>
+                </Pressable>
+              ) : null}
             </>
           ) : (
             <Pressable onPress={loadInvite} disabled={loading} style={styles.shareBtn}>
@@ -167,4 +192,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   shareText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.ink },
+  resetText: { fontFamily: fonts.ui.bold, fontSize: 14, color: colors.danger },
 });

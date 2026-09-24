@@ -74,13 +74,14 @@ Test locally with `supabase functions serve --env-file supabase/.env.local`
 5. Set the Vault secret `invite` (Dashboard → Vault, or SQL).
 6. Deploy Edge Functions: `supabase functions deploy purge cleanup-users
    delete-account`.
-7. Configure nightly jobs (per environment):
+7. Give the nightly jobs their endpoint + key via **Vault** (not a setting):
 
    ```sql
-   alter database postgres set app.functions_url = 'https://<ref>.functions.supabase.co';
-   alter database postgres set app.service_role_key = '<service role key>';
-   -- re-run the jobs migration (or call cron.schedule manually) to pick them up
+   select vault.create_secret('https://<ref>.functions.supabase.co', 'functions_url');
+   select vault.create_secret('<service role key>', 'service_role_key');
    ```
+
+   The jobs are always scheduled; they become active once these secrets exist.
 
 8. Enable CAPTCHA (Turnstile) and set `EXPO_PUBLIC_TURNSTILE_SITE_KEY` in the
    build env; `[auth.captcha]` is off locally, on in production.
@@ -96,11 +97,17 @@ Test locally with `supabase functions serve --env-file supabase/.env.local`
   note helpers).
 - **DB** (`supabase test db`) — pgTAP suites in `supabase/tests/`:
   `01_tables_rls`, `02_boards`, `03_items`, `04_entries`, `05_invites`,
-  `06_storage`, `07_accounts`, `08_jobs`.
+  `06_storage`, `07_accounts`, `08_jobs`, `09_position`, `10_privileges`,
+  `11_authz`, `12_expiry`.
 - **CI** (`.github/workflows/ci.yml`): job `check` = `npm ci
   --legacy-peer-deps` → `tsc --noEmit` → `expo lint` → unit tests; job
   `database` = `supabase/setup-cli` → `supabase start` → `db reset` →
   `test db` → `db lint`.
+- **Deploy** (`.github/workflows/deploy.yml`, manual `workflow_dispatch`):
+  links a hosted project and runs `supabase db push`. Pick the environment
+  (`notice-dev`/`notice-prod`); each has its own `SUPABASE_PROJECT_REF` and
+  `SUPABASE_DB_PASSWORD` (plus a shared `SUPABASE_ACCESS_TOKEN`). Migrations
+  reach production only through this workflow.
 
 ## Secrets
 

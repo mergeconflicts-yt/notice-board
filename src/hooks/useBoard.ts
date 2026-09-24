@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import * as Crypto from 'expo-crypto';
 import { supabase } from '../lib/supabase';
@@ -87,6 +88,21 @@ export function useBoard(boardId: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const lastSeenRef = useRef<string | null>(null);
+  const membersRef = useRef<BoardMember[]>([]);
+  useEffect(() => {
+    membersRef.current = members;
+  }, [members]);
+
+  /** Resolve an item's author from the loaded members (realtime rows have no
+   *  profile embed, so without this the author shows as unknown). */
+  const withAuthor = useCallback((item: ItemWithAuthor, previous?: ItemWithAuthor) => {
+    if (item.author) return item;
+    const author =
+      previous?.author ??
+      membersRef.current.find((m) => m.userId === item.createdBy)?.user ??
+      null;
+    return { ...item, author };
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -183,8 +199,16 @@ export function useBoard(boardId: string) {
             (mapped.keepUntil !== null && new Date(mapped.keepUntil) <= new Date());
           setItems((prev) => {
             const without = prev.filter((i) => i.id !== mapped.id);
-            return expired ? without : [...without, mapped];
+            if (expired) return without;
+            return [...without, withAuthor(mapped, prev.find((i) => i.id === mapped.id))];
           });
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'board_members', filter: `board_id=eq.${boardId}` },
+        () => {
+          void getMembers(boardId).then(setMembers).catch(() => {});
         },
       )
       .on(
@@ -234,7 +258,16 @@ export function useBoard(boardId: string) {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [boardId]);
+  }, [boardId, withAuthor]);
+
+  // Returning to the foreground refetches everything, catching up on posts,
+  // members and deletions missed while backgrounded.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') void load();
+    });
+    return () => sub.remove();
+  }, [load]);
 
   const toast = useToast.getState();
 
@@ -309,13 +342,13 @@ export function useBoard(boardId: string) {
       patchItem(
         item.id,
         {
-          body: patch.body ?? item.body,
-          title: patch.title ?? item.title,
-          eventAt: patch.eventAt ?? item.eventAt,
-          place: patch.place ?? item.place,
+          body: patch.body !== undefined ? patch.body : item.body,
+          title: patch.title !== undefined ? patch.title : item.title,
+          eventAt: patch.eventAt !== undefined ? patch.eventAt : item.eventAt,
+          place: patch.place !== undefined ? patch.place : item.place,
           color: patch.color ?? item.color,
         },
-        () => apiEditItem(item.id, item.version, patch),
+        () => apiEditItem(item, patch),
       ),
     [patchItem],
   );

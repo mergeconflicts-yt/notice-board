@@ -12,21 +12,21 @@ implemented slightly differently. Appended as work proceeds.
    NULL as pass), which would allow empty notes. Implemented as
    `char_length(btrim(coalesce(body, ''))) > 0` to enforce the evident
    intent.
-3. **Date lifetime timezone.** `default_keep_until(type, event_at, pinned,
-   now)` takes no timezone, so the "day after `event_at`" boundary is
-   computed with `date_trunc` (UTC on Supabase). `boards.timezone` is
-   stored as planned; threading it into the function signature can happen
-   when per-board timezones are actually needed.
-4. **Storage policies deferred.** Buckets (`board-photos`, `avatars`) are
-   created in the init migration, but the `storage.objects` policies from
-   plan section 7 land with phase 3 (photos), alongside their tests.
-5. **Rate counting uses sequences, not `rate_limits`.** A table row written
-   by a throttled call rolls back with that call, so failures (the exact
-   thing `invite_try` must count) would never accumulate. `hit_rate_limit`
-   counts with per-user/action/window sequences (`nextval` survives
-   rollback). The `rate_limits` table stays defined but unused; phase 6
-   should either drop it or use it for audit, and the hourly cleanup job
-   must drop stale `rl_*` sequences instead of/in addition to old rows.
+3. **Date lifetime timezone.** Implemented: `create_board` takes a
+   `timezone` (validated against `pg_timezone_names`), and
+   `default_keep_until(type, event_at, pinned, now, timezone)` computes the
+   "day after `event_at`" boundary in the board's zone. Covered by tests and
+   a live smoke.
+4. **Storage policies: implemented.** The `storage.objects` policies from
+   plan section 7 live in `20260925000003_storage_policies.sql`
+   (`board-photos` member read + own upload; `avatars` shared read + owner
+   write), with buckets private. The avatars sharing check was later inlined
+   and the `_shares_board_with` helper dropped (see #10).
+5. **Rate counting uses the `rate_limits` table.** (Superseded an earlier
+   sequence-based workaround.) Because invalid invites now return NULL rather
+   than raising, a failed attempt still commits its increment; a call that
+   does raise rolls back only its own increment, so the committed count stays
+   at the cap. `cleanup_rate_limits` deletes windows older than 2 hours.
 6. **Invalid invites return empty/NULL, not `invite_invalid`.** The plan
    says to raise the same `invite_invalid` for every failure. Raising aborts
    the call, which rolls back the `hit_rate_limit` attempt — so wrong guesses
@@ -53,3 +53,40 @@ implemented slightly differently. Appended as work proceeds.
    (`{x, y, manual}`) plus `set_item_position`, and the board drag gesture
    persists the drop point. New items stay auto-placed until dragged;
    passing NULL clears back to auto.
+10. **Default privileges vs. the Supabase image.** The lockdown migration runs
+    `alter default privileges in schema public revoke execute on functions
+    from public;` (per plan §5), but in this Supabase image a function created
+    by the `postgres` role in `public` still ends up with `proacl = NULL`
+    (PUBLIC execute), because the platform's own default ACL for the schema is
+    owned by `supabase_admin`. The statement is kept, but it is **not** a
+    safety net here — every migration must explicitly
+    `revoke execute ... from public, anon, authenticated`. Existing helpers
+    are locked by `20260925000008_lock_helpers.sql` and pinned by
+    `supabase/tests/10_privileges.test.sql`.
+
+11. **Position changes don't bump `version`.** The plan says "bump version on
+    every item change". `set_item_position` now updates `updated_at` but keeps
+    `version`, so one member dragging a note can't invalidate another author's
+    in-flight text edit (same "silent metadata" rule as list ticking).
+12. **Jobs read their endpoint/key from Vault.** The Edge-Function jobs first
+    read the base URL and service-role key from a database setting
+    (`app.functions_url` / `app.service_role_key`) — a deviation, since any
+    SQL session could read the key. They now read Vault secrets
+    `functions_url` and `service_role_key` at run time via `run_edge_job`;
+    jobs are always scheduled and no-op until the secrets exist.
+15. **`boards` added to Realtime.** `20260925000007_boards_realtime.sql` adds
+    `boards` to the `supabase_realtime` publication so a name/colour change
+    reaches open board screens live. Plan §4 listed only `items`,
+    `list_entries` and `board_members`; board metadata is member-scoped, so
+    RLS still gates the subscriber.
+13. **Ticks lock the parent list; edits are version-guarded in the UPDATE.**
+    `set_entry_checked`/`edit_entry`/`remove_entry` lock the parent item so two
+    people ticking the last two entries can't both recompute `keep_until` from
+    stale state; `edit_item` puts the version check in the UPDATE's `WHERE` (and
+    locks the row) so concurrent edits can't both win.
+14. **Pinned/done lifetime interactions.** `run_list_lifetime` leaves a pinned
+    list at `NULL`; `set_done` keeps a pinned item at `NULL`; unpinning a done
+    item keeps `done_at + 2 days`; adding an entry to a fully-ticked list
+    recomputes its lifetime (back to `NULL`). `post_item` rejects a
+    `photo_path` on non-photo items and any path outside the item's own folder.
+

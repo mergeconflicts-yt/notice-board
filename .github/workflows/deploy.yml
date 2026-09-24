@@ -1,0 +1,41 @@
+name: Deploy database
+
+# Manual only: migrations reach a hosted project solely through this workflow
+# (docs/plan.md §14). Uses GitHub Environments so each target has its own
+# SUPABASE_PROJECT_REF / DB password.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target Supabase project
+        type: choice
+        options: [notice-dev, notice-prod]
+        required: true
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+
+      - name: Push migrations
+        run: supabase db push
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Lint remote schema
+        run: supabase db lint --linked --level warning
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

@@ -1,7 +1,7 @@
 -- Phase 1d: list entry RPCs — positions, ticks, edits, lifetime rule.
 -- Roles: O owner, M member, S stranger. Board B2 (O only) for cross-board.
 begin;
-select plan(28);
+select plan(36);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000031', 'authenticated', 'authenticated'),
@@ -138,6 +138,39 @@ select lives_ok(
 select throws_ok(
   $$select public.set_entry_checked('d0000000-0000-0000-0000-000000000031', true)$$,
   'P0001', 'not_found', 'cannot tick entries of a removed list');
+reset role;
+
+-- Pinned lists never expire, and a new entry revives a fully-ticked list.
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000032', true);
+set role authenticated;
+select lives_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-000000000094', (select id from t_b),
+    'list', 'paper', null, 'Pinned', null, null, null, false,
+    '[{"id":"d0000000-0000-0000-0000-000000000094","text":"A"}]')$$,
+  'post a list');
+select lives_ok(
+  $$select public.set_pinned('c0000000-0000-0000-0000-000000000094', true)$$,
+  'pin the list');
+select lives_ok(
+  $$select public.set_entry_checked('d0000000-0000-0000-0000-000000000094', true)$$,
+  'tick its only entry');
+select ok(
+  (select keep_until is null from public.items where id = 'c0000000-0000-0000-0000-000000000094'),
+  'a pinned list stays even when fully ticked');
+select lives_ok(
+  $$select public.set_pinned('c0000000-0000-0000-0000-000000000094', false)$$,
+  'unpin the ticked list');
+select ok(
+  (select keep_until > now() and keep_until < now() + interval '3 days' from public.items
+   where id = 'c0000000-0000-0000-0000-000000000094'),
+  'unpinning a fully-ticked list gives 2 days');
+select lives_ok(
+  $$select public.add_entry('d0000000-0000-0000-0000-000000000095',
+    'c0000000-0000-0000-0000-000000000094', 'B')$$,
+  'add an entry to the ticked list');
+select ok(
+  (select keep_until is null from public.items where id = 'c0000000-0000-0000-0000-000000000094'),
+  'a new entry resets the list to stays');
 reset role;
 
 select * from finish();

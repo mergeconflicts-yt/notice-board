@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { colors } from '../theme';
+import { INVITE_BASE_URL } from '../lib/inviteLinks';
 
 type Props = {
   siteKey: string;
@@ -42,7 +43,9 @@ export function Turnstile({ siteKey, onToken, onError }: Props) {
     <View style={styles.wrap}>
       <WebView
         originWhitelist={['*']}
-        source={{ html }}
+        // Turnstile validates the page's domain, so load it from the app's
+        // real origin rather than about:blank.
+        source={{ html, baseUrl: INVITE_BASE_URL || 'https://localhost' }}
         onMessage={handleMessage}
         javaScriptEnabled
         style={styles.web}

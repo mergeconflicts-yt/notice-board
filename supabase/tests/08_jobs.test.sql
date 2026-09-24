@@ -1,6 +1,6 @@
 -- Phase 6: maintenance jobs (expire + rate-limit cleanup) and their schedule.
 begin;
-select plan(7);
+select plan(9);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000071', 'authenticated', 'authenticated');
@@ -27,13 +27,30 @@ select is(
   (select deleted_at is null from public.items where id = 'c0000000-0000-0000-0000-000000000072'),
   true, 'kept-forever item untouched');
 
--- Rate-limit sequence cleanup.
-create sequence public.rl_old_test_0;
-create sequence public.rl_new_test_99999999999;
-select is(public.cleanup_rate_limits(), 1, 'cleanup drops exactly the stale sequence');
+-- Rate-limit window cleanup: old windows go, current ones stay.
+insert into public.rate_limits (user_id, action, window_start, count) values
+  ('a0000000-0000-0000-0000-000000000071', 'x', now() - interval '3 hours', 5),
+  ('a0000000-0000-0000-0000-000000000071', 'x', now() - interval '5 minutes', 2);
+select is(public.cleanup_rate_limits(), 1, 'cleanup removes exactly the stale window');
 select is(
-  (select count(*)::integer from pg_class where relname = 'rl_new_test_99999999999'),
-  1, 'fresh sequence survives');
+  (select count(*)::integer from public.rate_limits
+   where user_id = 'a0000000-0000-0000-0000-000000000071' and action = 'x'),
+  1, 'current window survives');
+
+-- Purge candidates: only items removed beyond the 30-day retention window.
+insert into public.items (id, board_id, type, body, created_by, deleted_at) values
+  ('c0000000-0000-0000-0000-000000000073', 'b0000000-0000-0000-0000-000000000071',
+   'note', 'old', 'a0000000-0000-0000-0000-000000000071', now() - interval '31 days'),
+  ('c0000000-0000-0000-0000-000000000074', 'b0000000-0000-0000-0000-000000000071',
+   'note', 'recent', 'a0000000-0000-0000-0000-000000000071', now() - interval '1 day');
+select is(
+  (select count(*)::integer from public.expired_for_purge()
+   where id in ('c0000000-0000-0000-0000-000000000073', 'c0000000-0000-0000-0000-000000000074')),
+  1, 'only the item older than 30 days is a purge candidate');
+select ok(
+  (select deleted_at < now() - interval '30 days'
+   from public.expired_for_purge() where id = 'c0000000-0000-0000-0000-000000000073'),
+  'the old item is included');
 
 -- Schedule present.
 select is(

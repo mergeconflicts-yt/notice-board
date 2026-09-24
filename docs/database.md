@@ -33,7 +33,9 @@ PK (`board_id`, `user_id`). `role`, `joined_at`. `board_id → boards CASCADE`,
 ### `items`
 `id uuid PK` (**client-generated** — safe retries), `board_id`, `type`,
 `color`, `body`, `title`, `event_at`, `place`, `photo_path`, `pinned`,
-`keep_until`, `done_at`, `done_by`, `created_by` / `updated_by` / `deleted_by`
+`keep_until`, `done_at`, `done_by`, `layout jsonb` (`NULL` = auto-placed, else
+`{x, y, manual: true}` — x a fraction of board width, y in layout ref points),
+`created_by` / `updated_by` / `deleted_by`
 (all `→ profiles ON DELETE SET NULL`), `deleted_at`, `version`, timestamps.
 `unique (id, board_id)` is the target of `list_entries`' composite FK.
 Checks: date needs `event_at`, photo needs `photo_path`, note needs a body.
@@ -51,8 +53,8 @@ to `items (id, board_id)` (an entry can never point at another board),
 Partial unique index `invites_one_active_idx` = one active invite per board.
 
 ### `rate_limits`
-Defined but currently unused — rate limiting counts with sequences (see
-`hit_rate_limit`). Kept for future audit use.
+`(user_id, action, window_start, count)` PK. `hit_rate_limit` upserts the
+current window; the hourly job deletes windows older than 2 hours.
 
 ## Lifetime (`keep_until`)
 
@@ -103,8 +105,11 @@ function guards `auth.uid()`, checks membership/role, stamps actor fields from
 `auth.uid()` (never parameters), and raises a stable code as the exception
 message. See `docs/api.md` for signatures.
 
-Internal (no grants): `is_member`, `hit_rate_limit`, `promote_longest_member`,
-`run_list_lifetime`, `_path_board_id`, `_shares_board_with`.
+Internal (no grants): `hit_rate_limit`, `promote_longest_member`,
+`run_list_lifetime`, `expire_items`, `cleanup_rate_limits`, `run_edge_job`,
+`invite_key`, `pick_invite_code`, `normalise_invite_code`,
+`default_keep_until`. `is_member`/`_path_board_id` are granted to
+`authenticated` only (RLS/storage policies run as the caller).
 
 ## Triggers
 
@@ -117,8 +122,12 @@ Internal (no grants): `is_member`, `hit_rate_limit`, `promote_longest_member`,
 |---|---|---|
 | `expire-items` | every 15 min | `expire_items()` — soft-delete lapsed `keep_until` |
 | `cleanup-rate-limits` | hourly | `cleanup_rate_limits()` — drop stale `rl_*` sequences |
-| `purge-nightly` | 03:00 | Edge Function `purge` (scheduled only when configured) |
-| `cleanup-users-nightly` | 03:30 | Edge Function `cleanup-users` (scheduled only when configured) |
+| `purge-nightly` | 03:00 | `run_edge_job('/purge')` — Edge Function purge |
+| `cleanup-users-nightly` | 03:30 | `run_edge_job('/cleanup-users')` — Edge Function cleanup-users |
+
+The Edge-Function jobs read the functions base URL and service-role key from
+Vault (`functions_url`, `service_role_key`) at run time; if absent the job is a
+no-op. Nothing sensitive lives in a session setting.
 
 ## Migrations
 
@@ -127,4 +136,9 @@ Internal (no grants): `is_member`, `hit_rate_limit`, `promote_longest_member`,
 3. `..._functions_invites` — invite functions.
 4. `..._storage_policies` — board-photos/avatars policies.
 5. `..._accounts` — `delete_account`.
-6. `..._jobs` — extensions, `expire_items`, `cleanup_rate_limits`, schedules.
+6. `..._jobs` — extensions, `expire_items`, `cleanup_rate_limits`,
+   `run_edge_job`, schedules.
+7. `..._item_position` — `items.layout` + `set_item_position`.
+8. `..._boards_realtime` — adds `boards` to the realtime publication.
+9. `..._lock_helpers` — revokes client EXECUTE on internal helpers, drops
+   `_shares_board_with` (inlined into the avatars policy).

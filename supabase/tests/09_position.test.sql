@@ -34,9 +34,11 @@ select is(
   (select layout ->> 'y' from public.items
    where id = 'c0000000-0000-0000-0000-000000000081'),
   '320', 'y stored');
+-- Moving a note must not bump the version: doing so would cancel an author's
+-- in-flight text edit on another device.
 select is(
   (select version from public.items where id = 'c0000000-0000-0000-0000-000000000081'),
-  2, 'version bumped');
+  1, 'move does not bump the version');
 
 -- Note the clamp: x follows the member who moved it.
 select is(

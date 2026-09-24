@@ -317,7 +317,8 @@ create function public.default_keep_until(
   p_type item_type,
   p_event_at timestamptz,
   p_pinned boolean,
-  p_now timestamptz
+  p_now timestamptz,
+  p_timezone text
 )
 returns timestamptz
 language sql
@@ -327,7 +328,10 @@ set search_path = '' as $$
     when p_pinned then null
     when p_type = 'note' then p_now + interval '7 days'
     when p_type = 'photo' then p_now + interval '14 days'
-    when p_type = 'date' then date_trunc('day', p_event_at) + interval '1 day'
+    -- Start of the day AFTER the event, in the board's time zone.
+    when p_type = 'date' then
+      (date_trunc('day', p_event_at at time zone p_timezone) + interval '1 day')
+        at time zone p_timezone
     else null
   end;
 $$;

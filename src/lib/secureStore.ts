@@ -56,16 +56,18 @@ export const LargeSecureStore = {
     const encrypted = await AsyncStorage.getItem(key);
     if (!encrypted) return null;
     try {
-      // Legacy plaintext (from an older app version) or anything that isn't
-      // our hex ciphertext can't be decrypted — drop it so the app starts
-      // fresh instead of reporting a phantom "offline".
-      if (!/^[0-9a-fA-F]+$/.test(encrypted) || encrypted.length % 2 !== 0) {
+      // Format is hex(iv[16] || ciphertext). Anything else (legacy plaintext,
+      // old single-IV writes, corruption) is dropped so the app starts fresh
+      // instead of reporting a phantom "offline".
+      if (!/^[0-9a-fA-F]+$/.test(encrypted) || encrypted.length % 2 !== 0 || encrypted.length < 32) {
         await AsyncStorage.removeItem(key);
         return null;
       }
       const aesKey = await getOrCreateKey();
-      const cipher = new aesjs.ModeOfOperation.ctr(aesKey, new aesjs.Counter(1));
-      const decrypted = bytesToUtf8(cipher.decrypt(fromHex(encrypted)));
+      const iv = fromHex(encrypted.slice(0, 32));
+      const ciphertext = fromHex(encrypted.slice(32));
+      const cipher = new aesjs.ModeOfOperation.ctr(aesKey, new aesjs.Counter(iv));
+      const decrypted = bytesToUtf8(cipher.decrypt(ciphertext));
       if (!looksLikeJson(decrypted)) {
         await AsyncStorage.removeItem(key);
         return null;
@@ -81,9 +83,12 @@ export const LargeSecureStore = {
 
   async setItem(key: string, value: string): Promise<void> {
     const aesKey = await getOrCreateKey();
-    const cipher = new aesjs.ModeOfOperation.ctr(aesKey, new aesjs.Counter(1));
-    const encrypted = cipher.encrypt(utf8ToBytes(value));
-    await AsyncStorage.setItem(key, toHex(encrypted));
+    // Fresh random IV per write: reusing a counter would let two saved
+    // sessions be combined to recover the tokens.
+    const iv = Crypto.getRandomBytes(16);
+    const cipher = new aesjs.ModeOfOperation.ctr(aesKey, new aesjs.Counter(iv));
+    const ciphertext = cipher.encrypt(utf8ToBytes(value));
+    await AsyncStorage.setItem(key, toHex(iv) + toHex(ciphertext));
   },
 
   async removeItem(key: string): Promise<void> {

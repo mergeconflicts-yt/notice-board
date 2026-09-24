@@ -25,6 +25,7 @@ export default function StartScreen() {
   const status = useSession((s) => s.status);
   const error = useSession((s) => s.error);
   const init = useSession((s) => s.init);
+  const signOut = useSession((s) => s.signOut);
   const setDisplayName = useSession((s) => s.setDisplayName);
   const { boards } = useMyBoards();
   const [identityFor, setIdentityFor] = useState<'create' | 'join' | null>(null);
@@ -121,6 +122,12 @@ export default function StartScreen() {
         <Text style={styles.offlineTitle}>Can’t reach the board</Text>
         <Text style={styles.offlineSub}>{error ?? 'Check your connection and try again.'}</Text>
         <Button label="Retry" onPress={() => void init()} style={styles.retry} />
+        <Button
+          label="Sign out"
+          variant="soft"
+          onPress={() => void signOut().then(() => init())}
+          style={styles.retry}
+        />
       </SafeAreaView>
     );
   }

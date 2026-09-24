@@ -9,7 +9,7 @@ import { AddNoteSheet, NoteDraft } from '../../../../components/AddNoteSheet';
 import { useBoard } from '../../../../hooks/useBoard';
 import { useSession } from '../../../../store/session';
 import { useToast } from '../../../../store/toast';
-import { friendlyMessage, signedPhotoUrl } from '../../../../lib/api';
+import { editEntry, friendlyMessage, removeEntry, signedPhotoUrl } from '../../../../lib/api';
 import { keepUntilLabel } from '../../../../utils/note';
 
 const MAX_SCALE = 2.4;
@@ -60,19 +60,25 @@ export default function ItemDetailScreen() {
     if (!isCreator) return;
     setSaving(true);
     try {
+      // Send only the fields this post type owns; api.editItem merges the rest
+      // with the current item so nothing else is wiped.
       await editItem(item, {
-        body: item.type === 'list' ? undefined : draft.body,
-        title: draft.title || item.title,
-        eventAt: draft.eventAt ?? item.eventAt,
-        place: draft.place || item.place,
+        body: item.type === 'note' || item.type === 'photo' ? draft.body : undefined,
+        title: item.type === 'list' || item.type === 'date' ? draft.title : undefined,
+        eventAt: item.type === 'date' ? draft.eventAt : undefined,
+        place: item.type === 'date' ? draft.place : undefined,
         color: draft.color,
       });
       if (item.type === 'list') {
-        // Reconcile entries: add new ones; removal is explicit per row.
+        // Reconcile the checklist: add, edit and remove entries to match.
+        const draftIds = new Set(draft.entries.map((r) => r.id));
         for (const row of draft.entries) {
-          if (!itemEntries.some((e) => e.id === row.id)) {
-            await addListEntry(item.id, row.text);
-          }
+          const existing = itemEntries.find((e) => e.id === row.id);
+          if (!existing) await addListEntry(item.id, row.text);
+          else if (existing.text !== row.text) await editEntry(row.id, row.text);
+        }
+        for (const entry of itemEntries) {
+          if (!draftIds.has(entry.id)) await removeEntry(entry.id);
         }
       }
       setEditing(false);

@@ -19,7 +19,9 @@ export default function CreateBoardScreen() {
     setCreating(true);
     setError(null);
     try {
-      const board = await createBoard(name.trim(), color);
+      // The board's time zone drives date expiry (day after the event).
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      const board = await createBoard(name.trim(), color, timeZone);
       router.replace(`/board/${board.id}`);
     } catch (e) {
       setError(friendlyMessage(e));

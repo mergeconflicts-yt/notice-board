@@ -493,7 +493,6 @@ export type Database = {
     }
     Functions: {
       _path_board_id: { Args: { p_path: string }; Returns: string }
-      _shares_board_with: { Args: { p_user: string }; Returns: boolean }
       accept_invite: {
         Args: { p_display_name?: string; p_token_or_code: string }
         Returns: string
@@ -521,7 +520,7 @@ export type Database = {
       }
       cleanup_rate_limits: { Args: never; Returns: number }
       create_board: {
-        Args: { p_color?: string; p_name: string }
+        Args: { p_color?: string; p_name: string; p_timezone?: string }
         Returns: {
           color: string
           created_at: string
@@ -544,6 +543,7 @@ export type Database = {
           p_event_at: string
           p_now: string
           p_pinned: boolean
+          p_timezone: string
           p_type: Database["public"]["Enums"]["item_type"]
         }
         Returns: string
@@ -564,6 +564,38 @@ export type Database = {
         Returns: undefined
       }
       expire_items: { Args: never; Returns: number }
+      expired_for_purge: {
+        Args: { p_limit?: number }
+        Returns: {
+          board_id: string
+          body: string | null
+          color: Database["public"]["Enums"]["item_color"]
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          done_at: string | null
+          done_by: string | null
+          event_at: string | null
+          id: string
+          keep_until: string | null
+          layout: Json | null
+          photo_path: string | null
+          pinned: boolean
+          place: string | null
+          title: string | null
+          type: Database["public"]["Enums"]["item_type"]
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "items"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_invite_link: {
         Args: { p_board_id: string }
         Returns: {
@@ -683,6 +715,7 @@ export type Database = {
       }
       reset_invite_link: { Args: { p_board_id: string }; Returns: undefined }
       restore_item: { Args: { p_id: string }; Returns: undefined }
+      run_edge_job: { Args: { p_path: string }; Returns: undefined }
       run_list_lifetime: { Args: { p_item_id: string }; Returns: undefined }
       set_done: { Args: { p_done: boolean; p_id: string }; Returns: undefined }
       set_entry_checked: {
