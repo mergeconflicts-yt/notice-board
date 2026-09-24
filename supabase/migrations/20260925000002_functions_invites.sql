@@ -190,7 +190,9 @@ begin
   if auth.uid() is null then
     raise exception 'not_authenticated';
   end if;
-  perform public.hit_rate_limit('invite_try', 10, interval '1 hour');
+  -- No rate-limit here: a join calls preview then accept, so counting both
+  -- would charge invite_try twice per join. accept_invite (the action that
+  -- actually grants membership) is the one that counts.
   select * into v_inv
   from public.invites
   where token_hash = extensions.digest(coalesce(p_token_or_code, ''), 'sha256')

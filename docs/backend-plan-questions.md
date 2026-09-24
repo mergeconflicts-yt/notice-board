@@ -74,11 +74,6 @@ implemented slightly differently. Appended as work proceeds.
     SQL session could read the key. They now read Vault secrets
     `functions_url` and `service_role_key` at run time via `run_edge_job`;
     jobs are always scheduled and no-op until the secrets exist.
-15. **`boards` added to Realtime.** `20260925000007_boards_realtime.sql` adds
-    `boards` to the `supabase_realtime` publication so a name/colour change
-    reaches open board screens live. Plan §4 listed only `items`,
-    `list_entries` and `board_members`; board metadata is member-scoped, so
-    RLS still gates the subscriber.
 13. **Ticks lock the parent list; edits are version-guarded in the UPDATE.**
     `set_entry_checked`/`edit_entry`/`remove_entry` lock the parent item so two
     people ticking the last two entries can't both recompute `keep_until` from
@@ -89,4 +84,20 @@ implemented slightly differently. Appended as work proceeds.
     item keeps `done_at + 2 days`; adding an entry to a fully-ticked list
     recomputes its lifetime (back to `NULL`). `post_item` rejects a
     `photo_path` on non-photo items and any path outside the item's own folder.
+15. **`boards` added to Realtime.** `20260925000007_boards_realtime.sql` adds
+    `boards` to the `supabase_realtime` publication so a name/colour change
+    reaches open board screens live. Plan §4 listed only `items`,
+    `list_entries` and `board_members`; board metadata is member-scoped, so
+    RLS still gates the subscriber.
+16. **Migrations 00–06 were edited in place during development.** The plan's
+    "never edit an applied migration" rule was relaxed while the project had
+    no real data, so fixes land as edits rather than new migrations. This is
+    only safe because **production has never had `supabase db push` run** (the
+    deploy workflow is manual and unused). If it has, this history is already
+    applied and the changed migrations must be squashed into a fresh baseline
+    before shipping.
+17. **preview_invite no longer counts toward `invite_try`.** Plan §5 has
+    preview count toward the limit, but a join calls preview *then* accept, so
+    counting both charged the limit twice per join. Only `accept_invite` (the
+    action that grants membership) counts now.
 

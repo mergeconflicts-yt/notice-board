@@ -4,7 +4,7 @@ import { supabase, turnstileSiteKey } from '../lib/supabase';
 import { friendlyMessage, updateProfile } from '../lib/api';
 import { User } from '../types';
 
-type SessionStatus = 'loading' | 'ready' | 'offline' | 'needsCaptcha';
+type SessionStatus = 'loading' | 'ready' | 'offline' | 'needsCaptcha' | 'expired';
 
 type SessionState = {
   status: SessionStatus;
@@ -29,6 +29,13 @@ function clearRetry() {
   if (retryTimer) clearTimeout(retryTimer);
   retryTimer = null;
   retryDelay = 2000;
+}
+
+/** A real connectivity failure (as opposed to an invalid/expired session). */
+function isNetworkError(error: unknown): boolean {
+  const e = error as { name?: string; message?: string } | undefined;
+  if (!e) return false;
+  return e.name === 'AuthRetryableFetchError' || /fetch|network|timeout|internet/i.test(e.message ?? '');
 }
 
 function scheduleRetry() {
@@ -73,16 +80,26 @@ export const useSession = create<SessionState>((set) => ({
     try {
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser();
 
       if (!user) {
         // A stored session means we already have an identity. Never replace it
         // automatically — a brand-new anonymous user would lose every board
-        // (docs/plan.md §8.3). Only a genuinely absent session starts fresh;
-        // clearing a bad session is the user's explicit choice (Sign out).
+        // (docs/plan.md §8.3).
         if (await hasStoredSession()) {
-          set({ status: 'offline', error: 'Can\'t reach the board. Check your connection.' });
-          scheduleRetry();
+          if (isNetworkError(userError)) {
+            // Connectivity problem: keep the session, retry with backoff.
+            set({ status: 'offline', error: 'Can\'t reach the board. Check your connection.' });
+            scheduleRetry();
+            return;
+          }
+          // The stored session is unusable (deleted user, bad token, 401/403):
+          // don't retry forever — offer an explicit sign out.
+          set({
+            status: 'expired',
+            error: 'Your session has expired.',
+          });
           return;
         }
         // Production needs a Turnstile token; ask the UI to collect one first.
@@ -113,12 +130,14 @@ export const useSession = create<SessionState>((set) => ({
         error: null,
       });
     } catch (e) {
-      const message =
-        e instanceof Error && /fetch|network|timeout/i.test(e.message)
-          ? 'Can\'t reach the board. Check your connection.'
-          : friendlyMessage(e);
-      set({ status: 'offline', error: message });
-      scheduleRetry();
+      // Only connectivity failures are worth retrying; anything else (a
+      // rejected sign-in, a captcha error) shows offline without a loop.
+      if (isNetworkError(e)) {
+        set({ status: 'offline', error: 'Can\'t reach the board. Check your connection.' });
+        scheduleRetry();
+      } else {
+        set({ status: 'offline', error: friendlyMessage(e) });
+      }
     }
   },
 

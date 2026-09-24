@@ -79,50 +79,77 @@ export default function BoardScreen() {
     itemsRef.current = items;
   }, [items]);
 
-  const signPaths = useCallback(async (paths: string[]) => {
-    const unique = [...new Set(paths)];
-    if (unique.length === 0) return;
-    const pairs = await Promise.all(
-      unique.map(async (path) => [path, await signedPhotoUrl(path)] as const),
-    );
-    setPhotoUrls((prev) => {
-      const next = { ...prev };
-      for (const [path, url] of pairs) if (url) next[path] = url;
-      return next;
-    });
-  }, []);
+  // Paths we've already tried to sign, so a failure isn't retried until the
+  // periodic/foreground refresh.
+  const attemptedRef = useRef<Set<string>>(new Set());
 
-  // Sign only photos we don't already have a URL for, so a live update never
-  // re-signs (and flickers) every image on the board.
+  /** Apply signed URLs, returning the SAME object when nothing changed — a new
+   *  identity would re-run the effect below and spin forever on a null result. */
+  const applyUrls = useCallback(
+    (pairs: (readonly [string, string | null])[]) => {
+      setPhotoUrls((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const [path, url] of pairs) {
+          if (url && next[path] !== url) {
+            next[path] = url;
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    },
+    [],
+  );
+
+  const signPaths = useCallback(
+    async (paths: string[], force = false) => {
+      const unique = [...new Set(paths)].filter((p) => force || !attemptedRef.current.has(p));
+      if (unique.length === 0) return;
+      for (const p of unique) attemptedRef.current.add(p);
+      const pairs = await Promise.all(
+        unique.map(async (path) => [path, await signedPhotoUrl(path)] as const),
+      );
+      applyUrls(pairs);
+    },
+    [applyUrls],
+  );
+
+  // Sign only photos we don't already have a URL for and haven't already tried,
+  // so a live update never re-signs (or flickers) images, and a null result
+  // (offline / missing file) doesn't loop.
   useEffect(() => {
-    const missing = items
-      .filter((i) => i.photoPath && !(i.photoPath in photoUrls))
-      .map((i) => i.photoPath as string);
-    if (missing.length === 0) return;
+    const toTry = items
+      .map((i) => i.photoPath)
+      .filter(
+        (p): p is string => !!p && !(p in photoUrls) && !attemptedRef.current.has(p),
+      );
+    if (toTry.length === 0) return;
     let alive = true;
     void (async () => {
+      for (const p of toTry) attemptedRef.current.add(p);
       const pairs = await Promise.all(
-        missing.map(async (path) => [path, await signedPhotoUrl(path)] as const),
+        toTry.map(async (path) => [path, await signedPhotoUrl(path)] as const),
       );
       if (!alive) return;
-      setPhotoUrls((prev) => {
-        const next = { ...prev };
-        for (const [path, url] of pairs) if (url) next[path] = url;
-        return next;
-      });
+      applyUrls(pairs);
     })();
     return () => {
       alive = false;
     };
-  }, [items, photoUrls]);
+  }, [items, photoUrls, applyUrls]);
 
   // URLs expire after an hour: re-sign everything every ~50 minutes and when
-  // the app returns to the foreground.
+  // the app returns to the foreground. Clearing the attempts lets previously
+  // failed paths retry.
   useEffect(() => {
-    const refreshAll = () =>
+    const refreshAll = () => {
+      attemptedRef.current.clear();
       void signPaths(
         itemsRef.current.filter((i) => i.photoPath).map((i) => i.photoPath as string),
+        true,
       );
+    };
     const timer = setInterval(refreshAll, 50 * 60 * 1000);
     const sub = AppState.addEventListener('change', (next) => {
       if (next === 'active') refreshAll();

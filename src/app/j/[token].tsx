@@ -96,6 +96,20 @@ export default function JoinByLinkScreen() {
     );
   }
 
+  if (status === 'expired') {
+    return (
+      <SafeAreaView style={[styles.safe, styles.center]}>
+        <Text style={styles.title}>Session expired</Text>
+        <Text style={styles.sub}>{sessionError ?? 'Please sign out and start again.'}</Text>
+        <Button
+          label="Sign out"
+          onPress={() => void signOut().then(() => init())}
+          style={styles.join}
+        />
+      </SafeAreaView>
+    );
+  }
+
   if (status === 'offline') {
     return (
       <SafeAreaView style={[styles.safe, styles.center]}>

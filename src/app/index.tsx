@@ -27,7 +27,7 @@ export default function StartScreen() {
   const init = useSession((s) => s.init);
   const signOut = useSession((s) => s.signOut);
   const setDisplayName = useSession((s) => s.setDisplayName);
-  const { boards } = useMyBoards();
+  const { boards, error: boardsError } = useMyBoards();
   const [identityFor, setIdentityFor] = useState<'create' | 'join' | null>(null);
   const [identitySaving, setIdentitySaving] = useState(false);
   const [identityError, setIdentityError] = useState<string | null>(null);
@@ -116,6 +116,22 @@ export default function StartScreen() {
     );
   }
 
+  if (status === 'expired') {
+    return (
+      <SafeAreaView style={[styles.safe, styles.loading]}>
+        <Text style={styles.offlineTitle}>Session expired</Text>
+        <Text style={styles.offlineSub}>
+          {error ?? 'Please sign out and start again.'}
+        </Text>
+        <Button
+          label="Sign out"
+          onPress={() => void signOut().then(() => init())}
+          style={styles.retry}
+        />
+      </SafeAreaView>
+    );
+  }
+
   if (status === 'offline') {
     return (
       <SafeAreaView style={[styles.safe, styles.loading]}>
@@ -183,6 +199,7 @@ export default function StartScreen() {
               </View>
             </View>
           ) : null}
+          {boardsError ? <Text style={styles.boardsError}>{boardsError}</Text> : null}
           {boards.length > 0 ? (
             <View style={styles.boardsBlock}>
               <Text style={styles.boardsLabel}>Your boards</Text>
@@ -256,6 +273,12 @@ const styles = StyleSheet.create({
   headline: { fontFamily: fonts.hand.bold, fontSize: 54, lineHeight: 56, color: colors.ink },
   subhead: { fontFamily: fonts.ui.regular, fontSize: 17, color: colors.inkSoft, marginTop: 14 },
   footer: { gap: 12, paddingBottom: 24 },
+  boardsError: {
+    fontFamily: fonts.ui.regular,
+    fontSize: 13,
+    color: colors.danger,
+    marginBottom: 8,
+  },
   boardsBlock: { gap: 8, marginBottom: 8 },
   boardsLabel: {
     fontFamily: fonts.ui.bold,

@@ -70,7 +70,10 @@ Test locally with `supabase functions serve --env-file supabase/.env.local`
    sets it false in `config.toml`; confirm the hosted API exposes only granted
    objects.
 3. Apply `supabase/migrations/` in filename order (`supabase db push`).
-4. Auth → enable **anonymous sign-ins** and **manual linking**.
+4. Auth → enable **anonymous sign-ins** and **manual linking**; add
+   `noticeboard://auth` (and, if used, the web origin) to **Redirect URLs**.
+   `config.toml` only covers the local stack, so this must be set per hosted
+   project for identity linking to complete.
 5. Set the Vault secret `invite` (Dashboard → Vault, or SQL).
 6. Deploy Edge Functions: `supabase functions deploy purge cleanup-users
    delete-account`.

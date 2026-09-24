@@ -10,6 +10,8 @@ import {
   friendlyMessage,
   getBoard,
   getBoardContent,
+  getEntries,
+  getItemsSince,
   getMembers,
   getRemovedItems,
   ItemEdit,
@@ -79,6 +81,11 @@ function mapRealtimeEntry(row: Record<string, unknown>): ListEntry {
   };
 }
 
+/** How far behind the cursor a delta read looks, in ms. `updated_at` is set
+ *  when a transaction starts, so a write committing just after the cursor was
+ *  taken could otherwise be skipped. Re-merging a row is harmless. */
+const DELTA_LOOKBACK_MS = 5000;
+
 /** Newest server timestamp across items/entries — a clock-skew-proof cursor
  *  for delta reads (never the device clock). */
 function latestUpdated(items: ItemWithAuthor[], entries: ListEntry[]): string {
@@ -86,6 +93,18 @@ function latestUpdated(items: ItemWithAuthor[], entries: ListEntry[]): string {
   for (const i of items) if (i.updatedAt > max) max = i.updatedAt;
   for (const e of entries) if (e.updatedAt > max) max = e.updatedAt;
   return max;
+}
+
+/** Advance the cursor, never backwards (an empty catch-up must not reset it). */
+function advanceCursor(prev: string | null, items: ItemWithAuthor[], entries: ListEntry[]): string {
+  const latest = latestUpdated(items, entries);
+  return latest > (prev ?? '') ? latest : (prev ?? '');
+}
+
+/** The delta `since` value: the cursor shifted back by the lookback window. */
+function deltaSince(cursor: string | null): string | undefined {
+  if (!cursor) return undefined;
+  return new Date(new Date(cursor).getTime() - DELTA_LOOKBACK_MS).toISOString();
 }
 
 /** Live board state: board, people, posts and checklist rows. */
@@ -128,7 +147,7 @@ export function useBoard(boardId: string) {
       setMembers(nextMembers);
       setItems(content.items);
       setEntries(content.entries);
-      lastSeenRef.current = latestUpdated(content.items, content.entries);
+      lastSeenRef.current = advanceCursor(lastSeenRef.current, content.items, content.entries);
       setError(null);
     } catch (e) {
       setError(friendlyMessage(e));
@@ -154,7 +173,7 @@ export function useBoard(boardId: string) {
         setMembers(nextMembers);
         setItems(content.items);
         setEntries(content.entries);
-        lastSeenRef.current = latestUpdated(content.items, content.entries);
+        lastSeenRef.current = advanceCursor(lastSeenRef.current, content.items, content.entries);
         setError(null);
       } catch (e) {
         if (alive) setError(friendlyMessage(e));
@@ -258,11 +277,19 @@ export function useBoard(boardId: string) {
       )
       .subscribe((status) => {
         if (status === 'SUBSCRIBED' && lastSeenRef.current) {
-          void getBoardContent(boardId, lastSeenRef.current)
-            .then((delta) => {
-              setItems((prev) => mergeItems(prev, delta.items));
-              setEntries((prev) => mergeEntries(prev, delta.entries));
-              lastSeenRef.current = latestUpdated(delta.items, delta.entries);
+          // Catch up on items changed since the cursor — including deletions,
+          // which the live filter would hide — and take the full (small) entry
+          // list so hard-deleted rows disappear.
+          const since = deltaSince(lastSeenRef.current)!;
+          void Promise.all([getItemsSince(boardId, since), getEntries(boardId)])
+            .then(([deltaItems, allEntries]) => {
+              setItems((prev) => mergeDeltaItems(prev, deltaItems, withAuthor));
+              setEntries(allEntries);
+              lastSeenRef.current = advanceCursor(
+                lastSeenRef.current,
+                deltaItems,
+                allEntries,
+              );
             })
             .catch(() => {});
         }
@@ -495,14 +522,19 @@ export async function fetchRemovedItems(boardId: string): Promise<ItemWithAuthor
   return getRemovedItems(boardId);
 }
 
-function mergeItems(prev: ItemWithAuthor[], delta: ItemWithAuthor[]): ItemWithAuthor[] {
+/** Apply a delta: upsert changed items, drop deleted/expired ones. */
+function mergeDeltaItems(
+  prev: ItemWithAuthor[],
+  delta: ItemWithAuthor[],
+  resolve: (item: ItemWithAuthor, previous?: ItemWithAuthor) => ItemWithAuthor,
+): ItemWithAuthor[] {
   const byId = new Map(prev.map((i) => [i.id, i]));
-  for (const item of delta) byId.set(item.id, item);
-  return [...byId.values()];
-}
-
-function mergeEntries(prev: ListEntry[], delta: ListEntry[]): ListEntry[] {
-  const byId = new Map(prev.map((e) => [e.id, e]));
-  for (const entry of delta) byId.set(entry.id, entry);
+  for (const item of delta) {
+    const expired =
+      item.deletedAt !== null ||
+      (item.keepUntil !== null && new Date(item.keepUntil) <= new Date());
+    if (expired) byId.delete(item.id);
+    else byId.set(item.id, resolve(item, byId.get(item.id)));
+  }
   return [...byId.values()];
 }

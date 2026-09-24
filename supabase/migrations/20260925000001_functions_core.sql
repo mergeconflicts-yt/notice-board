@@ -465,10 +465,11 @@ begin
   -- done item keeps its own rule.
   v_keep := v_row.keep_until;
   if v_row.type = 'date' then
-    if v_row.done_at is not null then
-      v_keep := v_row.done_at + interval '2 days';
-    elsif v_row.pinned then
+    -- Pinned wins over done (a pinned item never expires).
+    if v_row.pinned then
       v_keep := null;
+    elsif v_row.done_at is not null then
+      v_keep := v_row.done_at + interval '2 days';
     else
       v_keep := public.default_keep_until(
         'date', coalesce(p_event_at, v_row.event_at), false, now(), v_tz

@@ -91,7 +91,13 @@ export default function ItemDetailScreen() {
 
   const handleRemove = async () => {
     const snapshot = item;
-    await removeItem(item).catch((e) => useToast.getState().show(friendlyMessage(e)));
+    try {
+      await removeItem(item);
+    } catch (e) {
+      // Stay on the screen and report the failure — don't claim it was removed.
+      useToast.getState().show(friendlyMessage(e));
+      return;
+    }
     router.back();
     useToast.getState().show('Removed', {
       label: 'Undo',

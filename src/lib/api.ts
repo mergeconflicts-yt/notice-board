@@ -229,35 +229,49 @@ export async function getMembers(boardId: string): Promise<BoardMember[]> {
   }));
 }
 
+/** Full board content: live items (not deleted, not expired) + all entries. */
 export async function getBoardContent(
   boardId: string,
-  since?: string,
 ): Promise<{ items: ItemWithAuthor[]; entries: ListEntry[] }> {
   // Live = not deleted AND (no expiry OR expiry in the future). The `now`
   // must be evaluated per call, and the two conditions are AND-ed — an `.or()`
   // over all three would resurrect a removed-but-unexpired post.
   const nowIso = new Date().toISOString();
-  let itemsQuery = supabase
+  const [items, entries] = await Promise.all([
+    supabase
+      .from('items')
+      .select(ITEM_SELECT)
+      .eq('board_id', boardId)
+      .is('deleted_at', null)
+      .or(`keep_until.is.null,keep_until.gt.${nowIso}`)
+      .order('created_at', { ascending: true }),
+    getEntries(boardId),
+  ]);
+  if (items.error) raise(items.error);
+  return { items: (items.data ?? []).map(mapItem), entries };
+}
+
+/** Items changed since a cursor — INCLUDING deleted/expired ones, so a
+ *  catch-up can remove them (the live filter would hide the deletion). */
+export async function getItemsSince(boardId: string, since: string): Promise<ItemWithAuthor[]> {
+  const { data, error } = await supabase
     .from('items')
     .select(ITEM_SELECT)
     .eq('board_id', boardId)
-    .is('deleted_at', null)
-    .or(`keep_until.is.null,keep_until.gt.${nowIso}`);
-  let entriesQuery = supabase.from('list_entries').select('*').eq('board_id', boardId);
-  if (since) {
-    itemsQuery = itemsQuery.gt('updated_at', since);
-    entriesQuery = entriesQuery.gt('updated_at', since);
-  }
-  const [itemsRes, entriesRes] = await Promise.all([
-    itemsQuery.order('created_at', { ascending: true }),
-    entriesQuery.order('position', { ascending: true }),
-  ]);
-  if (itemsRes.error) raise(itemsRes.error);
-  if (entriesRes.error) raise(entriesRes.error);
-  return {
-    items: (itemsRes.data ?? []).map(mapItem),
-    entries: (entriesRes.data ?? []).map(mapEntry),
-  };
+    .gt('updated_at', since)
+    .order('created_at', { ascending: true });
+  if (error) raise(error);
+  return (data ?? []).map(mapItem);
+}
+
+export async function getEntries(boardId: string): Promise<ListEntry[]> {
+  const { data, error } = await supabase
+    .from('list_entries')
+    .select('*')
+    .eq('board_id', boardId)
+    .order('position', { ascending: true });
+  if (error) raise(error);
+  return (data ?? []).map(mapEntry);
 }
 
 export async function getRemovedItems(boardId: string): Promise<ItemWithAuthor[]> {
@@ -488,13 +502,13 @@ export async function acceptInvite(
 export async function deleteAccount(): Promise<void> {
   const { error } = await supabase.rpc('delete_account');
   if (error) raise(error);
-  // Board state is tidy. Remove the auth user, then always drop the local
-  // session — staying signed in as a deleted user would fail every later call.
-  try {
-    await supabase.functions.invoke('delete-account', { method: 'POST' });
-  } catch {
-    // best effort; the session is cleared regardless
-  }
+  // Remove the auth user. `functions.invoke` returns { error } rather than
+  // throwing, so check it — otherwise we'd sign out and report success while
+  // the user (e.g. a linked Apple/Google account) still exists.
+  const { error: fnError } = await supabase.functions.invoke('delete-account', {
+    method: 'POST',
+  });
+  if (fnError) raise(fnError as { message?: string });
   await supabase.auth.signOut();
 }
 

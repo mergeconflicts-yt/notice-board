@@ -1,7 +1,7 @@
 -- Phase 1d: item RPCs — validation, authorship, versions, lifetimes.
 -- Roles: O owner/author, M member, S stranger.
 begin;
-select plan(59);
+select plan(64);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000021', 'authenticated', 'authenticated'),
@@ -258,6 +258,20 @@ select ok(
   (select keep_until > now() + interval '13 days' from public.items
    where id = 'c0000000-0000-0000-0000-000000000093'),
   'editing the note keeps the extended lifetime');
+
+-- A pinned date that is done must still never expire (pinned beats done).
+select lives_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-000000000094', (select id from t_b),
+    'date', 'sky', null, 'Party', '2026-12-01T10:00:00Z', null, null, false, null)$$,
+  'post a date');
+select lives_ok($$select public.set_pinned('c0000000-0000-0000-0000-000000000094', true)$$, 'pin the date');
+select lives_ok($$select public.set_done('c0000000-0000-0000-0000-000000000094', true)$$, 'mark the date done');
+select lives_ok(
+  $$select public.edit_item('c0000000-0000-0000-0000-000000000094', 3, null, 'Party!', '2026-12-02T10:00:00Z', null, 'sky')$$,
+  'edit the pinned done date');
+select ok(
+  (select keep_until is null from public.items where id = 'c0000000-0000-0000-0000-000000000094'),
+  'a pinned done date still never expires');
 reset role;
 
 select * from finish();

@@ -52,6 +52,7 @@ export default function RootLayout() {
         <Stack.Screen name="create" options={{ presentation: 'card' }} />
         <Stack.Screen name="join" options={{ presentation: 'card' }} />
         <Stack.Screen name="profile" options={{ presentation: 'card' }} />
+        <Stack.Screen name="auth" options={{ presentation: 'card' }} />
         <Stack.Screen name="j/[token]" options={{ presentation: 'card' }} />
         <Stack.Screen
           name="board/[id]/index"
