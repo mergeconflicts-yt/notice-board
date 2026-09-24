@@ -163,6 +163,9 @@ export default function StartScreen() {
           <Pressable onPress={() => router.push('/profile')} style={styles.you} hitSlop={8}>
             <Text style={styles.youText}>You · {user?.displayName ?? 'Someone'}</Text>
           </Pressable>
+          <Pressable onPress={() => router.push('/sign-in')} style={styles.you} hitSlop={8}>
+            <Text style={styles.signInText}>Already have an account? Sign in</Text>
+          </Pressable>
         </View>
       </ScrollView>
 
@@ -245,4 +248,5 @@ const styles = StyleSheet.create({
   promptSave: { fontFamily: fonts.ui.bold, fontSize: 14, color: colors.accentDeep },
   you: { alignSelf: 'center', paddingVertical: 10 },
   youText: { fontFamily: fonts.ui.semibold, fontSize: 14, color: colors.inkSoft },
+  signInText: { fontFamily: fonts.ui.bold, fontSize: 14, color: colors.accentDeep },
 });

@@ -37,9 +37,19 @@ function bytesToUtf8(bytes: Uint8Array): string {
   return new TextDecoder().decode(bytes);
 }
 
-async function getOrCreateKey(): Promise<Uint8Array> {
+/**
+ * Read-only key access. Returns null when no key is stored; THROWS on a
+ * keychain error (e.g. the device is locked during a background launch). It
+ * never creates a key — doing so on a read would make an already-encrypted
+ * session undecryptable.
+ */
+async function readKey(): Promise<Uint8Array | null> {
   const existing = await SecureStore.getItemAsync(KEY_ID);
-  if (existing) return fromHex(existing);
+  return existing ? fromHex(existing) : null;
+}
+
+/** Create a key — used only on a write, and only when none exists yet. */
+async function createKey(): Promise<Uint8Array> {
   const key = Crypto.getRandomBytes(32);
   await SecureStore.setItemAsync(KEY_ID, toHex(key));
   return key;
@@ -55,15 +65,21 @@ export const LargeSecureStore = {
   async getItem(key: string): Promise<string | null> {
     const encrypted = await AsyncStorage.getItem(key);
     if (!encrypted) return null;
+    // Format is hex(iv[16] || ciphertext). Anything else (legacy plaintext,
+    // old single-IV writes) can never be ours, so drop it and start fresh.
+    if (!/^[0-9a-fA-F]+$/.test(encrypted) || encrypted.length % 2 !== 0 || encrypted.length < 32) {
+      await AsyncStorage.removeItem(key);
+      return null;
+    }
+    // NOTE: readKey() may throw on a keychain error. Let it propagate — the
+    // session must NOT be deleted just because the keychain was unavailable.
+    const aesKey = await readKey();
+    if (aesKey == null) {
+      // Ciphertext with no key: unrecoverable (not a keychain error). Drop it.
+      await AsyncStorage.removeItem(key);
+      return null;
+    }
     try {
-      // Format is hex(iv[16] || ciphertext). Anything else (legacy plaintext,
-      // old single-IV writes, corruption) is dropped so the app starts fresh
-      // instead of reporting a phantom "offline".
-      if (!/^[0-9a-fA-F]+$/.test(encrypted) || encrypted.length % 2 !== 0 || encrypted.length < 32) {
-        await AsyncStorage.removeItem(key);
-        return null;
-      }
-      const aesKey = await getOrCreateKey();
       const iv = fromHex(encrypted.slice(0, 32));
       const ciphertext = fromHex(encrypted.slice(32));
       const cipher = new aesjs.ModeOfOperation.ctr(aesKey, new aesjs.Counter(iv));
@@ -74,15 +90,17 @@ export const LargeSecureStore = {
       }
       return decrypted;
     } catch {
-      // A rotated/damaged key or corrupt blob: drop it so the app can sign in
-      // again rather than crashing on every launch.
+      // Genuinely corrupt blob (key present, bytes unreadable): drop it.
       await AsyncStorage.removeItem(key);
       return null;
     }
   },
 
   async setItem(key: string, value: string): Promise<void> {
-    const aesKey = await getOrCreateKey();
+    // Only create a key when none exists — never replace an existing one, and
+    // never on the read path.
+    let aesKey = await readKey();
+    if (aesKey == null) aesKey = await createKey();
     // Fresh random IV per write: reusing a counter would let two saved
     // sessions be combined to recover the tokens.
     const iv = Crypto.getRandomBytes(16);

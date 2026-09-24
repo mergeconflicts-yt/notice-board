@@ -1,6 +1,6 @@
 -- Manual note positions: any member may move a note; the spot persists.
 begin;
-select plan(9);
+select plan(11);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000081', 'authenticated', 'authenticated'),
@@ -50,6 +50,14 @@ select is(
 select throws_ok(
   $$select public.set_item_position('c0000000-0000-0000-0000-000000000081', 'NaN'::double precision, 10)$$,
   'P0001', 'invalid_input', 'NaN position rejected');
+
+-- A huge y is capped so one drag can't make the board enormous.
+select lives_ok(
+  $$select public.set_item_position('c0000000-0000-0000-0000-000000000081', 0.3, 1e9)$$,
+  'drag with a huge y is accepted');
+select is(
+  (select layout ->> 'y' from public.items where id = 'c0000000-0000-0000-0000-000000000081'),
+  '20000', 'y is capped');
 
 -- Stranger cannot move.
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000083', true);

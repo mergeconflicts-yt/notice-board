@@ -247,13 +247,6 @@ export function useBoard(boardId: string) {
       )
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'board_members', filter: `board_id=eq.${boardId}` },
-        () => {
-          void getMembers(boardId).then(setMembers).catch(() => {});
-        },
-      )
-      .on(
-        'postgres_changes',
         { event: '*', schema: 'public', table: 'boards', filter: `id=eq.${boardId}` },
         (payload) => {
           if (payload.eventType === 'DELETE') {

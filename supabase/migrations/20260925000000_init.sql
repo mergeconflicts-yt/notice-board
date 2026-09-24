@@ -131,6 +131,16 @@ create index list_entries_board_idx on public.list_entries (board_id);
 create index board_members_user_idx on public.board_members (user_id);
 create index invites_board_idx on public.invites (board_id);
 
+-- "Who did it" columns: indexed so account deletion (which nulls these on
+-- ON DELETE SET NULL) and audits don't scan the whole table.
+create index items_created_by_idx on public.items (created_by);
+create index items_done_by_idx on public.items (done_by);
+create index items_updated_by_idx on public.items (updated_by);
+create index items_deleted_by_idx on public.items (deleted_by);
+create index list_entries_created_by_idx on public.list_entries (created_by);
+create index list_entries_checked_by_idx on public.list_entries (checked_by);
+create index boards_created_by_idx on public.boards (created_by);
+
 -- ---------------------------------------------------------------------------
 -- Triggers: updated_at touch + automatic profile rows
 -- ---------------------------------------------------------------------------
@@ -278,12 +288,9 @@ begin
   ) then
     alter publication supabase_realtime add table public.list_entries;
   end if;
-  if not exists (
-    select 1 from pg_publication_tables
-    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'board_members'
-  ) then
-    alter publication supabase_realtime add table public.board_members;
-  end if;
+  -- board_members is deliberately NOT published: Supabase doesn't apply RLS to
+  -- DELETE events, so every subscriber would learn who left any board. The
+  -- member list refreshes on focus/foreground instead.
 end
 $$;
 

@@ -89,7 +89,9 @@ the last two entries can't both recompute `keep_until` from stale state.
 
 ## Realtime
 
-Publication `supabase_realtime` carries only `items`, `list_entries`,
-`board_members`. The app opens one channel per board, filtered by
-`board_id=eq.<id>`, applies row changes in place, and runs a delta read on
-reconnect.
+Publication `supabase_realtime` carries `items`, `list_entries`, and `boards`.
+`board_members` is deliberately **not** published: Supabase doesn't apply RLS
+to DELETE events, so every subscriber would learn who left any board. The app
+opens one channel per board, filtered by `board_id=eq.<id>`, applies row
+changes in place, and runs a delta read on reconnect (the member list refreshes
+on focus/foreground).

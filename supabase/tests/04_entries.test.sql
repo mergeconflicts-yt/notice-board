@@ -1,7 +1,7 @@
 -- Phase 1d: list entry RPCs — positions, ticks, edits, lifetime rule.
 -- Roles: O owner, M member, S stranger. Board B2 (O only) for cross-board.
 begin;
-select plan(36);
+select plan(37);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000031', 'authenticated', 'authenticated'),
@@ -171,6 +171,14 @@ select lives_ok(
 select ok(
   (select keep_until is null from public.items where id = 'c0000000-0000-0000-0000-000000000094'),
   'a new entry resets the list to stays');
+
+-- A list can't be given an unbounded number of entries.
+select throws_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-000000000096', (select id from t_b),
+    'list', 'paper', null, 'Big', null, null, null, false,
+    (select jsonb_agg(jsonb_build_object('id', gen_random_uuid(), 'text', 'x'))
+     from generate_series(1, 501)))$$,
+  'P0001', 'invalid_input', 'too many entries in one list rejected');
 reset role;
 
 select * from finish();

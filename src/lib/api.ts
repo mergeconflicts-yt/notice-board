@@ -509,15 +509,18 @@ export async function deleteAccount(): Promise<void> {
   await supabase.auth.signOut();
 }
 
-export async function linkProvider(provider: 'apple' | 'google'): Promise<void> {
-  // In React Native linkIdentity returns the provider URL instead of
-  // redirecting; open it in an auth session so the sign-in page appears and
-  // the resulting session is captured.
+type OAuthProvider = 'apple' | 'google';
+
+/** Shared native OAuth flow for `linkIdentity` / `signInWithOAuth`. In RN the
+ *  call returns the provider URL instead of redirecting, so we open it in an
+ *  auth session and exchange the returned code. */
+async function oauthFlow(mode: 'link' | 'signin', provider: OAuthProvider): Promise<void> {
   const redirectTo = Linking.createURL('auth');
-  const { data, error } = await supabase.auth.linkIdentity({
-    provider,
-    options: { redirectTo, skipBrowserRedirect: true },
-  });
+  const options = { redirectTo, skipBrowserRedirect: true };
+  const { data, error } =
+    mode === 'link'
+      ? await supabase.auth.linkIdentity({ provider, options })
+      : await supabase.auth.signInWithOAuth({ provider, options });
   if (error) raise(error);
   if (!data?.url) return;
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
@@ -530,8 +533,27 @@ export async function linkProvider(provider: 'apple' | 'google'): Promise<void> 
   }
 }
 
+/** Add a sign-in method to the current (anonymous) account. */
+export async function linkProvider(provider: OAuthProvider): Promise<void> {
+  await oauthFlow('link', provider);
+}
+
+/** Sign in to an existing account (restores its boards on a new device). */
+export async function signInProvider(provider: OAuthProvider): Promise<void> {
+  await oauthFlow('signin', provider);
+}
+
 export async function linkEmail(email: string): Promise<void> {
   const { error } = await supabase.auth.updateUser({ email });
+  if (error) raise(error);
+}
+
+/** Email magic-link sign-in to an existing account. */
+export async function signInEmail(email: string): Promise<void> {
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: Linking.createURL('auth') },
+  });
   if (error) raise(error);
 }
 

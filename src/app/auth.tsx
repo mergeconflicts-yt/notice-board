@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { colors, fonts } from '../theme';
 import { supabase } from '../lib/supabase';
+import { useSession } from '../store/session';
 
 /**
  * Fallback target for the OAuth redirect (`noticeboard://auth`). Normally
@@ -24,6 +25,8 @@ export default function AuthCallbackScreen() {
           return;
         }
       }
+      // The session changed underneath; reload the profile before home.
+      await useSession.getState().init();
       router.replace('/');
     })();
   }, [code]);

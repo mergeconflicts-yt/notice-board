@@ -11,3 +11,6 @@ grant execute on function public.expired_for_purge(integer) to service_role;
 
 grant select, delete on public.items to service_role;
 grant select on public.board_members to service_role;
+-- purge also hard-deletes long-dead boards and sweeps avatars of gone users.
+grant select, delete on public.boards to service_role;
+grant select on public.profiles to service_role;

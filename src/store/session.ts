@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, turnstileSiteKey } from '../lib/supabase';
+import { LargeSecureStore } from '../lib/secureStore';
 import { friendlyMessage, updateProfile } from '../lib/api';
 import { User } from '../types';
 
@@ -15,10 +16,22 @@ type SessionState = {
   signOut: () => Promise<void>;
 };
 
-/** True when a Supabase session blob is present in storage (any project ref). */
+/**
+ * True when a *usable* Supabase session blob is in storage (any project ref).
+ * Reads through the encrypted store so a corrupt/legacy value is discarded
+ * (and reported as absent) rather than counted as a live session.
+ */
 async function hasStoredSession(): Promise<boolean> {
   const keys = await AsyncStorage.getAllKeys();
-  return keys.some((k) => k.endsWith('-auth-token'));
+  const key = keys.find((k) => k.endsWith('-auth-token'));
+  if (!key) return false;
+  try {
+    return (await LargeSecureStore.getItem(key)) != null;
+  } catch {
+    // Keychain temporarily unavailable (e.g. device locked). Assume a session
+    // exists so we never fall through to creating a new user.
+    return true;
+  }
 }
 
 // Offline auto-retry with backoff (2s → 4s → … capped at 30s).
@@ -78,6 +91,10 @@ export const useSession = create<SessionState>((set) => ({
     clearRetry();
     set({ status: 'loading', error: null });
     try {
+      // Capture this BEFORE getUser(): a failed refresh makes the Supabase
+      // library delete the stored session, so checking afterwards would find
+      // nothing and wrongly sign in a brand-new user.
+      const stored = await hasStoredSession();
       const {
         data: { user },
         error: userError,
@@ -87,7 +104,7 @@ export const useSession = create<SessionState>((set) => ({
         // A stored session means we already have an identity. Never replace it
         // automatically — a brand-new anonymous user would lose every board
         // (docs/plan.md §8.3).
-        if (await hasStoredSession()) {
+        if (stored) {
           if (isNetworkError(userError)) {
             // Connectivity problem: keep the session, retry with backoff.
             set({ status: 'offline', error: 'Can\'t reach the board. Check your connection.' });

@@ -34,7 +34,8 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned to the CLI version used in development.
+          version: 2.117.0
 
       - name: Start local stack
         run: supabase start
@@ -46,7 +47,9 @@ jobs:
         run: supabase test db
 
       - name: Lint schema
-        run: supabase db lint --level warning
+        # --fail-on makes schema warnings fail the build (it otherwise always
+        # exits 0).
+        run: supabase db lint --level warning --fail-on warning
 
       - name: Stop local stack
         if: always()

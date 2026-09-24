@@ -190,6 +190,10 @@ begin
   if auth.uid() is null then
     raise exception 'not_authenticated';
   end if;
+  -- Count EVERY attempt before the lookup. A scripted guess (even a GET that
+  -- skips the app) is throttled; a valid join (preview then accept) is charged
+  -- once here, since accept only counts failed lookups.
+  perform public.hit_rate_limit('invite_try', 10, interval '1 hour');
   select * into v_inv
   from public.invites
   where token_hash = extensions.digest(coalesce(p_token_or_code, ''), 'sha256')
@@ -197,15 +201,10 @@ begin
   select * into v_board
   from public.boards
   where id = v_inv.board_id and deleted_at is null;
-  -- Only failed lookups count toward invite_try. A valid preview costs
-  -- nothing, so a join (preview then accept) isn't charged; scripted guessing
-  -- still is. Returning (rather than raising) lets the count commit — a raise
-  -- would roll it back and make brute force unthrottleable.
   if v_inv.id is null
      or v_inv.revoked_at is not null
      or v_inv.expires_at <= now()
      or v_board.id is null then
-    perform public.hit_rate_limit('invite_try', 10, interval '1 hour');
     return;
   end if;
   -- No board content: name, inviter, member first names and count only.

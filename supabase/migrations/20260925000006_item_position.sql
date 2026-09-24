@@ -54,6 +54,7 @@ begin
     raise exception 'invalid_input';
   end if;
 
+  perform public.hit_rate_limit('set_item_position', 600, interval '1 hour');
   -- Position is presentation metadata: bump updated_at but NOT version, so a
   -- member dragging a note never invalidates the author's in-flight edit.
   if p_x is null or p_y is null then
@@ -66,9 +67,10 @@ begin
   end if;
 
   update public.items
-  set layout = jsonb_build_object(
+  set       layout = jsonb_build_object(
         'x', greatest(0::double precision, least(1::double precision, p_x)),
-        'y', greatest(0::double precision, p_y),
+        -- Cap y too: one huge value would make the board enormous for everyone.
+        'y', least(greatest(0::double precision, p_y), 20000::double precision),
         'manual', true
       ),
       updated_by = auth.uid(),

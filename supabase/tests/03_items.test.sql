@@ -1,7 +1,7 @@
 -- Phase 1d: item RPCs — validation, authorship, versions, lifetimes.
 -- Roles: O owner/author, M member, S stranger.
 begin;
-select plan(64);
+select plan(67);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000021', 'authenticated', 'authenticated'),
@@ -272,6 +272,22 @@ select lives_ok(
 select ok(
   (select keep_until is null from public.items where id = 'c0000000-0000-0000-0000-000000000094'),
   'a pinned done date still never expires');
+
+-- Re-posting an existing item id must not attach new entries to it.
+select lives_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-000000000095', (select id from t_b),
+    'list', 'paper', null, 'Once', null, null, null, false,
+    '[{"id":"d0000000-0000-0000-0000-000000000003","text":"first"}]')$$,
+  'post a list');
+select lives_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-000000000095', (select id from t_b),
+    'list', 'paper', null, 'Once', null, null, null, false,
+    '[{"id":"d0000000-0000-0000-0000-000000000004","text":"second"}]')$$,
+  're-post the same list id');
+select is(
+  (select count(*)::integer from public.list_entries
+   where item_id = 'c0000000-0000-0000-0000-000000000095'),
+  1, 're-post does not attach entries to the existing item');
 reset role;
 
 select * from finish();

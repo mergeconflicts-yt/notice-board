@@ -330,6 +330,7 @@ set search_path = '' as $$
 declare
   v_item public.items%rowtype;
   v_tz text;
+  v_new_id uuid;
   v_e record;
   v_eid text;
   v_etext text;
@@ -367,6 +368,9 @@ begin
     if jsonb_typeof(p_entries) != 'array' or p_type != 'list' then
       raise exception 'invalid_input';
     end if;
+    if jsonb_array_length(p_entries) > 500 then
+      raise exception 'invalid_input';
+    end if;
   end if;
   perform public.hit_rate_limit('post_item', 300, interval '1 hour');
   insert into public.items (
@@ -380,8 +384,12 @@ begin
     public.default_keep_until(p_type, p_event_at, coalesce(p_pinned, false), now(), v_tz),
     auth.uid(), auth.uid()
   )
-  on conflict (id) do nothing;
-  if p_entries is not null then
+  on conflict (id) do nothing
+  returning id into v_new_id;
+  -- Only insert entries when THIS call created the item. A re-post with an
+  -- existing id (e.g. someone else's item, or a retry) must never attach
+  -- entries to it.
+  if p_entries is not null and v_new_id is not null then
     for v_e in select value from jsonb_array_elements(p_entries) loop
       if jsonb_typeof(v_e.value) != 'object' then
         raise exception 'invalid_input';
@@ -788,6 +796,10 @@ begin
     raise exception 'invalid_input';
   end if;
   if p_text is null or char_length(btrim(p_text)) not between 1 and 200 then
+    raise exception 'invalid_input';
+  end if;
+  perform public.hit_rate_limit('add_entry', 300, interval '1 hour');
+  if (select count(*) from public.list_entries where item_id = p_item_id) >= 500 then
     raise exception 'invalid_input';
   end if;
   insert into public.list_entries (id, item_id, board_id, text, position, created_by)

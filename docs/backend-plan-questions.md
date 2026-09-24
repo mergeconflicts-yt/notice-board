@@ -96,11 +96,19 @@ implemented slightly differently. Appended as work proceeds.
     deploy workflow is manual and unused). If it has, this history is already
     applied and the changed migrations must be squashed into a fresh baseline
     before shipping.
-17. **`invite_try` counts only failed lookups.** Plan §5 had both
-    `preview_invite` and `accept_invite` count, but a join calls preview *then*
-    accept, so the limit was charged twice per join. Both now count **only when
-    the lookup fails** (wrong/expired/revoked code, or a deleted board): a valid
-    join is free, while scripted guessing through either function is still
-    throttled. Unusable invitations return empty/NULL rather than raising so the
-    count commits (see #6); the 11th wrong guess raises `rate_limited`.
+17. **`invite_try` counting.** Plan §5 had both `preview_invite` and
+    `accept_invite` count, which charged the limit twice per join. Now
+    `preview_invite` counts **every attempt at the top of the function** (so a
+    scripted guess — even a GET that bypasses the app — is throttled), and
+    `accept_invite` counts **only failed lookups**. A valid join (preview then
+    accept) is therefore charged exactly once; the 11th wrong guess raises
+    `rate_limited`. Unusable invitations return empty/NULL rather than raising
+    so the count commits (see #6).
+18. **Photo signed URLs last 24 hours** (was 1h), to cut load/flicker; the
+    board re-signs every 12h / on foreground and only signs missing paths.
+    Trade-off: a removed member keeps read access to photos they already have
+    a signed URL for, for up to 24h. Shorten the expiry if that matters more.
+19. **`board_members` removed from Realtime.** Supabase does not apply RLS to
+    DELETE events, so publishing the table leaked who left any board to every
+    subscriber. The member list refreshes on focus/foreground instead.
 
