@@ -305,6 +305,18 @@ function mapMembership(row: MemberRow): BoardMembership {
   };
 }
 
+let channelSeq = 0;
+
+/**
+ * A fresh topic per subscription. Reusing a topic hands back the already
+ * subscribed channel, which rejects further `.on()` calls — and two screens
+ * (e.g. board + settings) routinely watch the same board at once.
+ */
+function freshTopic(base: string, boardId: string): string {
+  channelSeq += 1;
+  return `${base}-${boardId}-${Date.now().toString(36)}-${channelSeq}`;
+}
+
 function mapSettings(row: SettingsRow): UserSettings {
   const themes = ['system', 'light', 'dark'] as const;
   return {
@@ -454,7 +466,7 @@ export class SupabaseBackendV2 implements NoticeBackendV2 {
 
   onBoardChanged(boardId: string, cb: (board: BoardDetails | null) => void): Unsubscribe {
     const channel = this.client
-      .channel(`v2-board-${boardId}`)
+      .channel(freshTopic(`v2-board`, boardId))
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'boards', filter: `id=eq.${boardId}` },
@@ -468,7 +480,7 @@ export class SupabaseBackendV2 implements NoticeBackendV2 {
 
   onMembersChanged(boardId: string, cb: (members: BoardMembership[]) => void): Unsubscribe {
     const channel = this.client
-      .channel(`v2-members-${boardId}`)
+      .channel(freshTopic(`v2-members`, boardId))
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'board_members', filter: `board_id=eq.${boardId}` },
@@ -782,7 +794,7 @@ export class SupabaseBackendV2 implements NoticeBackendV2 {
 
   onItemsChanged(boardId: string, cb: (items: BoardItemWithAuthor[]) => void): Unsubscribe {
     const channel = this.client
-      .channel(`v2-items-${boardId}`)
+      .channel(freshTopic(`v2-items`, boardId))
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'board_items', filter: `board_id=eq.${boardId}` },
@@ -796,7 +808,7 @@ export class SupabaseBackendV2 implements NoticeBackendV2 {
 
   onEntriesChanged(boardId: string, cb: (entries: ListEntry[]) => void): Unsubscribe {
     const channel = this.client
-      .channel(`v2-entries-${boardId}`)
+      .channel(freshTopic(`v2-entries`, boardId))
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'list_entries', filter: `board_id=eq.${boardId}` },
@@ -818,7 +830,7 @@ export class SupabaseBackendV2 implements NoticeBackendV2 {
       return ((data as AssetRow[]) ?? []).map(mapAsset);
     };
     const channel = this.client
-      .channel(`v2-assets-${boardId}`)
+      .channel(freshTopic(`v2-assets`, boardId))
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'item_assets', filter: `board_id=eq.${boardId}` },
