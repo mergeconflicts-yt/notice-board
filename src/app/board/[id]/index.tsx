@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
-import { ScrollView } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { colors, boardColors, fonts } from '../../../theme';
-import { BoardNote } from '../../../components/BoardNote';
+import { BoardSection } from '../../../components/BoardSection';
+import { PinnedStrip } from '../../../components/PinnedStrip';
 import { Avatar } from '../../../components/Avatar';
 import { AddNoteSheet, NoteDraft } from '../../../components/AddNoteSheet';
 import { useBoard, randomId } from '../../../hooks/useBoard';
 import { useToast } from '../../../store/toast';
 import { friendlyMessage, signedPhotoUrl, uploadPhoto } from '../../../lib/api';
-import { boardCanvasHeight, computeBoardLayout, REF_W } from '../../../utils/layout';
 import { ItemWithAuthor } from '../../../types';
+
+/** Share of the board height reserved for the pinned-forever strip. */
+const PINNED_FLEX = 2;
+const REST_FLEX = 8;
 
 export default function BoardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -29,7 +32,6 @@ export default function BoardScreen() {
   } = useBoard(boardId);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [boardW, setBoardW] = useState(0);
   const [entering, setEntering] = useState<Set<string>>(() => new Set());
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const seenIdsRef = useRef<Set<string>>(new Set());
@@ -37,9 +39,9 @@ export default function BoardScreen() {
 
   const openItem = (item: ItemWithAuthor) => router.push(`/board/${boardId}/note/${item.id}`);
 
-  const layout = useMemo(() => computeBoardLayout(items), [items]);
-  const scale = boardW > 0 ? boardW / REF_W : 1;
-  const canvasH = useMemo(() => boardCanvasHeight(layout, scale), [layout, scale]);
+  // Two board regions: pinned-forever posts up top (30%), everything else below.
+  const pinnedItems = useMemo(() => items.filter((i) => i.pinned), [items]);
+  const restItems = useMemo(() => items.filter((i) => !i.pinned), [items]);
 
   // Animate freshly-arrived items, ignoring the first paint.
   useEffect(() => {
@@ -77,15 +79,7 @@ export default function BoardScreen() {
     };
   }, [items, photoUrls]);
 
-  // A note was dropped: convert canvas pixels to the stored (fraction, ref-point)
-  // space, keep it on the board, then persist.
-  const handleMove = (item: ItemWithAuthor, left: number, top: number) => {
-    if (boardW <= 0) return;
-    const placement = layout.get(item.id);
-    if (!placement) return;
-    const refScale = boardW / REF_W;
-    const x = Math.max(0.02, Math.min(1 - placement.w - 0.02, left / boardW));
-    const y = Math.max(0, top / refScale);
+  const handleMove = (item: ItemWithAuthor, x: number, y: number) => {
     moveItem(item, x, y).catch(() => {});
   };
 
@@ -191,34 +185,33 @@ export default function BoardScreen() {
           </Pressable>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.boardContent} showsVerticalScrollIndicator={false}>
-          <View
-            style={[styles.canvas, { height: canvasH }]}
-            onLayout={(e) => setBoardW(e.nativeEvent.layout.width)}
-          >
-            {boardW > 0
-              ? items.map((item) => {
-                  const p = layout.get(item.id);
-                  if (!p) return null;
-                  return (
-                    <BoardNote
-                      key={item.id}
-                      item={item}
-                      left={p.x * boardW}
-                      top={p.y * scale}
-                      width={p.w * boardW}
-                      rotation={p.rotation}
-                      animateIn={entering.has(item.id)}
-                      entries={entries.filter((e) => e.itemId === item.id)}
-                      photoUrl={item.photoPath ? photoUrls[item.photoPath] ?? null : null}
-                      onPress={openItem}
-                      onMove={handleMove}
-                    />
-                  );
-                })
-              : null}
+        <View style={styles.sections}>
+          <View style={styles.pinnedSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>📌 Pinned forever</Text>
+            </View>
+            <PinnedStrip
+              items={pinnedItems}
+              entries={entries}
+              photoUrls={photoUrls}
+              onOpen={openItem}
+            />
           </View>
-        </ScrollView>
+
+          <View style={styles.sectionDivider} />
+
+          <View style={styles.restSection}>
+            <BoardSection
+              items={restItems}
+              entries={entries}
+              photoUrls={photoUrls}
+              entering={entering}
+              onOpen={openItem}
+              onMove={handleMove}
+              emptyHint="Everything else lives here."
+            />
+          </View>
+        </View>
       )}
 
       {!isEmpty ? (
@@ -297,8 +290,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 4,
   },
-  boardContent: { paddingHorizontal: 6, paddingBottom: 120 },
-  canvas: { position: 'relative' },
+  sections: { flex: 1 },
+  pinnedSection: { flex: PINNED_FLEX },
+  restSection: { flex: REST_FLEX },
+  sectionHeader: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 2 },
+  sectionTitle: {
+    fontFamily: fonts.ui.bold,
+    fontSize: 12,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: colors.inkSoft,
+  },
+  sectionDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(62, 54, 46, 0.28)',
+    marginHorizontal: 16,
+    marginVertical: 6,
+  },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingBottom: 60 },
   emptyHand: { fontSize: 40, marginBottom: 12 },
   emptyTitle: { fontFamily: fonts.hand.bold, fontSize: 32, color: colors.ink, marginBottom: 6 },

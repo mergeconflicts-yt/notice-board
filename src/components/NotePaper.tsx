@@ -18,6 +18,8 @@ type Props = {
   minHeight?: number;
   /** Show every checklist row instead of the first few. */
   showAllEntries?: boolean;
+  /** Cap on visible checklist rows before a "+N more" line (default 6). */
+  maxEntries?: number;
   entries?: ListEntry[];
   onToggleEntry?: (entry: ListEntry) => void;
   /** Resolved signed URL for a photo item. */
@@ -40,6 +42,7 @@ export function NotePaper({
   showAttribution = true,
   minHeight,
   showAllEntries = false,
+  maxEntries,
   entries = [],
   onToggleEntry,
   photoUrl,
@@ -106,6 +109,7 @@ export function NotePaper({
             item={item}
             entries={entries}
             large={large || showAllEntries}
+            maxEntries={maxEntries}
             onToggleEntry={onToggleEntry}
           />
         ) : variant === 'appointment' ? (
@@ -193,15 +197,17 @@ function ListBody({
   item,
   entries,
   large,
+  maxEntries,
   onToggleEntry,
 }: {
   item: ItemWithAuthor;
   entries: ListEntry[];
   large: boolean;
+  maxEntries?: number;
   onToggleEntry?: (entry: ListEntry) => void;
 }) {
   const sorted = [...entries].sort((a, b) => a.position - b.position);
-  const visible = large ? sorted : sorted.slice(0, ENTRY_LIMIT);
+  const visible = large ? sorted : sorted.slice(0, maxEntries ?? ENTRY_LIMIT);
   const truncated = visible.length < sorted.length;
   return (
     <View>
