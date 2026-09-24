@@ -158,7 +158,8 @@ export class LocalBackendV2 implements NoticeBackendV2 {
   }
 
   private withAuthor(item: BoardItem): BoardItemWithAuthor {
-    return { ...item, author: this.db.users[item.createdBy] ?? null };
+    // createdBy is null once the creator's account is gone.
+    return { ...item, author: item.createdBy ? (this.db.users[item.createdBy] ?? null) : null };
   }
 
   async ensureProfile(displayName: string, avatar?: string | null): Promise<User> {

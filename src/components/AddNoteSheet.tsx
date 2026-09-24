@@ -71,12 +71,24 @@ function expiryDateFor(kind: ExpiryKind): Date | null {
 function expiryIndexFor(expiresAt: string | null | undefined): number {
   if (!expiresAt) return 0;
   const target = new Date(expiresAt).getTime();
-  const idx = EXPIRY_OPTIONS.findIndex((o) => {
+  // -1 when the stored date matches no fresh relative option (e.g. a "This
+  // week" expiry set days ago): the caller preserves it as-is instead of
+  // silently resetting to "Keep forever".
+  return EXPIRY_OPTIONS.findIndex((o) => {
     const at = expiryDateFor(o.kind);
     if (!at) return false;
     return Math.abs(at.getTime() - target) < 12 * 3600000;
   });
-  return idx >= 0 ? idx : 0;
+}
+
+function formatKeptExpiry(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 'current date';
+  return d.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
 function expiryRowLabel(idx: number): string {
@@ -190,6 +202,9 @@ export function AddNoteSheet({
     return d;
   }, []);
   const [expiryIdx, setExpiryIdx] = useState(0);
+  // A stored expiry that matches no relative option, kept verbatim until the
+  // user picks a standard option (which clears it).
+  const [keepExpiry, setKeepExpiry] = useState<string | null>(null);
   const [expiryOpen, setExpiryOpen] = useState(false);
   const [picking, setPicking] = useState(false);
   const [wasOpen, setWasOpen] = useState(false);
@@ -217,7 +232,9 @@ export function AddNoteSheet({
       setText(initial?.text ?? '');
       setImage(initial?.imageUrl ?? null);
       setColor(initial?.color ?? colorForNote(randomId()));
-      setExpiryIdx(expiryIndexFor(initial?.expiresAt));
+      const matched = expiryIndexFor(initial?.expiresAt);
+      setExpiryIdx(matched >= 0 ? matched : 0);
+      setKeepExpiry(matched >= 0 || !initial?.expiresAt ? null : initial.expiresAt);
       setExpiryOpen(false);
       if (nextTab === 'list') {
         const seed = rowsFromInitial(initial?.text ?? '', initial?.data ?? null);
@@ -344,7 +361,9 @@ export function AddNoteSheet({
 
   const submit = () => {
     const expiry = expiryDateFor(EXPIRY_OPTIONS[expiryIdx].kind);
-    const expiresAt = expiry ? expiry.toISOString() : null;
+    // A preserved custom date wins over the (defaulted) option index, so
+    // saving without touching the expiry row keeps the original date.
+    const expiresAt = keepExpiry ?? (expiry ? expiry.toISOString() : null);
     if (tab === 'list') {
       const items = filledRows.map((r) => ({ text: r.text.trim(), done: r.done }));
       const lines = [
@@ -745,6 +764,7 @@ export function AddNoteSheet({
                       style={[styles.expiryOption, i > 0 && styles.expiryOptionBorder]}
                       onPress={() => {
                         setExpiryIdx(i);
+                        setKeepExpiry(null);
                         setExpiryOpen(false);
                       }}
                     >
@@ -756,7 +776,7 @@ export function AddNoteSheet({
                       >
                         {opt.label}
                       </Text>
-                      {i === expiryIdx ? (
+                      {i === expiryIdx && !keepExpiry ? (
                         <MaterialCommunityIcons
                           name="check"
                           size={20}
@@ -765,6 +785,21 @@ export function AddNoteSheet({
                       ) : null}
                     </Pressable>
                   ))}
+                  {keepExpiry ? (
+                    <Pressable
+                      style={[styles.expiryOption, styles.expiryOptionBorder]}
+                      onPress={() => setExpiryOpen(false)}
+                    >
+                      <Text style={[styles.expiryOptionText, styles.expiryOptionTextActive]}>
+                        Keep {formatKeptExpiry(keepExpiry)}
+                      </Text>
+                      <MaterialCommunityIcons
+                        name="check"
+                        size={20}
+                        color={colors.accentDeep}
+                      />
+                    </Pressable>
+                  ) : null}
                 </View>
               ) : null}
               <Pressable
@@ -772,7 +807,11 @@ export function AddNoteSheet({
                 onPress={() => setExpiryOpen((v) => !v)}
               >
                 <MaterialCommunityIcons name="clock-outline" size={22} color={colors.inkSoft} />
-                <Text style={styles.expiryText}>{expiryRowLabel(expiryIdx)}</Text>
+                <Text style={styles.expiryText}>
+                  {keepExpiry
+                    ? `Expires ${formatKeptExpiry(keepExpiry)}`
+                    : expiryRowLabel(expiryIdx)}
+                </Text>
                 <View style={styles.expirySpacer} />
                 <MaterialCommunityIcons
                     name={expiryOpen ? 'chevron-up' : 'chevron-right'}

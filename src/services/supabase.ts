@@ -28,7 +28,7 @@ type ProfileRow = {
 type BoardRow = {
   id: string;
   name: string;
-  owner_id: string;
+  owner_id: string | null;
   invite_code: string;
   created_at: string;
 };
@@ -41,7 +41,7 @@ type MemberRow = {
 type NoteRow = {
   id: string;
   board_id: string;
-  author_id: string;
+  author_id: string | null;
   text: string;
   image_url: string | null;
   color: string;

@@ -8,7 +8,8 @@ export type User = {
 export type Board = {
   id: string;
   name: string;
-  ownerId: string;
+  /** Null once the creating account is gone — the board itself survives. */
+  ownerId: string | null;
   inviteCode: string;
   createdAt: string;
 };
@@ -28,7 +29,8 @@ export type NoteKind = 'note' | 'photo' | 'list' | 'appointment';
 export type Note = {
   id: string;
   boardId: string;
-  authorId: string;
+  /** Null once the author's account is gone — the post itself survives. */
+  authorId: string | null;
   text: string;
   imageUrl: string | null;
   color: NoteColor;
@@ -81,7 +83,8 @@ export type BoardItem = {
   expiresAt: string | null;
   paper: ItemPaper;
   layout: ItemLayout;
-  createdBy: string;
+  /** Null once the creator's account is gone — the item itself survives. */
+  createdBy: string | null;
   createdAt: string;
   updatedBy: string | null;
   updatedAt: string | null;

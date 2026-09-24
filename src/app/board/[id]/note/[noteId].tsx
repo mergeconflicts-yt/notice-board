@@ -9,7 +9,6 @@ import { AddNoteSheet, NoteSheetInput } from '../../../../components/AddNoteShee
 import { useBoardMembers, useBoardNotes } from '../../../../hooks/useBoardV2';
 import { useSession } from '../../../../store/session';
 import { REF_W, computeBoardLayout, widthFracForNote } from '../../../../utils/layout';
-import { parseListItems } from '../../../../utils/note';
 
 /** Cap so a tiny note never balloons past this when scaled up. */
 const MAX_SCALE = 2.8;
@@ -44,7 +43,9 @@ export default function NoteDetailScreen() {
     );
   }
 
-  const isList = note.kind === 'list' || parseListItems(note.text).items.length > 0;
+  // Only a chosen list gets checkboxes: guessing from the text produced
+  // rows with no backing entries whose taps silently did nothing.
+  const isList = note.kind === 'list';
   const isCreator = !!me && me.id === note.authorId;
   const done = Boolean(note.completedAt);
 

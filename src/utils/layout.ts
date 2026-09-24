@@ -36,15 +36,15 @@ export const TWO_COL_MIN_W = 0.41;
 export const TWO_COL_MIN_H = 140;
 
 /** Stable width seed shared by creation-time packing and render. */
-function widthSeed(input: { text: string; kind: string; authorId: string }): string {
-  return `${input.text}|${input.kind}|${input.authorId}`;
+function widthSeed(input: { text: string; kind: string; authorId: string | null }): string {
+  return `${input.text}|${input.kind}|${input.authorId ?? ''}`;
 }
 
 type DimsInput = {
   text: string;
   imageUrl: string | null;
   kind: string;
-  authorId: string;
+  authorId: string | null;
   expiresAt?: string | null;
   data?: Record<string, unknown> | null;
 };

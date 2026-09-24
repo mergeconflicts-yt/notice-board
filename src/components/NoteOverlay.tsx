@@ -6,7 +6,6 @@ import { NotePaper } from './NotePaper';
 import { ErrorBoundary } from './ErrorBoundary';
 import { AddNoteSheet, NoteSheetInput } from './AddNoteSheet';
 import { BoardLayout, REF_W, widthFracForNote } from '../utils/layout';
-import { parseListItems } from '../utils/note';
 import { BoardMembership, NotePatch, NoteWithAuthor, User } from '../types';
 
 /** Cap so a tiny note never balloons past this when scaled up. */
@@ -54,7 +53,9 @@ export function NoteOverlay({
     return () => clearTimeout(t);
   }, []);
 
-  const isList = note.kind === 'list' || parseListItems(note.text).items.length > 0;
+  // Only a chosen list gets checkboxes: guessing from the text produced
+  // rows with no backing entries whose taps silently did nothing.
+  const isList = note.kind === 'list';
   const isCreator = !!me && me.id === note.authorId;
   const done = Boolean(note.completedAt);
 

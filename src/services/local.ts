@@ -215,7 +215,8 @@ export class LocalBackend implements NoticeBackend {
         ...n,
         // Normalize the retired 'grocery' kind to 'list' on read.
         kind: ((n.kind as string) === 'grocery' ? 'list' : n.kind) as Note['kind'],
-        author: this.db.users[n.authorId] ?? null,
+        // authorId is null once the author's account is gone.
+        author: n.authorId ? (this.db.users[n.authorId] ?? null) : null,
       }))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }

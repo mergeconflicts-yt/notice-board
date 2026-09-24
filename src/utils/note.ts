@@ -92,15 +92,29 @@ export function pinVariantForNote(input: {
   kind: string;
   expiresAt: string | null;
 }): PinVariant {
-  if (input.imageUrl || input.kind === 'photo') return 'photo';
+  const kind = input.kind ?? '';
+  if (input.imageUrl || kind === 'photo') return 'photo';
+  if (kind === 'list' || kind === 'grocery') return 'list';
+  if (kind === 'appointment' || kind === 'date') return 'appointment';
 
   const text = (input.text ?? '').trim();
-  if (input.kind === 'list' || input.kind === 'grocery' || parseMarkedItems(text).items.length >= 1) {
+
+  // A chosen plain note stays a plain note: the words are never
+  // second-guessed into a list, appointment, or receipt style. Only the
+  // size-based mini/announcement styles still apply.
+  if (kind === 'note') {
+    const lineCount = text.split('\n').filter((l) => l.trim()).length;
+    if (text.length >= 110 || lineCount >= 4) return 'announcement';
+    if (!text.includes('\n') && text.length <= 26 && input.expiresAt == null) return 'mini';
+    return 'note';
+  }
+
+  // Unknown kinds (legacy/defensive): keep the old content-guessing behavior.
+  if (parseMarkedItems(text).items.length >= 1) {
     return 'list';
   }
 
   if (
-    input.kind === 'appointment' ||
     (TIME_RE.test(text) && (DAY_RE.test(text) || APPT_WORD_RE.test(text))) ||
     (input.expiresAt != null && TIME_RE.test(text) && text.length <= 80)
   ) {

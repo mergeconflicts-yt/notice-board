@@ -40,7 +40,7 @@ type ProfileRow = {
 type BoardRow = {
   id: string;
   name: string;
-  owner_id: string;
+  owner_id: string | null;
   invite_code: string;
   created_at: string;
   created_by: string | null;
@@ -73,7 +73,7 @@ type ItemRow = {
   expires_at: string | null;
   paper: { color?: unknown; rotation?: unknown } | null;
   layout: { x?: unknown; y?: unknown; manual?: unknown } | null;
-  created_by: string;
+  created_by: string | null;
   created_at: string;
   updated_by: string | null;
   updated_at: string | null;

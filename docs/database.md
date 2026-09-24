@@ -13,7 +13,12 @@ only entry point.
 - **Write boundary.** Clients never send actor fields (`created_by`,
   `updated_by`, …), timestamps, or versions. `BEFORE` stamp triggers fill
   those from `auth.uid()` whenever a signed-in caller writes; anonymous
-  migration/service writes pass through untouched.
+  migration/service writes pass through untouched. Every actor WHO-column
+  (`completed_by`, `checked_by`, `uploaded_by`, `deleted_by`) is
+  server-decided too: stamped on the transition that implies the action
+  (or on insert when the flag arrives set), pinned to the old value
+  otherwise — so a member can never make it look like someone else
+  posted, ticked, completed, or deleted something.
 - **Soft deletes.** `board_items`, `list_entries`, `boards` (and `notes`
   legacy-side via `completed_at`) use `deleted_by`/`deleted_at`. Setting or
   clearing `deleted_at` stamps/clears `deleted_by` and logs `delete`/`restore`
@@ -21,6 +26,16 @@ only entry point.
 - **Versions.** `boards`, `board_items`, `list_entries` carry an integer
   `version`, bumped by triggers on every update — the optimistic-concurrency
   token the API checks.
+- **User deletion.** Deleting an auth user only clears attribution
+  (`boards.owner_id` / audit stamps, `notes.author_id`,
+  `board_items.created_by` are `ON DELETE SET NULL`). Boards and posts
+  survive; only the user's own profile, settings, and membership rows go
+  away with them.
+- **Visibility.** Profiles and photos are member-scoped, never public:
+  a profile is readable only by its owner and co-members of a shared
+  board; a legacy-bucket photo only by members of a board whose notes
+  reference it. Anonymous sign-ins are free, so "signed in" alone grants
+  nothing — every read policy keys off `board_members`.
 
 ## Tables (`public` schema unless noted)
 
@@ -34,10 +49,12 @@ One row per profile. `user_id uuid PK → profiles ON DELETE CASCADE`,
 nullable text, `theme` in (`system`,`light`,`dark`), `reduce_motion bool`.
 
 ### `boards`
-`id`, `name text`, `owner_id → auth.users` (original creator, immutable),
-`invite_code text UNIQUE NOT NULL` (legacy; new boards get a dummy
-`v2-…` value — invites live in `board_invites` now), `created_by/at`,
-`updated_by/at`, `deleted_by/at` (soft delete), `version`, `settings jsonb`.
+`id`, `name text`, `owner_id → auth.users ON DELETE SET NULL`, nullable
+(original creator, immutable; null once their account is gone — the board
+survives), `invite_code text UNIQUE NOT NULL` (legacy; new boards get a
+dummy `v2-…` value — invites live in `board_invites` now), `created_by/at`,
+`updated_by/at`, `deleted_by/at` (soft delete; the user links are
+`ON DELETE SET NULL`), `version`, `settings jsonb`.
 
 ### `board_members`
 PK (`board_id`, `user_id`). `role` in (`owner`,`admin`,`member`) — the owner
@@ -56,6 +73,8 @@ The note itself. `id`, `board_id`, `type` (`note`/`photo`/`list`/`date`),
 `expires_at`, `paper jsonb` (`{color, rotation, …}`),
 `layout jsonb NULL` (`{x, y, manual}` only when hand-placed; null = auto),
 `created/updated/completed/deleted_by + _at`, `version`.
+`created_by → profiles ON DELETE SET NULL` (null once the creator's account
+is gone — the item survives); the other actor stamps carry no FK.
 
 ### `list_entries` (realtime)
 Checklist rows. `id`, `board_id`, `item_id → board_items ON DELETE CASCADE`,
@@ -77,7 +96,8 @@ Audit trail. `id`, `board_id`, `actor_id NULL` (null = server-side write),
 `request_id NULL` (reserved for client idempotency keys), `created_at`.
 
 ### `notes` (legacy, frozen)
-The original table (`author_id`, `text`, `image_url`, `color`, `rotation`,
+The original table (`author_id NULL → auth.users / profiles
+ON DELETE SET NULL`, `text`, `image_url`, `color`, `rotation`,
 `position_x/y`, `kind`, `data`, timestamps, `expires_at`, `completed_at`).
 Kept so old clients keep working; superseded by `board_items` and friends.
 Do not extend it.
@@ -95,11 +115,11 @@ Do not extend it.
 | `board_items`, `list_entries`, `item_assets` | `*_member_all` (ALL) | full CRUD for members; deletes flow through soft-delete convention |
 | `board_invites` | `board_invites_member_read` (SELECT) | members can list/manage; all writes via RPCs |
 | `board_events` | `board_events_member_read` (SELECT) | read-only trail; only triggers insert |
-| `profiles` | read all signed-in; insert/update own row | — |
+| `profiles` | `profiles_member_read` (SELECT: own row + co-members of a shared board); insert/update own row | anon key alone lists nothing |
 | `user_settings` | select/insert/update own row | — |
 | `notes` (legacy) | member read/insert/update/delete | unchanged |
 | `storage.objects` | `board_media_member_*` (SELECT/INSERT/UPDATE/DELETE) | path must be `board/<id>/…` and caller a member of `<id>` |
-| `storage.objects` | `notes_images_*` (legacy bucket) | unchanged |
+| `storage.objects` | `notes_images_member_read` (SELECT: object referenced by a note on a caller's board), `notes_images_member_upload` (INSERT: board members, own `<uid>/…` folder), `notes_images_owner_delete` (DELETE: own folder) | legacy bucket is private; no update policy |
 
 ## Realtime publication (`supabase_realtime`)
 
@@ -128,7 +148,7 @@ Dropped after serving: `migrate_notes_to_board_items()` (legacy backfill).
 | Bucket | Visibility | Used by |
 |---|---|---|
 | `board-media` | **private** | v2 photo flow; clients use time-boxed signed URLs only |
-| `notes` | private (legacy; auto-flipped once empty) | old public URLs — see `scripts/migrate-legacy-photos.cjs` for moving leftovers |
+| `notes` | **private** (legacy; flipped unconditionally — public buckets bypass RLS) | member-scoped reads via note references; run `scripts/migrate-legacy-photos.cjs` to move leftovers into `board-media` (legacy public URLs stop resolving until moved) |
 
 ## Migrations (in order)
 
@@ -147,6 +167,17 @@ Dropped after serving: `migrate_notes_to_board_items()` (legacy backfill).
 13. `20260924061300_stamp_completed_by` — completion attribution.
 14. `20260924063412_create_list_item_rpc` — atomic list creation.
 15. `20260924063500_privatize_legacy_bucket` — privatizes `notes` once empty.
+16. `20260924070000_user_cleanup_set_null` — owner/author/audit user links
+    become `ON DELETE SET NULL` (nullable) so deleting an account only clears
+    attribution; memberships still cascade (PK), board content still cascades
+    off deleted boards.
+17. `20260924070100_close_public_reads` — profiles visible to self +
+    co-members only; legacy `notes` bucket privatised with member-scoped
+    read / own-folder member upload / own-folder delete.
+18. `20260924070200_lock_actor_stamps` — `completed_by` / `checked_by` /
+    `uploaded_by` / `deleted_by` stamped-or-pinned server-side, closing
+    attribution forgery (including `checked_by` on insert and
+    `uploaded_by` on update).
 
 ## Legacy → v2 field mapping (what the backfill did)
 
