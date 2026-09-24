@@ -19,3 +19,5 @@ export function inviteMessage(boardName: string, token: string): string {
 export function inviteCodeMessage(boardName: string, code: string): string {
   return `Join “${boardName}” on Notice Board. Invite code: ${code}`;
 }
+
+export { parseInviteInput } from '../utils/invite';

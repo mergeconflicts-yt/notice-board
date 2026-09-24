@@ -6,8 +6,8 @@ import { colors, fonts } from '../theme';
 import { Button } from '../components/Button';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { acceptInvite, friendlyMessage, previewInvite } from '../lib/api';
+import { parseInviteInput } from '../lib/inviteLinks';
 import { useSession } from '../store/session';
-import { normalizeInviteCode } from '../utils/id';
 
 export default function JoinBoardScreen() {
   const user = useSession((s) => s.user);
@@ -16,13 +16,16 @@ export default function JoinBoardScreen() {
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const clean = normalizeInviteCode(code);
+  // Send what the user typed (or pasted), unnormalized: tokens are
+  // case-sensitive. The server tries the raw value as a token and a
+  // normalized copy as a code.
+  const invite = parseInviteInput(code);
 
   const preview = async () => {
-    if (!clean) return;
+    if (!invite) return;
     setError(null);
     try {
-      const info = await previewInvite(clean);
+      const info = await previewInvite(invite);
       setBoardName(info?.boardName ?? null);
       if (!info) setError('Hmm, that code doesn’t match any board.');
     } catch (e) {
@@ -31,11 +34,11 @@ export default function JoinBoardScreen() {
   };
 
   const join = async () => {
-    if (!clean || joining) return;
+    if (!invite || joining) return;
     setJoining(true);
     setError(null);
     try {
-      const boardId = await acceptInvite(clean, user?.displayName ?? null);
+      const boardId = await acceptInvite(invite, user?.displayName ?? null);
       if (!boardId) {
         setError('That invite isn’t working. Ask for a fresh link.');
         setJoining(false);
@@ -78,7 +81,7 @@ export default function JoinBoardScreen() {
           <Button
             label="Join"
             onPress={join}
-            disabled={!clean || joining}
+            disabled={!invite || joining}
             style={styles.join}
           />
         </View>

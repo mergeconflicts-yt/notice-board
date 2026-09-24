@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import * as Crypto from 'expo-crypto';
 import { supabase } from '../lib/supabase';
 import {
@@ -144,6 +145,20 @@ export function useBoard(boardId: string) {
     return load();
   }, [load]);
 
+  // Safety net: refresh the board row whenever a board screen regains focus
+  // (covers a missed realtime event or a change made on another device).
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      void getBoard(boardId).then((next) => {
+        if (alive) setBoard(next);
+      });
+      return () => {
+        alive = false;
+      };
+    }, [boardId]),
+  );
+
   // Realtime: one channel per open board. Rows are applied in place; a
   // reconnect (SUBSCRIBED after a drop) triggers a delta read instead of a
   // full refetch.
@@ -171,6 +186,25 @@ export function useBoard(boardId: string) {
           setItems((prev) => {
             const without = prev.filter((i) => i.id !== mapped.id);
             return expired ? without : [...without, mapped];
+          });
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'boards', filter: `id=eq.${boardId}` },
+        (payload) => {
+          if (payload.eventType === 'DELETE') {
+            setBoard(null);
+            return;
+          }
+          const row = payload.new as { deleted_at?: string | null };
+          if (row.deleted_at) {
+            setBoard(null);
+            return;
+          }
+          // The row is raw; refetch to map it (and pick up name/colour).
+          void getBoard(boardId).then((next) => {
+            if (next) setBoard(next);
           });
         },
       )

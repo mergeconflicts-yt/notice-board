@@ -202,7 +202,9 @@ export async function getBoard(boardId: string): Promise<Board | null> {
     .eq('id', boardId)
     .maybeSingle();
   if (error) raise(error);
-  return data ? mapBoard(data) : null;
+  if (!data) return null;
+  const board = mapBoard(data);
+  return board.deletedAt ? null : board;
 }
 
 export async function getMembers(boardId: string): Promise<BoardMember[]> {
