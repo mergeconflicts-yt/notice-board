@@ -26,3 +26,28 @@ jobs:
 
       - name: Unit tests
         run: node scripts/run-unit-tests.cjs
+
+  database:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local stack
+        run: supabase start
+
+      - name: Apply migrations
+        run: supabase db reset
+
+      - name: pgTAP tests
+        run: supabase test db
+
+      - name: Lint schema
+        run: supabase db lint --level warning
+
+      - name: Stop local stack
+        if: always()
+        run: supabase stop

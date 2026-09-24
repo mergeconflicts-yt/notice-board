@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import type { PinVariant } from '../utils/note';
+import type { PaperVariant } from '../utils/note';
 import { seeded } from '../utils/id';
 
 export type PinAlign = 'left' | 'center' | 'right';
@@ -28,20 +28,17 @@ const STICKER_BG = ['#F6C445', '#F194B4', '#9CCB86', '#8FB8DE', '#C3B2E8', '#F49
 const STICKER_EMOJI = ['❤️', '⭐', '🌸', '🔥', '🎈', '🍀'];
 
 /** Which fasteners each paper type can wear. */
-const SETS: Record<PinVariant, FastenerKind[]> = {
+const SETS: Record<PaperVariant, FastenerKind[]> = {
   note: ['pin', 'tape', 'scotch', 'clip', 'sticker', 'tack'],
-  mini: ['pin', 'tape', 'scotch', 'clip', 'sticker', 'tack'],
-  announcement: ['pin', 'tape', 'scotch', 'clip', 'sticker', 'tack'],
   photo: ['pin', 'clip', 'sticker', 'tack'],
   list: ['pin', 'clip', 'tack', 'sticker'],
   appointment: ['pin', 'sticker', 'clip', 'tack', 'tape'],
-  receipt: ['tape', 'scotch'],
 };
 
 const ALIGNS: PinAlign[] = ['left', 'center', 'right'];
 
-/** Deal a random-but-stable fastener per note, like a real junk-drawer board. */
-export function fastenerForNote(seed: string, variant: PinVariant): Fastener {
+/** Deal a random-but-stable fastener per item, like a real junk-drawer board. */
+export function fastenerForItem(seed: string, variant: PaperVariant): Fastener {
   const rand = seeded(seed);
   const set = SETS[variant] ?? SETS.note;
   const kind = set[Math.floor(rand() * set.length)];

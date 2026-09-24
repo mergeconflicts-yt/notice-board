@@ -1,123 +1,62 @@
-import { useEffect, useState } from 'react';
 import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
-import { NoteWithAuthor } from '../types';
+import { ItemWithAuthor, ListEntry } from '../types';
 import { colors, noteColors, fonts } from '../theme';
-import { FastenerView, fastenerForNote } from './Pin';
-import { expiresShort, clockTime } from '../utils/time';
+import { FastenerView, fastenerForItem } from './Pin';
 import {
-  fontSizeForText,
-  parseListItems,
-  pinVariantForNote,
-  PinVariant,
+  PaperVariant,
+  formatEventDate,
+  formatEventTime,
+  keepUntilLabel,
+  paperVariantFor,
 } from '../utils/note';
 
 type Props = {
-  note: NoteWithAuthor;
+  item: ItemWithAuthor;
   large?: boolean;
   showAttribution?: boolean;
   /** Floor for the rendered height, so small papers still fill their slot. */
   minHeight?: number;
-  /** Show every list item instead of trimming to the first few. */
-  showAllItems?: boolean;
-  /** When provided (detail screen), list checkboxes become tappable for everyone. */
-  onToggleItem?: (index: number) => void;
+  /** Show every checklist row instead of the first few. */
+  showAllEntries?: boolean;
+  entries?: ListEntry[];
+  onToggleEntry?: (entry: ListEntry) => void;
+  /** Resolved signed URL for a photo item. */
+  photoUrl?: string | null;
 };
 
-const RADIUS: Record<PinVariant, number> = {
-  mini: 2,
+const RADIUS: Record<PaperVariant, number> = {
   note: 2,
-  announcement: 3,
-  photo: 4,
   list: 6,
   appointment: 2,
-  receipt: 3,
-};
-
-const LINES: Record<PinVariant, number> = {
-  mini: 3,
-  note: 6,
-  announcement: 8,
   photo: 4,
-  list: 99,
-  appointment: 5,
-  receipt: 8,
 };
 
-const ratioCache = new Map<string, number>();
-
-/** Measured width/height of a photo so the polaroid fits it exactly — never cropped. */
-function useImageRatio(uri: string | null): number | null {
-  const [ratio, setRatio] = useState<number | null>(() =>
-    uri ? (ratioCache.get(uri) ?? null) : null,
-  );
-
-  useEffect(() => {
-    if (!uri || ratioCache.has(uri)) return;
-    let alive = true;
-    Image.getSize(
-      uri,
-      (w, h) => {
-        if (!alive || w <= 0 || h <= 0) return;
-        const r = w / h;
-        ratioCache.set(uri, r);
-        setRatio(r);
-      },
-      () => {
-        if (alive) {
-          ratioCache.set(uri, 4 / 3);
-          setRatio(4 / 3);
-        }
-      },
-    );
-    return () => {
-      alive = false;
-    };
-  }, [uri]);
-
-  return ratio;
-}
+const TITLE_LINES = 3;
+const ENTRY_LIMIT = 6;
 
 export function NotePaper({
-  note,
+  item,
   large = false,
   showAttribution = true,
   minHeight,
-  showAllItems = false,
-  onToggleItem,
+  showAllEntries = false,
+  entries = [],
+  onToggleEntry,
+  photoUrl,
 }: Props) {
-  const variant = pinVariantForNote(note);
-  const palette = noteColors[note.color];
-  const done = Boolean(note.completedAt);
-  const expiry = expiresShort(note.expiresAt);
+  const variant = paperVariantFor(item.type);
+  const palette = noteColors[item.color];
+  const done = Boolean(item.doneAt);
+  const expiry = keepUntilLabel(item.keepUntil);
 
   const isPhoto = variant === 'photo';
   const isList = variant === 'list';
-  const isSticky = variant === 'note' || variant === 'mini' || variant === 'announcement' || variant === 'appointment';
-  // Notebook / polaroid / slip papers are warm white; stickies keep their pastel color.
-  const cardBg = isPhoto || isList ? '#FFFDF7' : palette.bg;
-  const ink = isList ? colors.ink : palette.ink;
+  const cardBg = item.color === 'paper' ? '#FFFDF7' : palette.bg;
+  const borderColor = item.color === 'paper' ? '#EAE0CC' : palette.edge;
 
-  const rawData = note.data as { eventAt?: unknown } | null;
-  const eventIso =
-    rawData && typeof rawData.eventAt === 'string' && rawData.eventAt ? rawData.eventAt : null;
-  const eventDate = eventIso ? new Date(eventIso) : null;
-  const validEventDate = eventDate && !Number.isNaN(eventDate.getTime()) ? eventDate : null;
-  const photoRatio = useImageRatio(isPhoto ? note.imageUrl : null);
+  const bodyFontSize = large ? 26 : item.type === 'note' ? 20 : 18;
 
-  const bodyFontSize =
-    variant === 'mini'
-      ? 19
-      : variant === 'announcement'
-        ? large
-          ? 32
-          : 27
-        : variant === 'appointment'
-          ? large
-            ? 26
-            : 22
-          : large
-            ? 30
-            : fontSizeForText(note.text);
+  const authorName = item.author?.displayName ?? (item.createdBy ? null : 'Former member');
 
   return (
     <View
@@ -125,25 +64,18 @@ export function NotePaper({
         styles.paper,
         {
           backgroundColor: cardBg,
-          borderColor: isPhoto || isList ? '#EAE0CC' : palette.edge,
-          borderWidth: isSticky ? 0 : 1,
-          shadowColor: isPhoto || isList ? colors.shadow : palette.shadow,
-          shadowOpacity: isSticky ? 0.28 : 0.22,
-          shadowRadius: isSticky ? 10 : 7,
-          shadowOffset: isSticky ? { width: 0, height: 6 } : { width: 0, height: 4 },
-          elevation: isSticky ? 5 : 4,
+          borderColor,
+          borderWidth: item.color === 'paper' ? 1 : 0,
+          shadowColor: palette.shadow,
           borderRadius: RADIUS[variant],
-          borderTopWidth: isList ? 0 : undefined,
           minHeight: minHeight ?? undefined,
-          padding: large ? 22 : variant === 'mini' ? 12 : variant === 'receipt' ? 14 : 16,
-          paddingTop: isList ? (large ? 36 : 32) : undefined,
-          paddingLeft: undefined,
-          paddingBottom: isPhoto ? (large ? 18 : 14) : undefined,
+          padding: large ? 22 : variant === 'photo' ? 14 : 16,
+          paddingTop: isList ? (large ? 34 : 30) : undefined,
         },
       ]}
     >
       <View accessible={false}>
-        <FastenerView fastener={fastenerForNote(note.id, variant)} />
+        <FastenerView fastener={fastenerForItem(item.id, variant)} />
       </View>
 
       {isList ? (
@@ -158,110 +90,98 @@ export function NotePaper({
       ) : null}
 
       <View style={styles.body}>
-      {isPhoto && note.imageUrl ? (
-        <Image
-          source={{ uri: note.imageUrl }}
-          style={[styles.image, { borderRadius: 2, aspectRatio: photoRatio ?? 4 / 3 }]}
-          resizeMode="cover"
-          accessible
-          accessibilityLabel={note.text.trim() ? note.text.trim() : 'Attached photo'}
-          accessibilityRole="image"
-        />
-      ) : null}
+        {isPhoto && photoUrl ? (
+          <Image
+            source={{ uri: photoUrl }}
+            style={[styles.image, { borderRadius: 2, aspectRatio: 4 / 3 }]}
+            resizeMode="cover"
+            accessible
+            accessibilityLabel={item.body?.trim() ? item.body.trim() : 'Attached photo'}
+            accessibilityRole="image"
+          />
+        ) : null}
 
-      {variant === 'list' ? (
-        <ListBody
-          note={note}
-          large={large || showAllItems}
-          ink={ink}
-          done={done}
-          onToggleItem={onToggleItem}
-        />
-      ) : variant === 'appointment' ? (
-        <View>
+        {variant === 'list' ? (
+          <ListBody
+            item={item}
+            entries={entries}
+            large={large || showAllEntries}
+            onToggleEntry={onToggleEntry}
+          />
+        ) : variant === 'appointment' ? (
+          <View>
+            <Text
+              numberOfLines={large ? undefined : TITLE_LINES}
+              style={[
+                styles.text,
+                styles.ticketText,
+                {
+                  color: palette.ink,
+                  fontSize: bodyFontSize,
+                  lineHeight: bodyFontSize * 1.2,
+                  textDecorationLine: done ? 'line-through' : 'none',
+                  opacity: done ? 0.55 : 1,
+                },
+              ]}
+            >
+              {item.title ?? ''}
+            </Text>
+            {item.eventAt ? (
+              <View style={styles.apptEvent}>
+                <Text style={[styles.apptEventDate, { color: palette.ink }]}>
+                  {formatEventDate(item.eventAt)}
+                </Text>
+                <Text style={[styles.apptEventTime, { color: palette.ink }]}>
+                  {formatEventTime(item.eventAt)}
+                </Text>
+              </View>
+            ) : null}
+            {item.place ? (
+              <Text style={[styles.place, { color: palette.ink }]} numberOfLines={2}>
+                📍 {item.place}
+              </Text>
+            ) : null}
+          </View>
+        ) : isPhoto ? (
+          item.body?.trim() ? (
+            <Text
+              numberOfLines={large ? undefined : 3}
+              style={[styles.text, styles.photoCaption, { color: palette.ink, fontSize: bodyFontSize }]}
+            >
+              {item.body}
+            </Text>
+          ) : null
+        ) : (
           <Text
-            numberOfLines={large ? undefined : 3}
+            numberOfLines={large ? undefined : 6}
             style={[
               styles.text,
-              styles.ticketText,
               {
-                color: ink,
+                color: palette.ink,
                 fontSize: bodyFontSize,
-                lineHeight: bodyFontSize * 1.2,
+                lineHeight: bodyFontSize * 1.25,
                 textDecorationLine: done ? 'line-through' : 'none',
                 opacity: done ? 0.55 : 1,
               },
             ]}
           >
-            {note.text}
+            {item.body ?? ''}
           </Text>
-          {validEventDate ? (
-            <View style={styles.apptEvent}>
-              <Text style={[styles.apptEventDate, { color: ink }]}>
-                {validEventDate.toLocaleDateString(undefined, {
-                  weekday: 'short',
-                  month: 'short',
-                  day: 'numeric',
-                })}
-              </Text>
-              <Text style={[styles.apptEventTime, { color: ink }]}>
-                {clockTime(validEventDate.toISOString())}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-      ) : variant === 'receipt' ? (
-        <View>
-          <Text style={styles.receiptKicker}>· NOTE ·</Text>
-          <View style={styles.receiptRule} />
-          <Text
-            numberOfLines={large ? undefined : LINES[variant]}
-            style={[
-              styles.receiptText,
-              {
-                textDecorationLine: done ? 'line-through' : 'none',
-                opacity: done ? 0.55 : 1,
-              },
-            ]}
-          >
-            {note.text}
-          </Text>
-          <View style={styles.receiptRule} />
-        </View>
-      ) : !isPhoto || note.text.trim() ? (
-        <Text
-          numberOfLines={large ? undefined : LINES[variant]}
-          style={[
-            styles.text,
-            variant === 'mini' && styles.miniText,
-            variant === 'announcement' && styles.announcementText,
-            isPhoto && styles.photoCaption,
-            {
-              color: ink,
-              fontSize: bodyFontSize,
-              lineHeight: bodyFontSize * 1.25,
-              textDecorationLine: done ? 'line-through' : 'none',
-              opacity: done ? 0.55 : 1,
-            },
-          ]}
-        >
-          {note.text}
-        </Text>
-      ) : null}
+        )}
       </View>
 
-      {showAttribution && (note.author || expiry) ? (
-        <View style={[styles.attribution, isPhoto && styles.photoAttribution]}>
-          {note.author ? (
+      {showAttribution && (authorName || expiry) ? (
+        <View style={styles.attribution}>
+          {authorName ? (
             <Text
               numberOfLines={1}
-              style={[styles.signature, { color: ink, fontSize: large ? 26 : 21 }]}
+              style={[styles.signature, { color: palette.ink, fontSize: large ? 24 : 20 }]}
             >
-              - {note.author.displayName}
+              - {authorName}
             </Text>
           ) : null}
           {expiry ? (
-            <Text style={[styles.expiryInline, { color: ink }]}>· ⏳ {expiry}</Text>
+            <Text style={[styles.expiryInline, { color: palette.ink }]}>· ⏳ {expiry}</Text>
           ) : null}
         </View>
       ) : null}
@@ -270,78 +190,74 @@ export function NotePaper({
 }
 
 function ListBody({
-  note,
+  item,
+  entries,
   large,
-  ink,
-  done,
-  onToggleItem,
+  onToggleEntry,
 }: {
-  note: NoteWithAuthor;
+  item: ItemWithAuthor;
+  entries: ListEntry[];
   large: boolean;
-  ink: string;
-  done: boolean;
-  onToggleItem?: (index: number) => void;
+  onToggleEntry?: (entry: ListEntry) => void;
 }) {
-  const { title, items } = parseListItems(note.text);
-  const visible = large ? items : items.slice(0, 6);
-  const truncated = visible.length < items.length;
+  const sorted = [...entries].sort((a, b) => a.position - b.position);
+  const visible = large ? sorted : sorted.slice(0, ENTRY_LIMIT);
+  const truncated = visible.length < sorted.length;
   return (
     <View>
-      {title ? (
-        <Text style={[styles.listTitle, { color: ink }]} numberOfLines={2}>
-          {title}
+      {item.title ? (
+        <Text style={[styles.listTitle, { color: colors.ink }]} numberOfLines={2}>
+          {item.title}
         </Text>
       ) : null}
       <View style={styles.listItems}>
-        {visible.map((item, i) => {
-          const checked = item.done || done;
-          const rowBody = (
+        {visible.map((entry) => {
+          const checked = entry.checkedAt !== null;
+          const row = (
             <>
               <View
-                style={[
-                  styles.checkbox,
-                  { borderColor: ink },
-                  checked && { backgroundColor: ink, borderColor: ink },
-                ]}
+                style={[styles.checkbox, { borderColor: colors.ink }, checked && styles.checkboxDone]}
               >
-                {checked && <Text style={styles.checkmark}>✓</Text>}
+                {checked ? <Text style={styles.checkmark}>✓</Text> : null}
               </View>
               <Text
                 style={[
                   styles.listText,
                   {
-                    color: ink,
+                    color: colors.ink,
                     textDecorationLine: checked ? 'line-through' : 'none',
                     opacity: checked ? 0.55 : 1,
                   },
                 ]}
                 numberOfLines={2}
               >
-                {item.text}
+                {entry.text}
               </Text>
             </>
           );
-          return onToggleItem ? (
+          return onToggleEntry ? (
             <Pressable
-              key={`${item.text}-${i}`}
+              key={entry.id}
               style={styles.listRow}
-              onPress={() => onToggleItem(i)}
+              onPress={() => onToggleEntry(entry)}
               hitSlop={8}
               accessibilityRole="checkbox"
-              accessibilityLabel={item.text}
+              accessibilityLabel={entry.text}
               accessibilityState={{ checked }}
             >
-              {rowBody}
+              {row}
             </Pressable>
           ) : (
-            <View key={`${item.text}-${i}`} style={styles.listRow}>
-              {rowBody}
+            <View key={entry.id} style={styles.listRow}>
+              {row}
             </View>
           );
         })}
       </View>
       {!large && truncated ? (
-        <Text style={[styles.listMore, { color: ink }]}>+{items.length - visible.length} more</Text>
+        <Text style={[styles.listMore, { color: colors.ink }]}>
+          +{sorted.length - visible.length} more
+        </Text>
       ) : null}
     </View>
   );
@@ -355,12 +271,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
   },
-  // Grows to fill any spare height (from minHeight) so the text sits centred
-  // and the attribution is pushed to the bottom edge.
-  body: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
+  body: { flexGrow: 1, justifyContent: 'center' },
   holes: {
     position: 'absolute',
     top: 0,
@@ -370,16 +281,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-evenly',
     zIndex: 1,
   },
-  tornHole: {
-    alignItems: 'center',
-    width: 12,
-  },
-  tornSlit: {
-    width: 5,
-    height: 9,
-    backgroundColor: colors.background,
-    marginBottom: -3,
-  },
+  tornHole: { alignItems: 'center', width: 12 },
+  tornSlit: { width: 5, height: 9, backgroundColor: colors.background, marginBottom: -3 },
   hole: {
     width: 11,
     height: 11,
@@ -388,64 +291,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(62, 54, 46, 0.28)',
   },
-  image: {
-    width: '100%',
-    marginBottom: 10,
-    marginTop: 8,
-    backgroundColor: 'rgba(0,0,0,0.04)',
-  },
-  text: {
-    fontFamily: fonts.hand.semibold,
-  },
-  miniText: {
-    textAlign: 'center',
-  },
-  announcementText: {
-    fontFamily: fonts.hand.bold,
-  },
-  photoCaption: {
-    textAlign: 'center',
-  },
-  photoAttribution: {
-    justifyContent: 'center',
-  },
-  ticketText: {
-    fontFamily: fonts.hand.bold,
-  },
-  apptEvent: {
-    marginTop: 6,
-    gap: 1,
-  },
-  apptEventDate: {
-    fontFamily: fonts.hand.regular,
-    fontSize: 20,
-    lineHeight: 24,
-  },
-  apptEventTime: {
-    fontFamily: fonts.hand.bold,
-    fontSize: 22,
-    lineHeight: 26,
-    textDecorationLine: 'underline',
-  },
-  receiptKicker: {
-    fontFamily: fonts.ui.bold,
-    fontSize: 10,
-    letterSpacing: 2,
-    textAlign: 'center',
-    color: colors.inkFaint,
-  },
-  receiptRule: {
-    borderTopWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: colors.border,
-    marginVertical: 8,
-  },
-  receiptText: {
-    fontFamily: fonts.ui.semibold,
-    fontSize: 13.5,
-    lineHeight: 20,
-    color: colors.ink,
-  },
+  image: { width: '100%', marginBottom: 10, marginTop: 6, backgroundColor: 'rgba(0,0,0,0.04)' },
+  text: { fontFamily: fonts.hand.semibold },
+  photoCaption: { textAlign: 'center' },
+  ticketText: { fontFamily: fonts.hand.bold },
+  apptEvent: { marginTop: 6, gap: 1 },
+  apptEventDate: { fontFamily: fonts.hand.regular, fontSize: 20, lineHeight: 24 },
+  apptEventTime: { fontFamily: fonts.hand.bold, fontSize: 22, lineHeight: 26 },
+  place: { fontFamily: fonts.ui.semibold, fontSize: 14, marginTop: 6, opacity: 0.85 },
   listTitle: {
     fontFamily: fonts.hand.regular,
     fontSize: 26,
@@ -454,10 +307,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     textDecorationLine: 'underline',
   },
-  listItems: {
-    gap: 4,
-    marginTop: 6,
-  },
+  listItems: { gap: 4, marginTop: 6 },
   listRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -474,24 +324,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkmark: {
-    color: '#FFFDF7',
-    fontSize: 12,
-    fontWeight: '800',
-    marginTop: -1,
-  },
-  listText: {
-    flex: 1,
-    fontFamily: fonts.hand.regular,
-    fontSize: 22,
-    lineHeight: 24,
-  },
-  listMore: {
-    fontFamily: fonts.ui.semibold,
-    fontSize: 12,
-    opacity: 0.6,
-    marginTop: 8,
-  },
+  checkboxDone: { backgroundColor: colors.ink, borderColor: colors.ink },
+  checkmark: { color: '#FFFDF7', fontSize: 12, fontWeight: '800', marginTop: -1 },
+  listText: { flex: 1, fontFamily: fonts.hand.regular, fontSize: 22, lineHeight: 24 },
+  listMore: { fontFamily: fonts.ui.semibold, fontSize: 12, opacity: 0.6, marginTop: 8 },
   attribution: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -499,15 +335,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     gap: 6,
   },
-  // Signed like a paper note: a dash and a handwritten name.
-  signature: {
-    flexShrink: 1,
-    fontFamily: fonts.hand.semibold,
-    opacity: 0.85,
-  },
-  expiryInline: {
-    fontFamily: fonts.ui.semibold,
-    fontSize: 12,
-    opacity: 0.65,
-  },
+  signature: { flexShrink: 1, fontFamily: fonts.hand.semibold, opacity: 0.85 },
+  expiryInline: { fontFamily: fonts.ui.semibold, fontSize: 12, opacity: 0.65 },
 });

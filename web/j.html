@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="apple-itunes-app" content="app-id=REPLACE_APP_STORE_ID" />
+    <title>Join a Notice Board</title>
+    <style>
+      body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+             background: #FBF5E9; color: #3E362E; display: grid; place-items: center;
+             min-height: 100vh; text-align: center; padding: 24px; }
+      h1 { font-size: 28px; margin: 0 0 8px; }
+      p { color: #6B6156; margin: 0 0 24px; }
+      a.btn { display: inline-block; background: #3E362E; color: #FBF5E9; text-decoration: none;
+              padding: 14px 28px; border-radius: 999px; font-weight: 700; }
+      a.secondary { display: block; margin-top: 16px; color: #6B6156; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>You’re invited</h1>
+      <p>Open this invite in the Notice Board app.</p>
+      <a class="btn" id="open" href="#">Open in the app</a>
+      <a class="secondary" href="https://apps.apple.com/app/REPLACE_APP_STORE_ID">Get it on the App Store</a>
+      <a class="secondary" href="https://play.google.com/store/apps/details?id=com.noticeboard.app">Get it on Google Play</a>
+    </main>
+    <script>
+      // /j/<token> -> noticeboard://j/<token> (maps to the app's /j/[token] route)
+      var parts = window.location.pathname.split('/').filter(Boolean);
+      var token = parts[parts.length - 1] || '';
+      var deepLink = 'noticeboard://j/' + encodeURIComponent(token);
+      document.getElementById('open').href = deepLink;
+      // Try to bounce straight into the app; the page stays as a fallback.
+      window.location.replace(deepLink);
+    </script>
+  </body>
+</html>

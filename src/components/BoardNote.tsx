@@ -1,203 +1,160 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { NoteWithAuthor } from '../types';
+import { ItemWithAuthor, ListEntry } from '../types';
 import { NotePaper } from './NotePaper';
-import { useReduceMotion } from '../hooks/useReduceMotion';
 
 type Props = {
-  note: NoteWithAuthor;
+  item: ItemWithAuthor;
   left: number;
   top: number;
   width: number;
-  /** Floor for the paper's rendered height, so short notes still read big. */
+  /** Floor for the paper's rendered height. */
   minHeight?: number;
   rotation: number;
-  /** Play the "settling onto the board" entrance (only for freshly added notes). */
   animateIn?: boolean;
-  onPress: (note: NoteWithAuthor) => void;
-  /** A held note was picked up and is now following the finger. */
-  onDragStart?: (note: NoteWithAuthor) => void;
-  /** The held note moved; `screenY` is the finger's position in the window. */
-  onDragUpdate?: (note: NoteWithAuthor, screenY: number) => void;
-  /** Called when a held note is dropped, with its new canvas position (px). */
-  onMove?: (note: NoteWithAuthor, x: number, y: number) => void;
-  /** Reports the paper's rendered height so the layout can reserve enough room. */
-  onMeasure?: (id: string, height: number) => void;
+  entries: ListEntry[];
+  photoUrl?: string | null;
+  onPress: (item: ItemWithAuthor) => void;
+  onToggleEntry?: (entry: ListEntry) => void;
+  /** Called on drop with the note's new top-left corner, in canvas pixels. */
+  onMove?: (item: ItemWithAuthor, left: number, top: number) => void;
 };
 
 /** How long a note must be held before it can be picked up and dragged. */
-const LIFT_MS = 280;
+const LIFT_MS = 260;
 
 /**
- * A pin on the board. It follows the deterministic layout until it is held,
- * at which point it lifts and can be dragged; dropping it reports the new
- * spot so the board can save it. A quick tap still opens the note.
+ * A pinned paper. A quick tap opens it; holding picks it up and drags it,
+ * reporting the drop point so the board can persist the new spot. List rows
+ * can be ticked right on the board.
+ *
+ * The gesture callbacks run on the JS thread (`.runOnJS(true)`) — Reanimated
+ * is present, so without it they'd be workletized and calling React state
+ * there crashes the native app.
  */
 export function BoardNote({
-  note,
+  item,
   left,
   top,
   width,
   minHeight,
   rotation,
   animateIn = false,
+  entries,
+  photoUrl,
   onPress,
-  onDragStart,
-  onDragUpdate,
+  onToggleEntry,
   onMove,
-  onMeasure,
 }: Props) {
+  const [enter] = useState(() => new Animated.Value(animateIn ? 0 : 1));
   const [posX] = useState(() => new Animated.Value(left));
   const [posY] = useState(() => new Animated.Value(top));
-  const [enter] = useState(() => new Animated.Value(animateIn ? 0 : 1));
   const [lift] = useState(() => new Animated.Value(0));
-  const [press] = useState(() => new Animated.Value(0));
-  const [shake] = useState(() => new Animated.Value(0));
   const [dragging, setDragging] = useState(false);
-  const reduceMotion = useReduceMotion();
 
   const draggingRef = useRef(false);
-  const startRef = useRef({ x: left, y: top });
   const posRef = useRef({ x: left, y: top });
+  const startRef = useRef({ x: left, y: top });
 
-  // Follow the layout unless the note is in hand. Once it is dropped, the
-  // saved position flows back through `left`/`top`, so this settles on the
-  // same spot without a jump.
+  // Latest props for the (stable) gesture callbacks.
+  const handlers = useRef({ item, onPress, onMove });
+  useEffect(() => {
+    handlers.current = { item, onPress, onMove };
+  });
+
+  // Follow the layout unless the note is in hand (so a saved position settles
+  // back through `left`/`top` without a jump).
   useEffect(() => {
     posRef.current = { x: left, y: top };
     if (draggingRef.current) return;
-    Animated.timing(posX, { toValue: left, duration: 240, useNativeDriver: false }).start();
-    Animated.timing(posY, { toValue: top, duration: 240, useNativeDriver: false }).start();
+    Animated.timing(posX, { toValue: left, duration: 220, useNativeDriver: false }).start();
+    Animated.timing(posY, { toValue: top, duration: 220, useNativeDriver: false }).start();
   }, [left, top, posX, posY]);
 
   useEffect(() => {
     if (!animateIn) return;
-    if (reduceMotion) {
-      enter.setValue(1);
-      shake.setValue(0);
-      return;
-    }
-    // Drop the paper onto the board, then give it a quick damped wobble so a
-    // fresh note catches the eye.
-    Animated.sequence([
-      Animated.spring(enter, {
-        toValue: 1,
-        friction: 7,
-        tension: 80,
-        useNativeDriver: false,
-      }),
-      Animated.timing(shake, { toValue: 1, duration: 55, useNativeDriver: false }),
-      Animated.timing(shake, { toValue: -1, duration: 55, useNativeDriver: false }),
-      Animated.timing(shake, { toValue: 0.65, duration: 50, useNativeDriver: false }),
-      Animated.timing(shake, { toValue: -0.45, duration: 50, useNativeDriver: false }),
-      Animated.timing(shake, { toValue: 0.25, duration: 45, useNativeDriver: false }),
-      Animated.timing(shake, { toValue: 0, duration: 45, useNativeDriver: false }),
-    ]).start();
-  }, [animateIn, enter, shake, reduceMotion]);
+    Animated.spring(enter, { toValue: 1, friction: 7, tension: 80, useNativeDriver: false }).start();
+  }, [animateIn, enter]);
 
-  // `runOnJS(true)` keeps every callback on the JS thread. Reanimated is
-  // installed (via expo-router), so without it gesture callbacks are
-  // workletized onto the UI thread — where touching navigation or React state
-  // crashes the native app with no JS error.
-  const pan = Gesture.Pan()
-    .runOnJS(true)
-    .activateAfterLongPress(LIFT_MS)
-    // eslint-disable-next-line react-hooks/refs -- gesture callbacks run off-render
-    .onStart(() => {
-      draggingRef.current = true;
-      startRef.current = { ...posRef.current };
-      setDragging(true);
-      Animated.spring(lift, {
-        toValue: 1,
-        friction: 7,
-        tension: 90,
-        useNativeDriver: false,
-      }).start();
-      onDragStart?.(note);
-    })
-    // eslint-disable-next-line react-hooks/refs -- gesture callbacks run off-render
-    .onUpdate((e) => {
-      const x = startRef.current.x + e.translationX;
-      const y = startRef.current.y + e.translationY;
-      posRef.current = { x, y };
-      posX.setValue(x);
-      posY.setValue(y);
-      onDragUpdate?.(note, e.absoluteY);
-    })
-    // eslint-disable-next-line react-hooks/refs -- gesture callbacks run off-render
-    .onFinalize(() => {
-      if (!draggingRef.current) return;
-      draggingRef.current = false;
-      setDragging(false);
-      Animated.spring(lift, {
-        toValue: 0,
-        friction: 7,
-        tension: 90,
-        useNativeDriver: false,
-      }).start();
-      onMove?.(note, posRef.current.x, posRef.current.y);
-    });
+  const gesture = useMemo(() => {
+    const pan = Gesture.Pan()
+      .runOnJS(true)
+      .activateAfterLongPress(LIFT_MS)
+      // eslint-disable-next-line react-hooks/refs -- gesture callbacks run off-render
+      .onStart(() => {
+        draggingRef.current = true;
+        startRef.current = { ...posRef.current };
+        setDragging(true);
+        Animated.spring(lift, { toValue: 1, friction: 7, tension: 90, useNativeDriver: false }).start();
+      })
+      // eslint-disable-next-line react-hooks/refs -- gesture callbacks run off-render
+      .onUpdate((e) => {
+        const x = startRef.current.x + e.translationX;
+        const y = startRef.current.y + e.translationY;
+        posRef.current = { x, y };
+        posX.setValue(x);
+        posY.setValue(y);
+      })
+      // eslint-disable-next-line react-hooks/refs -- gesture callbacks run off-render
+      .onFinalize(() => {
+        if (!draggingRef.current) return;
+        draggingRef.current = false;
+        setDragging(false);
+        Animated.spring(lift, { toValue: 0, friction: 7, tension: 90, useNativeDriver: false }).start();
+        handlers.current.onMove?.(handlers.current.item, posRef.current.x, posRef.current.y);
+      });
 
-  const tap = Gesture.Tap()
-    .runOnJS(true)
-    .maxDuration(LIFT_MS)
-    .onBegin(() => {
-      Animated.timing(press, { toValue: 1, duration: 90, useNativeDriver: false }).start();
-    })
-    .onFinalize(() => {
-      Animated.timing(press, { toValue: 0, duration: 120, useNativeDriver: false }).start();
-    })
-    .onEnd((_e, success) => {
-      if (success) onPress(note);
-    });
+    const tap = Gesture.Tap()
+      .runOnJS(true)
+      .maxDuration(LIFT_MS)
+      // eslint-disable-next-line react-hooks/refs -- gesture callbacks run off-render
+      .onEnd((_e, success) => {
+        if (!success) return;
+        // Defer out of the gesture callback so the re-render it causes lands
+        // after the native gesture has fully finished.
+        const current = handlers.current;
+        setTimeout(() => current.onPress(current.item), 0);
+      });
 
-  const gesture = Gesture.Race(pan, tap);
+    return Gesture.Race(pan, tap);
+  }, [posX, posY, lift]);
 
-  const settleY = enter.interpolate({ inputRange: [0, 1], outputRange: [-18, 0] });
-  const settleScale = enter.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] });
-  const shakeX = shake.interpolate({ inputRange: [-1, 1], outputRange: [-7, 7] });
-  const shakeRotate = shake.interpolate({
-    inputRange: [-1, 1],
-    outputRange: ['-2.4deg', '2.4deg'],
-  });
-  const pressScale = press.interpolate({ inputRange: [0, 1], outputRange: [1, 0.985] });
+  const enterTranslateY = enter.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] });
+  const enterScale = enter.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] });
   const liftScale = lift.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
-  const liftRotate = lift.interpolate({
-    inputRange: [0, 1],
-    outputRange: [`${rotation}deg`, '0deg'],
-  });
 
-  const preview = note.text.trim().split('\n')[0]?.slice(0, 80) ?? '';
-  const author = note.author?.displayName;
   return (
     <Animated.View
-      accessible
-      accessibilityRole="button"
-      accessibilityLabel={`Note${author ? ` by ${author}` : ''}${preview ? `: ${preview}` : ''}`}
-      accessibilityHint="Double tap to open. Touch and hold to drag."
       style={[
         styles.pin,
-        { left: posX, top: posY, width, opacity: enter, zIndex: dragging ? 20 : 0 },
+        {
+          // All values are JS-driven (useNativeDriver: false): the native
+          // driver rejects layout props like `left`/`top` (even constants), so
+          // the note is positioned with animated left/top on the JS thread.
+          left: posX,
+          top: posY,
+          width,
+          opacity: enter,
+          zIndex: dragging ? 20 : 0,
+          transform: [
+            { translateY: enterTranslateY },
+            { scale: enterScale },
+            { scale: liftScale },
+            { rotate: `${rotation}deg` },
+          ],
+        },
       ]}
-      onLayout={(e) => onMeasure?.(note.id, e.nativeEvent.layout.height)}
     >
       <GestureDetector gesture={gesture}>
-        <Animated.View
-          style={{
-            transform: [
-              { translateX: shakeX },
-              { translateY: settleY },
-              { scale: settleScale },
-              { rotate: shakeRotate },
-            ],
-          }}
-        >
-          <Animated.View style={{ transform: [{ scale: pressScale }] }}>
-            <Animated.View style={{ transform: [{ scale: liftScale }, { rotate: liftRotate }] }}>
-              <NotePaper note={note} minHeight={minHeight} />
-            </Animated.View>
-          </Animated.View>
+        <Animated.View>
+          <NotePaper
+            item={item}
+            minHeight={minHeight}
+            entries={entries}
+            photoUrl={photoUrl}
+            onToggleEntry={onToggleEntry}
+          />
         </Animated.View>
       </GestureDetector>
     </Animated.View>

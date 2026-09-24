@@ -5,28 +5,45 @@ import { router } from 'expo-router';
 import { colors, fonts } from '../theme';
 import { Button } from '../components/Button';
 import { ScreenHeader } from '../components/ScreenHeader';
-import { getBackendV2 } from '../services';
+import { acceptInvite, friendlyMessage, previewInvite } from '../lib/api';
+import { useSession } from '../store/session';
 import { normalizeInviteCode } from '../utils/id';
 
 export default function JoinBoardScreen() {
+  const user = useSession((s) => s.user);
   const [code, setCode] = useState('');
+  const [boardName, setBoardName] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const clean = normalizeInviteCode(code);
+
+  const preview = async () => {
+    if (!clean) return;
+    setError(null);
+    try {
+      const info = await previewInvite(clean);
+      setBoardName(info?.boardName ?? null);
+      if (!info) setError('Hmm, that code doesn’t match any board.');
+    } catch (e) {
+      setError(friendlyMessage(e));
+    }
+  };
+
   const join = async () => {
-    const clean = normalizeInviteCode(code);
     if (!clean || joining) return;
     setJoining(true);
     setError(null);
     try {
-      const boardId = await getBackendV2().acceptInvite(clean);
+      const boardId = await acceptInvite(clean, user?.displayName ?? null);
+      if (!boardId) {
+        setError('That invite isn’t working. Ask for a fresh link.');
+        setJoining(false);
+        return;
+      }
       router.replace(`/board/${boardId}`);
     } catch (e) {
-      setError(
-        e instanceof Error && /fully used/.test(e.message)
-          ? 'That invite has already been fully used.'
-          : 'Hmm, that code doesn’t match any board.',
-      );
+      setError(friendlyMessage(e));
       setJoining(false);
     }
   };
@@ -42,22 +59,26 @@ export default function JoinBoardScreen() {
           <Text style={styles.label}>Invite code</Text>
           <TextInput
             style={styles.input}
-            placeholder="AB12-CD34"
+            placeholder="AB2DE-FG3HJ"
             placeholderTextColor={colors.inkFaint}
             value={code}
-            onChangeText={setCode}
+            onChangeText={(v) => {
+              setCode(v);
+              setBoardName(null);
+              setError(null);
+            }}
+            onBlur={preview}
             autoCapitalize="characters"
             autoCorrect={false}
             autoFocus
           />
+          {boardName ? <Text style={styles.board}>Join “{boardName}”</Text> : null}
           {error ? <Text style={styles.error}>{error}</Text> : null}
-          <Text style={styles.hint}>
-            Ask someone on the board for their invite code.
-          </Text>
+          <Text style={styles.hint}>Ask someone on the board for their invite code.</Text>
           <Button
             label="Join"
             onPress={join}
-            disabled={!normalizeInviteCode(code) || joining}
+            disabled={!clean || joining}
             style={styles.join}
           />
         </View>
@@ -70,12 +91,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   body: { flex: 1, paddingHorizontal: 24, paddingTop: 24 },
-  label: {
-    fontFamily: fonts.ui.semibold,
-    fontSize: 13,
-    color: colors.inkSoft,
-    marginBottom: 10,
-  },
+  label: { fontFamily: fonts.ui.semibold, fontSize: 13, color: colors.inkSoft, marginBottom: 10 },
   input: {
     height: 56,
     backgroundColor: colors.surface,
@@ -88,17 +104,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     color: colors.ink,
   },
-  error: {
-    fontFamily: fonts.ui.regular,
-    color: colors.danger,
-    fontSize: 13,
-    marginTop: 12,
-  },
-  hint: {
-    fontFamily: fonts.ui.regular,
-    color: colors.inkFaint,
-    fontSize: 13,
-    marginTop: 14,
-  },
+  board: { fontFamily: fonts.hand.bold, fontSize: 22, color: colors.ink, marginTop: 14 },
+  error: { fontFamily: fonts.ui.regular, color: colors.danger, fontSize: 13, marginTop: 12 },
+  hint: { fontFamily: fonts.ui.regular, color: colors.inkFaint, fontSize: 13, marginTop: 14 },
   join: { marginTop: 24 },
 });

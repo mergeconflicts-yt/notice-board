@@ -1,41 +1,41 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts } from '../../../../theme';
 import { NotePaper } from '../../../../components/NotePaper';
-import { AddNoteSheet, NoteSheetInput } from '../../../../components/AddNoteSheet';
-import { useBoardMembers, useBoardNotes } from '../../../../hooks/useBoardV2';
+import { AddNoteSheet, NoteDraft } from '../../../../components/AddNoteSheet';
+import { useBoard } from '../../../../hooks/useBoard';
 import { useSession } from '../../../../store/session';
-import { REF_W, computeBoardLayout, widthFracForNote } from '../../../../utils/layout';
+import { useToast } from '../../../../store/toast';
+import { friendlyMessage, signedPhotoUrl } from '../../../../lib/api';
+import { keepUntilLabel } from '../../../../utils/note';
 
-/** Cap so a tiny note never balloons past this when scaled up. */
-const MAX_SCALE = 2.8;
-
+const MAX_SCALE = 2.4;
 const noop = () => {};
 
-/**
- * A read-only zoom of a single post. The note is rendered exactly as it sits
- * on the board (same width and tilt) and then scaled up to fill a centred
- * popup. List checkboxes stay tappable; tapping the backdrop dismisses it.
- */
-export default function NoteDetailScreen() {
+export default function ItemDetailScreen() {
   const { id, noteId } = useLocalSearchParams<{ id: string; noteId: string }>();
   const boardId = id as string;
-  const { notes, toggleEntry, updateNote, saveEdit } = useBoardNotes(boardId);
-  const { members } = useBoardMembers(boardId);
+  const { items, entries, members, toggleEntry, setDone, setPinned, keepLonger, removeItem, restoreItem, editItem, addListEntry } =
+    useBoard(boardId);
   const me = useSession((s) => s.user);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const { width: screenW, height: screenH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [noteH, setNoteH] = useState(0);
 
-  const layout = useMemo(() => computeBoardLayout(notes ?? []), [notes]);
-  const note = notes?.find((n) => n.id === noteId);
+  const item = items.find((i) => i.id === noteId) ?? null;
+  const itemEntries = entries.filter((e) => e.itemId === noteId);
 
-  if (!note) {
+  useEffect(() => {
+    if (item?.photoPath) void signedPhotoUrl(item.photoPath).then(setPhotoUrl);
+  }, [item?.photoPath]);
+
+  if (!item) {
     return (
       <View style={styles.container}>
         <ActivityIndicator color={colors.accent} />
@@ -43,63 +43,59 @@ export default function NoteDetailScreen() {
     );
   }
 
-  // Only a chosen list gets checkboxes: guessing from the text produced
-  // rows with no backing entries whose taps silently did nothing.
-  const isList = note.kind === 'list';
-  const isCreator = !!me && me.id === note.authorId;
-  const done = Boolean(note.completedAt);
+  const isCreator = !!me && me.id === item.createdBy;
+  const done = Boolean(item.doneAt);
+  const completedBy = item.doneBy
+    ? (members.find((m) => m.userId === item.doneBy)?.user.displayName ?? null)
+    : null;
+  const expiry = keepUntilLabel(item.keepUntil);
+  const canMarkDone = item.type === 'note' || item.type === 'date';
 
-  // Checklist taps flip the entry row itself — no text rewriting, so two
-  // people toggling at once never clobber each other.
-  const toggleListItem = (index: number) => {
-    toggleEntry(note.id, index).catch((e) => console.error('toggle failed', e));
-  };
+  const naturalW = Math.min(screenW - 48, 340);
+  const maxH = screenH - insets.top - insets.bottom - 140;
+  const scale = Math.min(naturalW / Math.max(naturalW, 1), noteH > 0 ? maxH / noteH : MAX_SCALE, MAX_SCALE);
+  const belowTop = noteH > 0 ? (noteH * (scale - 1)) / 2 + 12 : 12;
 
-  const toggleDone = () => {
-    if (!isCreator) return;
-    updateNote(note.id, {
-      completedAt: done ? null : new Date().toISOString(),
-    }).catch((e) => console.error('toggle done failed', e));
-  };
-
-  const completedById = (note.data as { completedBy?: unknown } | null)?.completedBy;
-  const completedByName =
-    typeof completedById === 'string'
-      ? (members ?? []).find((m) => m.userId === completedById)?.user.displayName ?? null
-      : null;
-
-  const handleEdit = async (input: NoteSheetInput) => {
+  const handleEdit = async (draft: NoteDraft) => {
     if (!isCreator) return;
     setSaving(true);
     try {
-      await saveEdit(note.id, input);
+      await editItem(item, {
+        body: item.type === 'list' ? undefined : draft.body,
+        title: draft.title || item.title,
+        eventAt: draft.eventAt ?? item.eventAt,
+        place: draft.place || item.place,
+        color: draft.color,
+      });
+      if (item.type === 'list') {
+        // Reconcile entries: add new ones; removal is explicit per row.
+        for (const row of draft.entries) {
+          if (!itemEntries.some((e) => e.id === row.id)) {
+            await addListEntry(item.id, row.text);
+          }
+        }
+      }
       setEditing(false);
     } catch (e) {
-      console.error('edit failed', e);
+      useToast.getState().show(friendlyMessage(e));
     } finally {
       setSaving(false);
     }
   };
 
-  // Match the board's paper width (but present it straight, no tilt).
-  const placement = layout.get(note.id);
-  const naturalW = (placement?.w ?? widthFracForNote(note)) * REF_W;
-
-  const maxW = Math.min(screenW - 48, 340);
-  const maxH = screenH - insets.top - insets.bottom - 140;
-  const scale = Math.min(maxW / naturalW, noteH > 0 ? maxH / noteH : MAX_SCALE, MAX_SCALE);
-  // The paper is scaled around its centre, so it spills past its layout box;
-  // push anything below it clear of the enlarged visual.
-  const belowTop = noteH > 0 ? (noteH * (scale - 1)) / 2 + 12 : 12;
+  const handleRemove = async () => {
+    const snapshot = item;
+    await removeItem(item).catch((e) => useToast.getState().show(friendlyMessage(e)));
+    router.back();
+    useToast.getState().show('Removed', {
+      label: 'Undo',
+      onPress: () => restoreItem(snapshot).catch(noop),
+    });
+  };
 
   return (
     <Pressable style={styles.container} onPress={() => router.back()}>
-      <BlurView
-        intensity={20}
-        tint="default"
-        pointerEvents="none"
-        style={StyleSheet.absoluteFill}
-      />
+      <BlurView intensity={20} tint="default" pointerEvents="none" style={StyleSheet.absoluteFill} />
       <View style={styles.center}>
         <Pressable onPress={noop}>
           <View
@@ -107,58 +103,66 @@ export default function NoteDetailScreen() {
             onLayout={(e) => setNoteH(e.nativeEvent.layout.height)}
           >
             <NotePaper
-              note={note}
-              showAllItems
-              onToggleItem={isList ? toggleListItem : undefined}
+              item={item}
+              large
+              showAllEntries
+              entries={itemEntries}
+              photoUrl={photoUrl}
+              onToggleEntry={item.type === 'list' ? toggleEntry : undefined}
             />
           </View>
         </Pressable>
-        {done || isCreator ? (
-          <View style={[styles.doneRow, { marginTop: belowTop }]}>
-            {done ? (
-              <Text style={styles.doneText}>
-                ✓ {completedByName ? `Completed by ${completedByName}` : 'Completed'}
-              </Text>
-            ) : null}
-            {isCreator ? (
-              <View style={styles.doneActions}>
-                <Pressable
-                  onPress={toggleDone}
-                  hitSlop={10}
-                  accessibilityRole="button"
-                  accessibilityLabel={done ? 'Reopen note' : 'Mark note done'}
-                >
-                  <Text style={styles.doneAction}>{done ? 'Reopen' : 'Mark done'}</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => setEditing(true)}
-                  hitSlop={10}
-                  accessibilityRole="button"
-                  accessibilityLabel="Edit note"
-                >
-                  <Text style={styles.doneAction}>Edit</Text>
-                </Pressable>
-              </View>
-            ) : null}
-          </View>
-        ) : null}
+
+        <View style={[styles.actions, { marginTop: belowTop }]}>
+          {done ? (
+            <Text style={styles.doneText}>
+              ✓ {completedBy ? `Completed by ${completedBy}` : 'Completed'}
+            </Text>
+          ) : null}
+          {expiry ? <Text style={styles.expiry}>{expiry}</Text> : null}
+        </View>
+
+        <View style={styles.buttonRow}>
+          {canMarkDone ? (
+            <Action label={done ? 'Reopen' : 'Mark done'} onPress={() => setDone(item, !done)} />
+          ) : null}
+          <Action
+            label={item.pinned ? 'Unpin' : 'Pin'}
+            onPress={() => setPinned(item, !item.pinned)}
+          />
+          {!item.pinned && item.type !== 'list' ? (
+            <Action label="Keep longer" onPress={() => keepLonger(item)} />
+          ) : null}
+          {isCreator ? <Action label="Edit" onPress={() => setEditing(true)} /> : null}
+          <Action label="Remove" destructive onPress={handleRemove} />
+        </View>
       </View>
 
       <AddNoteSheet
         visible={editing && isCreator}
         submitting={saving}
-        submitLabel="Save note"
-        initial={{
-          text: note.text,
-          imageUrl: note.imageUrl,
-          expiresAt: note.expiresAt,
-          kind: note.kind,
-          data: note.data,
-          color: note.color,
-        }}
+        submitLabel="Save"
+        initial={item}
+        entries={itemEntries.map((e) => ({ id: e.id, text: e.text }))}
         onClose={() => setEditing(false)}
         onSubmit={handleEdit}
       />
+    </Pressable>
+  );
+}
+
+function Action({
+  label,
+  onPress,
+  destructive = false,
+}: {
+  label: string;
+  onPress: () => void;
+  destructive?: boolean;
+}) {
+  return (
+    <Pressable onPress={onPress} hitSlop={10} style={styles.actionPill} accessibilityRole="button">
+      <Text style={[styles.actionText, destructive && styles.actionDanger]}>{label}</Text>
     </Pressable>
   );
 }
@@ -170,29 +174,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(62, 54, 46, 0.12)',
   },
-  center: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  center: { alignItems: 'center', justifyContent: 'center' },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  doneText: { fontFamily: fonts.ui.semibold, fontSize: 13, color: colors.inkSoft, opacity: 0.85 },
+  expiry: { fontFamily: fonts.ui.semibold, fontSize: 12, color: colors.inkSoft, opacity: 0.75 },
+  buttonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16, justifyContent: 'center' },
+  actionPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.9)',
   },
-  doneRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  doneText: {
-    fontFamily: fonts.ui.semibold,
-    fontSize: 13,
-    color: colors.inkSoft,
-    opacity: 0.85,
-  },
-  doneAction: {
-    fontFamily: fonts.ui.bold,
-    fontSize: 14,
-    color: colors.accentDeep,
-  },
-  doneActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
+  actionText: { fontFamily: fonts.ui.bold, fontSize: 14, color: colors.ink },
+  actionDanger: { color: colors.danger },
 });

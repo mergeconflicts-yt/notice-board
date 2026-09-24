@@ -1,83 +1,115 @@
 # Infrastructure
 
-## Local development (default)
+## Local development
 
-Everything runs on this machine via Docker + the Supabase CLI. A second
-project (`*_Bible_Compass`) already lives here, so this stack is namespaced
-`notice` and shifted off the default ports.
+Everything runs locally via Docker + the Supabase CLI. This stack is
+namespaced `notice` and shifted off the default ports so it can coexist with
+other local projects.
 
-| Service | This app | Other app |
-|---|---|---|
-| API (Kong) | **55321** | 54321 |
-| Postgres | **55322** | 54322 |
-| Studio | **55323** | 54323 |
-| Mailpit | 55324 | 54324 |
-| Analytics | 55327 | 54327 |
+| Service | This app |
+|---|---|
+| API (Kong) | **55321** |
+| Postgres | **55322** |
+| Studio | **55323** |
+| Mailpit | 55324 |
+| Analytics | 55327 |
 
-Relevant files: `supabase/config.toml` (ports above, anonymous sign-ins on),
-`supabase/migrations/` (the only schema entry point), `.env` (gitignored).
+Relevant files: `supabase/config.toml`, `supabase/migrations/`, `.env`
+(gitignored, from `.env.example`).
 
-### Everyday commands (run in the repo root)
+### Everyday commands (repo root)
 
 ```bash
 supabase start          # start the notice stack
-supabase stop           # stop only this stack
+supabase stop           # stop it
 supabase status         # URLs + keys
-supabase db reset       # wipe notice DB, replay all migrations (dev only!)
+supabase db reset       # wipe + replay all migrations (dev only!)
+supabase test db        # pgTAP suites in supabase/tests/
+supabase db lint --level warning
+supabase functions serve   # run Edge Functions locally
 ```
-
-`stop`/`reset` touch only `supabase_*_notice` containers — the other project
-is never affected (verified repeatedly).
 
 ### App wiring
 
-`.env` (create from `.env.example` + `supabase status` output):
+`.env` (create from `.env.example`):
 
 ```
 EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:55321
-EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon key from status>
+EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon key from `supabase status`>
+EXPO_PUBLIC_INVITE_BASE_URL=            # optional locally
+EXPO_PUBLIC_TURNSTILE_SITE_KEY=         # empty locally => captcha off
 ```
 
-- Restart `npx expo start` (use `-c` after env changes) — values are baked in
-  at bundle time.
-- Simulators reach `127.0.0.1` fine. **Physical phones need the Mac's LAN IP**
-  (`ipconfig getifaddr en0`), e.g. `http://192.168.1.110:55321` — same
-  address works for simulators too. Re-check it when Wi-Fi/DHCP changes.
-- Without these vars the app runs the on-device demo backend instead.
-- Studio: http://127.0.0.1:55323 · direct psql:
-  `psql "postgresql://postgres:postgres@127.0.0.1:55322/postgres"`.
+- Restart `npx expo start -c` after env changes (values are baked in).
+- Simulators reach `127.0.0.1`; physical phones need the Mac's LAN IP.
+- Without the Supabase vars the app throws at startup (there is no local
+  demo backend anymore).
 
-### Production (hosted Supabase)
+### One-time local step: the invite Vault secret
 
-1. Create a project; note its URL + anon key.
-2. Apply `supabase/migrations/` **in filename order**. The initial schema,
-   FK fix, hardening, new-model tables + backfill, invites, events/triggers,
-   bucket, privacy, invite hardening, and list RPC must all land. (The legacy
-   backfill auto-runs inside its migration; it no-ops on empty DBs.)
-3. Dashboard → Authentication → enable **anonymous sign-ins** (the app's only
-   auth; mirrors `enable_anonymous_sign_ins = true` locally).
-4. Point the release build's env at the hosted URL/key.
-5. Legacy data, if any: run `scripts/migrate-legacy-photos.cjs` **before**
-   relying on the privatised bucket (moves `notes`-bucket files into
-   `board-media`, rewrites `item_assets`, drops the old objects; `--delete-bucket`
-   removes the bucket once empty).
+The invite functions encrypt links under a Vault secret named `invite`.
+`supabase db reset` does not create it (tests create and roll back their own).
+Run once after a reset:
+
+```sql
+select vault.create_secret('any-dev-key', 'invite');
+```
+
+Until then, invite calls fail with "invite service not configured". See
+`docs/backend-plan-questions.md` #7.
+
+### Edge Functions
+
+- `delete-account` — called by the app after `delete_account()`; removes the
+  auth user via the admin API. `verify_jwt = true`.
+- `purge` — nightly (via pg_cron/pg_net); hard-deletes items removed >30 days
+  ago and sweeps orphan photo files. Service-role only.
+- `cleanup-users` — nightly; deletes idle anonymous users with no boards.
+
+Test locally with `supabase functions serve --env-file supabase/.env.local`
+(needs `SUPABASE_SERVICE_ROLE_KEY`).
+
+## Production (hosted Supabase)
+
+1. Create two projects: `notice-dev` and `notice-prod`.
+2. Delete `[api] auto_expose_new_tables` default assumption — the migration
+   sets it false in `config.toml`; confirm the hosted API exposes only granted
+   objects.
+3. Apply `supabase/migrations/` in filename order (`supabase db push`).
+4. Auth → enable **anonymous sign-ins** and **manual linking**.
+5. Set the Vault secret `invite` (Dashboard → Vault, or SQL).
+6. Deploy Edge Functions: `supabase functions deploy purge cleanup-users
+   delete-account`.
+7. Configure nightly jobs (per environment):
+
+   ```sql
+   alter database postgres set app.functions_url = 'https://<ref>.functions.supabase.co';
+   alter database postgres set app.service_role_key = '<service role key>';
+   -- re-run the jobs migration (or call cron.schedule manually) to pick them up
+   ```
+
+8. Enable CAPTCHA (Turnstile) and set `EXPO_PUBLIC_TURNSTILE_SITE_KEY` in the
+   build env; `[auth.captcha]` is off locally, on in production.
+9. Point the release build at the hosted URL/anon key and
+   `EXPO_PUBLIC_INVITE_BASE_URL` (see `web/README.md` for the link site).
+10. Before launch: turn on point-in-time recovery, review the security and
+    performance advisors, and set anonymous-sign-in rate limits.
 
 ## Tests & CI
 
-- **Unit** (`node scripts/run-unit-tests.cjs`, no device/backend needed):
-  compiles the pure modules and runs `node:test` suites in `scripts/unit`
-  (adapter mapping, layout modes/minimums, manual placement + settle).
-- **DB integration** (`scripts/db-integration.cjs`): needs `SUPABASE_URL` +
-  `SUPABASE_ANON_KEY` pointing at a throwaway stack (it creates and
-  soft-deletes a test board). Covers auth, board/member privacy, invites
-  (issue/accept/uses/expiry/revoke), items/entries CRUD, toggles, version
-  conflicts, soft delete/restore, expiry filtering, events, settings.
-- **CI** (`.github/workflows/ci.yml`, on push/PR): `npm ci
-  --legacy-peer-deps` → `tsc --noEmit` → `expo lint` → unit tests. The
-  `--legacy-peer-deps` flag matches how the lockfile was built (React 19
-  peer ranges); DB tests stay local-only since they need a live stack.
+- **Unit** (`node scripts/run-unit-tests.cjs`) — compiles the pure modules
+  (`src/utils/*`) and runs `node:test` suites in `scripts/unit` (layout,
+  note helpers).
+- **DB** (`supabase test db`) — pgTAP suites in `supabase/tests/`:
+  `01_tables_rls`, `02_boards`, `03_items`, `04_entries`, `05_invites`,
+  `06_storage`, `07_accounts`, `08_jobs`.
+- **CI** (`.github/workflows/ci.yml`): job `check` = `npm ci
+  --legacy-peer-deps` → `tsc --noEmit` → `expo lint` → unit tests; job
+  `database` = `supabase/setup-cli` → `supabase start` → `db reset` →
+  `test db` → `db lint`.
 
-## One-off scripts
+## Secrets
 
-- `scripts/migrate-legacy-photos.cjs` — see Production §5. Needs
-  `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`.
+Never in the repo: service-role key, Turnstile secret, Supabase access token.
+They live in GitHub secrets, Supabase Vault, or Edge Function secrets.
+`.env.example` lists only public values.

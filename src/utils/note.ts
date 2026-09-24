@@ -1,39 +1,36 @@
-import { NoteColor } from '../types';
-import { noteColorKeys, noteColors } from '../theme';
+import { ItemColor, ItemType, ItemWithAuthor } from '../types';
+import { noteColorKeys } from '../theme';
 
-export function colorForNote(seed: string): NoteColor {
+/** Deterministic colour deal for an item id (used when the user doesn't pick). */
+export function colorForItem(seed: string): ItemColor {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
   return noteColorKeys[h % noteColorKeys.length];
 }
 
-export function rotationForNote(seed: string): number {
+/** Stable tilt in degrees, roughly ±4.5°. */
+export function rotationForItem(seed: string): number {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 33 + seed.charCodeAt(i)) >>> 0;
-  // -4.5 .. 4.5 degrees, skewed slightly so most notes lean gently
   const v = (h % 100) / 100;
   return Math.round((v - 0.5) * 90) / 10;
 }
 
-export function fontSizeForText(text: string): number {
-  if (text.length <= 28) return 22;
-  if (text.length <= 70) return 20;
-  return 18;
-}
+/** Visual paper style — driven entirely by the author's chosen type. */
+export type PaperVariant = 'note' | 'list' | 'appointment' | 'photo';
 
-export function isLightColor(color: NoteColor): boolean {
-  return !!noteColors[color];
+export function paperVariantFor(type: ItemType): PaperVariant {
+  switch (type) {
+    case 'list':
+      return 'list';
+    case 'date':
+      return 'appointment';
+    case 'photo':
+      return 'photo';
+    default:
+      return 'note';
+  }
 }
-
-/** Visual pin shape, inferred from content behind the scenes. */
-export type PinVariant =
-  | 'mini'
-  | 'note'
-  | 'announcement'
-  | 'photo'
-  | 'list'
-  | 'appointment'
-  | 'receipt';
 
 export type ListItem = { text: string; done: boolean };
 
@@ -41,16 +38,8 @@ const LIST_MARKER =
   /^\s*(?:[-•*○◯☐□▪▫◦–—]|\d+[.)]|\(\d+\)|\[ ?\]|\[x\]|☐|☑|☒|✓|✔|✗)\s+/i;
 const DONE_MARKER = /^\s*(?:\[x\]|☑|☒|✓|✔)\s+/i;
 
-const TIME_RE = /\b\d{1,2}(:\d{2})?\s?(am|pm)\b/i;
-const DAY_RE =
-  /\b(mon|monday|tue|tues|tuesday|wed|wednesday|thu|thur|thurs|thursday|fri|friday|sat|saturday|sun|sunday|today|tomorrow|tonight|weekend)\b/i;
-const APPT_WORD_RE =
-  /(appointment|dentist|doctor|meeting|service|visit|flight|trip|reservation|interview|call|dinner|party|pickup|drop-?off|shower|ceremony)/i;
-const RECEIPT_RE =
-  /(wifi|wi-?fi|password|passcode|total|\$\s?\d|receipt|check-?in|gate|seat|booking|code\s*[:#=]|pin\s*[:#=])/i;
-
-/** Checklist lines with explicit markers ("- Milk", "☐ Milk", "1. Milk"). */
-export function parseMarkedItems(text: string): { title: string | null; items: ListItem[] } {
+/** Parse composer text into a title + checklist rows (composer convenience only). */
+export function parseListItems(text: string): { title: string | null; items: ListItem[] } {
   const lines = text
     .split('\n')
     .map((l) => l.trim())
@@ -71,66 +60,34 @@ export function parseMarkedItems(text: string): { title: string | null; items: L
   return { title, items };
 }
 
-/** Split "title + checklist lines" notes. Also treats bare multi-line
- *  short text ("Milk\nEggs\nBread") as a list. */
-export function parseListItems(text: string): { title: string | null; items: ListItem[] } {
-  const marked = parseMarkedItems(text);
-  if (marked.items.length >= 1) return marked;
-  const lines = text
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean);
-  if (lines.length >= 3 && lines.every((l) => l.length <= 32) && text.trim().length <= 140) {
-    return { title: lines[0], items: lines.slice(1).map((t) => ({ text: t, done: false })) };
-  }
-  return { title: null, items: [] };
+/** Human date for a date item's event. */
+export function formatEventDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-export function pinVariantForNote(input: {
-  text: string;
-  imageUrl: string | null;
-  kind: string;
-  expiresAt: string | null;
-}): PinVariant {
-  const kind = input.kind ?? '';
-  if (input.imageUrl || kind === 'photo') return 'photo';
-  if (kind === 'list' || kind === 'grocery') return 'list';
-  if (kind === 'appointment' || kind === 'date') return 'appointment';
+export function formatEventTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
 
-  const text = (input.text ?? '').trim();
+/** "Leaves the board Thu 1 Oct" style copy, straight from the server's keep_until. */
+export function keepUntilLabel(keepUntil: string | null): string | null {
+  if (!keepUntil) return null;
+  const d = new Date(keepUntil);
+  if (Number.isNaN(d.getTime())) return null;
+  const label = d.toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+  return `Leaves the board ${label}`;
+}
 
-  // A chosen plain note stays a plain note: the words are never
-  // second-guessed into a list, appointment, or receipt style. Only the
-  // size-based mini/announcement styles still apply.
-  if (kind === 'note') {
-    const lineCount = text.split('\n').filter((l) => l.trim()).length;
-    if (text.length >= 110 || lineCount >= 4) return 'announcement';
-    if (!text.includes('\n') && text.length <= 26 && input.expiresAt == null) return 'mini';
-    return 'note';
-  }
-
-  // Unknown kinds (legacy/defensive): keep the old content-guessing behavior.
-  if (parseMarkedItems(text).items.length >= 1) {
-    return 'list';
-  }
-
-  if (
-    (TIME_RE.test(text) && (DAY_RE.test(text) || APPT_WORD_RE.test(text))) ||
-    (input.expiresAt != null && TIME_RE.test(text) && text.length <= 80)
-  ) {
-    return 'appointment';
-  }
-
-  if (RECEIPT_RE.test(text) && text.length <= 140) return 'receipt';
-
-  if (parseListItems(text).items.length >= 1) return 'list';
-
-  const lineCount = text.split('\n').filter((l) => l.trim()).length;
-  if (text.length >= 110 || lineCount >= 4) return 'announcement';
-
-  if (!text.includes('\n') && text.length <= 26 && input.expiresAt == null) return 'mini';
-
-  return 'note';
+/** Caption / body preview used for accessibility labels. */
+export function itemPreview(item: ItemWithAuthor): string {
+  const text = (item.body ?? item.title ?? '').trim().replace(/\s+/g, ' ');
+  return text.length > 80 ? `${text.slice(0, 80)}…` : text;
 }
 
 export const AVATAR_EMOJIS = [

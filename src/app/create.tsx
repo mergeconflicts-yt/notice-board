@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { colors, fonts } from '../theme';
+import { boardColorKeys, boardColors, colors, fonts } from '../theme';
 import { Button } from '../components/Button';
 import { ScreenHeader } from '../components/ScreenHeader';
-import { getBackendV2 } from '../services';
+import { createBoard, friendlyMessage } from '../lib/api';
+import { BoardColor } from '../types';
 
 export default function CreateBoardScreen() {
   const [name, setName] = useState('');
+  const [color, setColor] = useState<BoardColor>('sage');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,10 +19,10 @@ export default function CreateBoardScreen() {
     setCreating(true);
     setError(null);
     try {
-      const board = await getBackendV2().createBoard(name.trim());
+      const board = await createBoard(name.trim(), color);
       router.replace(`/board/${board.id}`);
-    } catch {
-      setError('Could not create the board. Please try again.');
+    } catch (e) {
+      setError(friendlyMessage(e));
       setCreating(false);
     }
   };
@@ -42,6 +44,22 @@ export default function CreateBoardScreen() {
             onChangeText={setName}
             autoFocus
           />
+          <Text style={[styles.label, styles.colorLabel]}>Colour</Text>
+          <View style={styles.swatches}>
+            {boardColorKeys.map((k) => (
+              <Pressable
+                key={k}
+                onPress={() => setColor(k)}
+                accessibilityLabel={`${k} board colour`}
+                accessibilityState={{ selected: k === color }}
+                style={[
+                  styles.swatch,
+                  { backgroundColor: boardColors[k] },
+                  k === color && styles.swatchActive,
+                ]}
+              />
+            ))}
+          </View>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <Button
             label="Create"
@@ -59,12 +77,8 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   body: { flex: 1, paddingHorizontal: 24, paddingTop: 24 },
-  label: {
-    fontFamily: fonts.ui.semibold,
-    fontSize: 13,
-    color: colors.inkSoft,
-    marginBottom: 10,
-  },
+  label: { fontFamily: fonts.ui.semibold, fontSize: 13, color: colors.inkSoft, marginBottom: 10 },
+  colorLabel: { marginTop: 24 },
   input: {
     height: 56,
     backgroundColor: colors.surface,
@@ -76,11 +90,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: colors.ink,
   },
-  error: {
-    fontFamily: fonts.ui.regular,
-    color: colors.danger,
-    fontSize: 13,
-    marginTop: 12,
-  },
-  create: { marginTop: 24 },
+  swatches: { flexDirection: 'row', gap: 12 },
+  swatch: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: 'transparent' },
+  swatchActive: { borderColor: colors.ink },
+  error: { fontFamily: fonts.ui.regular, color: colors.danger, fontSize: 13, marginTop: 12 },
+  create: { marginTop: 28 },
 });

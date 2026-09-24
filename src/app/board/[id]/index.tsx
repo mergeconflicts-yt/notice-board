@@ -1,221 +1,124 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  StyleSheet,
-  ActivityIndicator,
-  useWindowDimensions,
-  NativeSyntheticEvent,
-  NativeScrollEvent,
-} from 'react-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { colors, fonts } from '../../../theme';
+import { colors, boardColors, fonts } from '../../../theme';
 import { BoardNote } from '../../../components/BoardNote';
 import { Avatar } from '../../../components/Avatar';
-import { AddNoteSheet, NoteSheetInput } from '../../../components/AddNoteSheet';
-import { useBoardDetails, useBoardMembers, useBoardNotes } from '../../../hooks/useBoardV2';
-import { useSession } from '../../../store/session';
+import { AddNoteSheet, NoteDraft } from '../../../components/AddNoteSheet';
+import { useBoard, randomId } from '../../../hooks/useBoard';
 import { useToast } from '../../../store/toast';
-import {
-  REF_W,
-  TWO_COLUMN_MAX,
-  TWO_COL_MIN_H,
-  computeBoardLayout,
-  settleManual,
-} from '../../../utils/layout';
-import { NoteWithAuthor } from '../../../types';
-
-/** Scroll distance below which the viewer counts as "already at the top". */
-const NEAR_TOP_Y = 140;
-
-/** Height of the drag-to-delete target at the bottom of the screen. */
-const DELETE_ZONE_HEIGHT = 96;
+import { friendlyMessage, signedPhotoUrl, uploadPhoto } from '../../../lib/api';
+import { boardCanvasHeight, computeBoardLayout, REF_W } from '../../../utils/layout';
+import { ItemWithAuthor } from '../../../types';
 
 export default function BoardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const boardId = id as string;
   const insets = useSafeAreaInsets();
-  const { height: windowH } = useWindowDimensions();
-  const { board, loading: boardLoading, missing } = useBoardDetails(boardId);
-  const { notes, loading: notesLoading, addNote, updateNote, deleteNote } = useBoardNotes(boardId);
-  const { members } = useBoardMembers(boardId);
-  const user = useSession((s) => s.user);
-  const toastVisible = useToast((s) => s.message !== null);
+  const {
+    board,
+    members,
+    items,
+    entries,
+    loading,
+    error,
+    createItem,
+    moveItem,
+  } = useBoard(boardId);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [boardW, setBoardW] = useState(0);
   const [entering, setEntering] = useState<Set<string>>(() => new Set());
-  const [chipVisible, setChipVisible] = useState(false);
-  const [dragActive, setDragActive] = useState(false);
-  const [overDelete, setOverDelete] = useState(false);
-  const [measuredHeights, setMeasuredHeights] = useState<Record<string, number>>({});
-
-  const scrollRef = useRef<ScrollView>(null);
-  const nearTopRef = useRef(true);
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const seenIdsRef = useRef<Set<string>>(new Set());
   const firstLoadRef = useRef(true);
-  const chipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const overDeleteRef = useRef(false);
-  const lastBoardWRef = useRef(0);
-  const lastTwoColRef = useRef<boolean | null>(null);
 
-  const openNote = (note: NoteWithAuthor) => {
-    router.push(`/board/${boardId}/note/${note.id}`);
-  };
+  const openItem = (item: ItemWithAuthor) => router.push(`/board/${boardId}/note/${item.id}`);
 
-  // Every device derives the identical board from note metadata alone; once
-  // notes have rendered, their real heights replace the estimates so long
-  // notes reserve the space they actually need.
-  const layout = useMemo(
-    () => computeBoardLayout(notes ?? [], measuredHeights),
-    [notes, measuredHeights],
-  );
-  // Stacking order: notes lower on the board paint last (on top), so a paper
-  // can be lapped over at its bottom but its pinned top edge always shows.
-  const ordered = useMemo(() => {
-    return [...(notes ?? [])].sort((a, b) => {
-      const ya = layout.get(a.id)?.y ?? 0;
-      const yb = layout.get(b.id)?.y ?? 0;
-      return ya - yb || a.createdAt.localeCompare(b.createdAt);
-    });
-  }, [notes, layout]);
+  const layout = useMemo(() => computeBoardLayout(items), [items]);
+  const scale = boardW > 0 ? boardW / REF_W : 1;
+  const canvasH = useMemo(() => boardCanvasHeight(layout, scale), [layout, scale]);
 
-  // React to realtime arrivals: animate fresh papers, and only hijack the
-  // viewport when the viewer is already near the top.
+  // Animate freshly-arrived items, ignoring the first paint.
   useEffect(() => {
-    if (!notes) return;
-    const ids = new Set(notes.map((n) => n.id));
+    const ids = new Set(items.map((i) => i.id));
     if (firstLoadRef.current) {
       firstLoadRef.current = false;
       seenIdsRef.current = ids;
       return;
     }
-    const added = notes.filter((n) => !seenIdsRef.current.has(n.id));
+    const added = items.filter((i) => !seenIdsRef.current.has(i.id));
     seenIdsRef.current = ids;
-    if (added.length === 0) return;
+    if (added.length > 0) setEntering(new Set(added.map((i) => i.id)));
+  }, [items]);
 
-    setEntering(new Set(added.map((n) => n.id)));
+  // Resolve signed URLs once per photo path.
+  useEffect(() => {
+    const missing = items
+      .filter((i) => i.photoPath && !(i.photoPath in photoUrls))
+      .map((i) => i.photoPath as string);
+    if (missing.length === 0) return;
+    let alive = true;
+    void (async () => {
+      const pairs = await Promise.all(
+        missing.map(async (path) => [path, await signedPhotoUrl(path)] as const),
+      );
+      if (!alive) return;
+      setPhotoUrls((prev) => {
+        const next = { ...prev };
+        for (const [path, url] of pairs) if (url) next[path] = url;
+        return next;
+      });
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [items, photoUrls]);
 
-    const fromOthers = added.some((n) => n.authorId !== user?.id);
-    if (!fromOthers) return;
-    if (nearTopRef.current) {
-      scrollRef.current?.scrollTo({ y: 0, animated: true });
-    } else {
-      setChipVisible(true);
-      if (chipTimerRef.current) clearTimeout(chipTimerRef.current);
-      chipTimerRef.current = setTimeout(() => setChipVisible(false), 4000);
-    }
-  }, [notes, user]);
-
-  useEffect(
-    () => () => {
-      if (chipTimerRef.current) clearTimeout(chipTimerRef.current);
-    },
-    [],
-  );
-
-  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    nearTopRef.current = e.nativeEvent.contentOffset.y < NEAR_TOP_Y;
+  // A note was dropped: convert canvas pixels to the stored (fraction, ref-point)
+  // space, keep it on the board, then persist.
+  const handleMove = (item: ItemWithAuthor, left: number, top: number) => {
+    if (boardW <= 0) return;
+    const placement = layout.get(item.id);
+    if (!placement) return;
+    const refScale = boardW / REF_W;
+    const x = Math.max(0.02, Math.min(1 - placement.w - 0.02, left / boardW));
+    const y = Math.max(0, top / refScale);
+    moveItem(item, x, y).catch(() => {});
   };
 
-  const handleAdd = async (input: NoteSheetInput) => {
+  const handleAdd = async (draft: NoteDraft) => {
     setSubmitting(true);
     try {
-      // Photos upload straight from the composer input; the hook attaches the
-      // bytes to the new item (no pre-upload step).
-      await addNote({ ...input });
+      const itemId = randomId();
+      let photoPath: string | null = null;
+      if (draft.type === 'photo' && draft.photoUri) {
+        photoPath = await uploadPhoto(boardId, itemId, draft.photoUri);
+      }
+      await createItem({
+        id: itemId,
+        boardId,
+        type: draft.type,
+        color: draft.color,
+        body: draft.body || null,
+        title: draft.title || null,
+        eventAt: draft.eventAt,
+        place: draft.place || null,
+        photoPath,
+        entries: draft.type === 'list' ? draft.entries : undefined,
+      });
       setSheetOpen(false);
-      requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: true }));
     } catch (e) {
-      console.error('add note failed', e);
+      console.error('add post failed', e);
+      useToast.getState().show(friendlyMessage(e));
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDragStart = () => {
-    overDeleteRef.current = false;
-    setOverDelete(false);
-    setDragActive(true);
-  };
-
-  // The finger counts as "over delete" once it reaches the bottom zone.
-  const handleDragUpdate = (_note: NoteWithAuthor, screenY: number) => {
-    const over = screenY >= windowH - insets.bottom - DELETE_ZONE_HEIGHT;
-    if (over !== overDeleteRef.current) {
-      overDeleteRef.current = over;
-      setOverDelete(over);
-    }
-  };
-
-  // A held note was dropped: delete it if it landed in the zone, otherwise
-  // remember the spot it was dropped in.
-  const handleMove = (note: NoteWithAuthor, x: number, y: number) => {
-    const shouldDelete = overDeleteRef.current;
-    overDeleteRef.current = false;
-    setOverDelete(false);
-    setDragActive(false);
-
-    if (shouldDelete) {
-      deleteNote(note.id);
-      return;
-    }
-    if (boardW <= 0) return;
-    const refScale = boardW / REF_W;
-    const placed = layout.get(note.id);
-    const w = placed?.w ?? 0.4;
-    const h = placed?.h ?? 150;
-    const others: { x: number; y: number; w: number; h: number }[] = [];
-    layout.forEach((q, id) => {
-      if (id !== note.id) others.push(q);
-    });
-    const settled = settleManual(x / boardW, y / refScale, w, h, others);
-    updateNote(note.id, {
-      positionX: settled.x,
-      positionY: settled.y,
-      data: { ...((note.data as Record<string, unknown> | null) ?? {}), manual: true },
-    }).catch((e) => console.error('move note failed', e));
-  };
-
-  const scale = boardW > 0 ? boardW / REF_W : 1;
-  const twoColMode = (notes?.length ?? 0) <= TWO_COLUMN_MAX;
-  // In the roomy two-column mode, papers are given a minimum height so short
-  // notes still fill their section.
-  const minNoteH = twoColMode ? TWO_COL_MIN_H * scale : 0;
-
-  // Feed each note's real rendered height back to the layout (in ref points).
-  const handleMeasure = (id: string, heightPx: number) => {
-    if (boardW <= 0 || heightPx <= 0) return;
-    const refH = (heightPx * REF_W) / boardW;
-    setMeasuredHeights((prev) =>
-      Math.abs((prev[id] ?? -1) - refH) < 1 ? prev : { ...prev, [id]: refH },
-    );
-  };
-
-  // Measurements only hold for the width and layout mode they were taken in.
-  useEffect(() => {
-    if (boardW <= 0 || boardW === lastBoardWRef.current) return;
-    lastBoardWRef.current = boardW;
-    setMeasuredHeights({});
-  }, [boardW]);
-
-  useEffect(() => {
-    if (lastTwoColRef.current === twoColMode) return;
-    lastTwoColRef.current = twoColMode;
-    setMeasuredHeights({});
-  }, [twoColMode]);
-  const canvasH = useMemo(() => {
-    let bottom = 0;
-    layout.forEach((p) => {
-      bottom = Math.max(bottom, p.y + p.h);
-    });
-    return Math.max(1100 * scale, bottom * scale + 90);
-  }, [layout, scale]);
-
-  if (boardLoading) {
+  if (loading && !board) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
@@ -225,7 +128,7 @@ export default function BoardScreen() {
     );
   }
 
-  if (missing || !board) {
+  if (!board) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
@@ -239,35 +142,29 @@ export default function BoardScreen() {
     );
   }
 
-  const isLoading = notesLoading;
-  const isEmpty = notes && notes.length === 0;
+  const isEmpty = items.length === 0;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: boardColors[board.color] }]} edges={['top']}>
       <View style={styles.header}>
         <Pressable
           hitSlop={8}
           onPress={() => router.push(`/board/${boardId}/people`)}
           style={styles.peopleBtn}
-          accessibilityRole="button"
-          accessibilityLabel="View board members"
         >
-          {(members ?? []).slice(0, 3).map((m, i) => (
+          {members.slice(0, 3).map((m, i) => (
             <View key={m.userId} style={[styles.avatarStack, { zIndex: 10 - i, marginLeft: i === 0 ? 0 : -8 }]}>
-              <Avatar name={m.user.displayName} emoji={m.user.avatar} size={26} />
+              <Avatar name={m.user.displayName} size={26} />
             </View>
           ))}
-          {members && members.length > 3 ? (
+          {members.length > 3 ? (
             <View style={[styles.avatarStack, styles.moreStack, { marginLeft: -8 }]}>
               <Text style={styles.moreText}>+{members.length - 3}</Text>
             </View>
           ) : null}
         </Pressable>
 
-        <Pressable
-          onPress={() => router.push(`/board/${boardId}/settings`)}
-          style={styles.boardTitle}
-        >
+        <Pressable onPress={() => router.push(`/board/${boardId}/settings`)} style={styles.boardTitle}>
           <Text style={styles.boardName} numberOfLines={1}>{board.name}</Text>
           <Text style={styles.boardSubtitle}>Shared board</Text>
         </Pressable>
@@ -276,18 +173,15 @@ export default function BoardScreen() {
           hitSlop={8}
           onPress={() => router.push(`/board/${boardId}/settings`)}
           style={styles.settingsBtn}
-          accessibilityRole="button"
           accessibilityLabel="Board settings"
         >
           <Text style={styles.settingsGlyph}>⚙︎</Text>
         </Pressable>
       </View>
 
-      {isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.accent} />
-        </View>
-      ) : isEmpty ? (
+      {error ? <Text style={styles.banner}>{error}</Text> : null}
+
+      {isEmpty ? (
         <View style={styles.empty}>
           <Text style={styles.emptyHand}>✍️</Text>
           <Text style={styles.emptyTitle}>Leave the first note</Text>
@@ -297,36 +191,28 @@ export default function BoardScreen() {
           </Pressable>
         </View>
       ) : (
-        <ScrollView
-          ref={scrollRef}
-          contentContainerStyle={styles.boardContent}
-          showsVerticalScrollIndicator={false}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
-        >
+        <ScrollView contentContainerStyle={styles.boardContent} showsVerticalScrollIndicator={false}>
           <View
-            style={[styles.canvas, { minHeight: 1100 * scale, height: canvasH }]}
+            style={[styles.canvas, { height: canvasH }]}
             onLayout={(e) => setBoardW(e.nativeEvent.layout.width)}
           >
             {boardW > 0
-              ? ordered.map((n) => {
-                  const p = layout.get(n.id);
+              ? items.map((item) => {
+                  const p = layout.get(item.id);
                   if (!p) return null;
                   return (
                     <BoardNote
-                      key={n.id}
-                      note={n}
+                      key={item.id}
+                      item={item}
                       left={p.x * boardW}
                       top={p.y * scale}
                       width={p.w * boardW}
-                      minHeight={minNoteH}
                       rotation={p.rotation}
-                      animateIn={entering.has(n.id)}
-                      onPress={openNote}
-                      onDragStart={handleDragStart}
-                      onDragUpdate={handleDragUpdate}
+                      animateIn={entering.has(item.id)}
+                      entries={entries.filter((e) => e.itemId === item.id)}
+                      photoUrl={item.photoPath ? photoUrls[item.photoPath] ?? null : null}
+                      onPress={openItem}
                       onMove={handleMove}
-                      onMeasure={handleMeasure}
                     />
                   );
                 })
@@ -335,39 +221,11 @@ export default function BoardScreen() {
         </ScrollView>
       )}
 
-      {chipVisible && (
-        <Pressable
-          onPress={() => {
-            setChipVisible(false);
-            scrollRef.current?.scrollTo({ y: 0, animated: true });
-          }}
-          style={[styles.chip, { top: insets.top + 60 }]}
-        >
-          <Text style={styles.chipText}>New note added ↑</Text>
-        </Pressable>
-      )}
-
-      {dragActive && (
-        <View
-          pointerEvents="none"
-          style={[
-            styles.deleteZone,
-            { bottom: insets.bottom + 24 },
-            overDelete && styles.deleteZoneOver,
-          ]}
-        >
-          <Text style={[styles.deleteZoneText, overDelete && styles.deleteZoneTextOver]}>
-            {overDelete ? 'Release to delete' : 'Put here to delete'}
-          </Text>
-        </View>
-      )}
-
-      {!isEmpty && !dragActive && !toastVisible && (
+      {!isEmpty ? (
         <Pressable
           onPress={() => setSheetOpen(true)}
           accessibilityRole="button"
           accessibilityLabel="Add note"
-          accessibilityHint="Opens the composer to pin a new note."
           style={({ pressed }) => [
             styles.fab,
             { bottom: insets.bottom + 24 },
@@ -376,7 +234,7 @@ export default function BoardScreen() {
         >
           <Text style={styles.fabGlyph}>+</Text>
         </Pressable>
-      )}
+      ) : null}
 
       <AddNoteSheet
         visible={sheetOpen}
@@ -398,16 +256,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 56,
   },
-  peopleBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: 96,
-  },
-  avatarStack: {
-    borderRadius: 15,
-    borderWidth: 2,
-    borderColor: colors.background,
-  },
+  peopleBtn: { flexDirection: 'row', alignItems: 'center', width: 96 },
+  avatarStack: { borderRadius: 15, borderWidth: 2, borderColor: 'rgba(255,255,255,0.85)' },
   moreStack: {
     width: 26,
     height: 26,
@@ -418,11 +268,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  moreText: {
-    fontFamily: fonts.ui.bold,
-    fontSize: 11,
-    color: colors.inkSoft,
-  },
+  moreText: { fontFamily: fonts.ui.bold, fontSize: 11, color: colors.inkSoft },
   boardName: {
     textAlign: 'center',
     fontFamily: fonts.hand.bold,
@@ -431,12 +277,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   boardTitle: { flex: 1, alignItems: 'center' },
-  boardSubtitle: {
-    fontFamily: fonts.ui.regular,
-    fontSize: 11,
-    color: colors.inkFaint,
-    marginTop: -2,
-  },
+  boardSubtitle: { fontFamily: fonts.ui.regular, fontSize: 11, color: colors.inkSoft, marginTop: -2 },
   settingsBtn: {
     width: 40,
     height: 40,
@@ -447,37 +288,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  settingsGlyph: {
-    fontSize: 18,
-    color: colors.inkSoft,
-  },
-  boardContent: {
-    paddingHorizontal: 10,
-    paddingBottom: 120,
-  },
-  canvas: {
-    position: 'relative',
-  },
-  empty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-    paddingBottom: 60,
-  },
-  emptyHand: { fontSize: 40, marginBottom: 12 },
-  emptyTitle: {
-    fontFamily: fonts.hand.bold,
-    fontSize: 32,
-    color: colors.ink,
-    marginBottom: 6,
-  },
-  emptySub: {
-    fontFamily: fonts.ui.regular,
-    fontSize: 15,
-    color: colors.inkSoft,
+  settingsGlyph: { fontSize: 18, color: colors.inkSoft },
+  banner: {
+    fontFamily: fonts.ui.semibold,
+    fontSize: 13,
+    color: colors.danger,
     textAlign: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 4,
   },
+  boardContent: { paddingHorizontal: 6, paddingBottom: 120 },
+  canvas: { position: 'relative' },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingBottom: 60 },
+  emptyHand: { fontSize: 40, marginBottom: 12 },
+  emptyTitle: { fontFamily: fonts.hand.bold, fontSize: 32, color: colors.ink, marginBottom: 6 },
+  emptySub: { fontFamily: fonts.ui.regular, fontSize: 15, color: colors.inkSoft, textAlign: 'center' },
   emptyBtn: {
     marginTop: 22,
     backgroundColor: colors.ink,
@@ -485,11 +310,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 16,
   },
-  emptyBtnText: {
-    fontFamily: fonts.ui.bold,
-    fontSize: 16,
-    color: colors.background,
-  },
+  emptyBtnText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.background },
   fab: {
     position: 'absolute',
     right: 22,
@@ -506,68 +327,9 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   fabPressed: { transform: [{ scale: 0.94 }] },
-  fabGlyph: {
-    fontSize: 34,
-    lineHeight: 38,
-    color: '#fff',
-    marginTop: -2,
-  },
-  chip: {
-    position: 'absolute',
-    alignSelf: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: 999,
-    backgroundColor: colors.ink,
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 5,
-  },
-  chipText: {
-    fontFamily: fonts.ui.bold,
-    fontSize: 13,
-    color: colors.background,
-  },
-  deleteZone: {
-    position: 'absolute',
-    alignSelf: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 999,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-  },
-  deleteZoneOver: {
-    backgroundColor: colors.danger,
-    borderColor: colors.danger,
-  },
-  deleteZoneText: {
-    fontFamily: fonts.ui.bold,
-    fontSize: 15,
-    color: colors.inkSoft,
-  },
-  deleteZoneTextOver: {
-    color: colors.white,
-  },
-  missingTitle: {
-    fontFamily: fonts.hand.bold,
-    fontSize: 30,
-    color: colors.ink,
-  },
-  missingSub: {
-    fontFamily: fonts.ui.regular,
-    fontSize: 14,
-    color: colors.inkSoft,
-    marginTop: 6,
-  },
+  fabGlyph: { fontSize: 34, lineHeight: 38, color: '#fff', marginTop: -2 },
+  missingTitle: { fontFamily: fonts.hand.bold, fontSize: 30, color: colors.ink },
+  missingSub: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.inkSoft, marginTop: 6 },
   missingBtn: {
     marginTop: 20,
     paddingHorizontal: 20,
@@ -575,8 +337,5 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: colors.ink,
   },
-  missingBtnText: {
-    fontFamily: fonts.ui.bold,
-    color: colors.background,
-  },
+  missingBtnText: { fontFamily: fonts.ui.bold, color: colors.background },
 });

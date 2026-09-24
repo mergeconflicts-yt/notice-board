@@ -13,13 +13,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import DateTimePicker, { DateTimePickerChangeEvent } from '@react-native-community/datetimepicker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, fonts, noteColors, noteColorKeys } from '../theme';
-import { NoteColor, NoteKind } from '../types';
-import { colorForNote, parseListItems } from '../utils/note';
-import { randomId } from '../utils/id';
-import { formatEventAt } from '../utils/time';
+import { ItemColor, ItemType, ItemWithAuthor } from '../types';
+import { colorForItem, parseListItems } from '../utils/note';
+import { randomId } from '../hooks/useBoard';
 
 type ComposerTab = 'note' | 'photo' | 'list' | 'date';
 
@@ -30,71 +29,19 @@ const TABS: { id: ComposerTab; label: string; icon: keyof typeof MaterialCommuni
   { id: 'date', label: 'Date', icon: 'calendar-month-outline' },
 ];
 
-type ExpiryKind = 'none' | 'today' | 'tomorrow' | 'week';
+export type NoteDraft = {
+  type: ItemType;
+  color: ItemColor;
+  body: string;
+  title: string;
+  eventAt: string | null;
+  place: string;
+  entries: { id: string; text: string }[];
+  /** A freshly picked local image, or null. */
+  photoUri: string | null;
+};
 
-const EXPIRY_OPTIONS: { label: string; kind: ExpiryKind }[] = [
-  { label: 'Keep forever', kind: 'none' },
-  { label: 'Today', kind: 'today' },
-  { label: 'Tomorrow', kind: 'tomorrow' },
-  { label: 'This week', kind: 'week' },
-];
-
-function endOfToday(): Date {
-  const d = new Date();
-  d.setHours(23, 59, 59, 999);
-  return d;
-}
-function endOfTomorrow(): Date {
-  const d = endOfToday();
-  d.setDate(d.getDate() + 1);
-  return d;
-}
-function endOfWeek(): Date {
-  const d = endOfToday();
-  d.setDate(d.getDate() + 7);
-  return d;
-}
-
-function expiryDateFor(kind: ExpiryKind): Date | null {
-  switch (kind) {
-    case 'today':
-      return endOfToday();
-    case 'tomorrow':
-      return endOfTomorrow();
-    case 'week':
-      return endOfWeek();
-    default:
-      return null;
-  }
-}
-
-function expiryIndexFor(expiresAt: string | null | undefined): number {
-  if (!expiresAt) return 0;
-  const target = new Date(expiresAt).getTime();
-  // -1 when the stored date matches no fresh relative option (e.g. a "This
-  // week" expiry set days ago): the caller preserves it as-is instead of
-  // silently resetting to "Keep forever".
-  return EXPIRY_OPTIONS.findIndex((o) => {
-    const at = expiryDateFor(o.kind);
-    if (!at) return false;
-    return Math.abs(at.getTime() - target) < 12 * 3600000;
-  });
-}
-
-function formatKeptExpiry(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return 'current date';
-  return d.toLocaleDateString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
-function expiryRowLabel(idx: number): string {
-  if (idx === 0) return 'Keep forever';
-  return `Expires ${EXPIRY_OPTIONS[idx].label.toLowerCase()}`;
-}
+type ListRow = { id: string; text: string };
 
 function defaultEventAt(): Date {
   const d = new Date();
@@ -103,120 +50,88 @@ function defaultEventAt(): Date {
   return d;
 }
 
-function eventAtFrom(data: Record<string, unknown> | null | undefined): Date {
-  const raw = data?.eventAt;
-  if (typeof raw === 'string') {
-    const d = new Date(raw);
-    if (!Number.isNaN(d.getTime())) return d;
-  }
-  return defaultEventAt();
-}
-
-type ListRow = { id: string; text: string; done: boolean };
-
-function rowsFromInitial(
-  text: string,
-  data: Record<string, unknown> | null | undefined,
-): { title: string; rows: ListRow[] } {
-  const rawItems = data?.items;
-  if (Array.isArray(rawItems) && rawItems.length > 0) {
-    const rows = rawItems
-      .filter((it): it is { text: unknown; done?: unknown } => typeof it === 'object' && it !== null)
-      .map((it) => ({
-        id: randomId(),
-        text: typeof it.text === 'string' ? it.text : '',
-        done: it.done === true,
-      }))
-      .filter((r) => r.text.trim());
-    if (rows.length > 0) {
-      const parsed = parseListItems(text);
-      return { title: parsed.title ?? '', rows };
-    }
-  }
-  const parsed = parseListItems(text);
-  if (parsed.items.length > 0) {
-    return {
-      title: parsed.title ?? '',
-      rows: parsed.items.map((it) => ({ id: randomId(), text: it.text, done: it.done })),
-    };
-  }
-  return { title: text.trim(), rows: [{ id: randomId(), text: '', done: false }] };
-}
-
-function tabForInitial(initial: NoteSheetInitial | undefined): ComposerTab {
-  if (!initial) return 'note';
-  if (initial.imageUrl) return 'photo';
-  if (initial.kind === 'photo') return 'photo';
-  if (initial.kind === 'list') return 'list';
-  if (initial.kind === 'appointment') return 'date';
+function tabForItem(item: ItemWithAuthor): ComposerTab {
+  if (item.type === 'photo') return 'photo';
+  if (item.type === 'list') return 'list';
+  if (item.type === 'date') return 'date';
   return 'note';
 }
-
-export type NoteSheetInput = {
-  text: string;
-  imageUrl: string | null;
-  expiresAt: string | null;
-  kind: NoteKind;
-  data: Record<string, unknown> | null;
-  color: NoteColor;
-};
-
-export type NoteSheetInitial = {
-  text: string;
-  imageUrl: string | null;
-  expiresAt: string | null;
-  kind?: NoteKind;
-  data?: Record<string, unknown> | null;
-  color?: NoteColor;
-};
 
 type Props = {
   visible: boolean;
   submitting?: boolean;
   submitLabel?: string;
-  initial?: NoteSheetInitial;
+  /** Present when editing; drives the initial tab and fields. */
+  initial?: ItemWithAuthor | null;
+  entries?: { id: string; text: string }[];
   onClose: () => void;
-  onSubmit: (input: NoteSheetInput) => void;
+  onSubmit: (draft: NoteDraft) => void;
 };
 
 export function AddNoteSheet({
   visible,
   submitting,
-  submitLabel = 'Post note',
-  initial,
+  submitLabel = 'Post',
+  initial = null,
+  entries = [],
   onClose,
   onSubmit,
 }: Props) {
+  const editing = initial !== null;
   const [tab, setTab] = useState<ComposerTab>('note');
   const [text, setText] = useState('');
-  const [image, setImage] = useState<string | null>(null);
-  const [color, setColor] = useState<NoteColor>('yellow');
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [color, setColor] = useState<ItemColor>('butter');
   const [listTitle, setListTitle] = useState('');
+  const [listNotes, setListNotes] = useState('');
   const [rows, setRows] = useState<ListRow[]>([]);
   const [eventAt, setEventAt] = useState<Date>(() => defaultEventAt());
+  const [place, setPlace] = useState('');
   const [openPicker, setOpenPicker] = useState<'date' | 'time' | null>(null);
-  const [dtKey, setDtKey] = useState(0);
+  const [picking, setPicking] = useState(false);
+  const [wasOpen, setWasOpen] = useState(false);
+  const rowInputRefs = useRef(new Map<string, TextInput | null>());
+  const pendingFocusRowId = useRef<string | null>(null);
+  const scrollRef = useRef<ScrollView | null>(null);
   const todayStart = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     return d;
   }, []);
-  const [expiryIdx, setExpiryIdx] = useState(0);
-  // A stored expiry that matches no relative option, kept verbatim until the
-  // user picks a standard option (which clears it).
-  const [keepExpiry, setKeepExpiry] = useState<string | null>(null);
-  const [expiryOpen, setExpiryOpen] = useState(false);
-  const [picking, setPicking] = useState(false);
-  const [wasOpen, setWasOpen] = useState(false);
-  const scrollRef = useRef<ScrollView | null>(null);
-  const rowInputRefs = useRef(new Map<string, TextInput | null>());
-  const pendingFocusRowId = useRef<string | null>(null);
 
+  if (visible !== wasOpen) {
+    setWasOpen(visible);
+    if (visible) {
+      if (initial) {
+        const nextTab = tabForItem(initial);
+        setTab(nextTab);
+        setColor(initial.color);
+        setText(initial.type === 'note' || initial.type === 'photo' ? (initial.body ?? '') : '');
+        setListTitle(initial.type === 'list' ? (initial.title ?? '') : '');
+        setListNotes('');
+        setRows(initial.type === 'list' ? entries.map((e) => ({ id: e.id, text: e.text })) : []);
+        setPlace(initial.place ?? '');
+        setEventAt(initial.eventAt ? new Date(initial.eventAt) : defaultEventAt());
+      } else {
+        setTab('note');
+        setColor(colorForItem(randomId()));
+        setText('');
+        setListTitle('');
+        setListNotes('');
+        setRows([]);
+        setPlace('');
+        setEventAt(defaultEventAt());
+      }
+      setPhotoUri(null);
+      setOpenPicker(null);
+    }
+  }
+
+  // Focus a freshly added row once it has mounted, and keep it in view.
   useEffect(() => {
     const id = pendingFocusRowId.current;
     if (!id) return;
     pendingFocusRowId.current = null;
-    // Wait a tick so the new row has mounted, then focus + ensure visible.
     const t = setTimeout(() => {
       rowInputRefs.current.get(id)?.focus();
       scrollRef.current?.scrollToEnd({ animated: true });
@@ -224,185 +139,118 @@ export function AddNoteSheet({
     return () => clearTimeout(t);
   }, [rows]);
 
-  if (visible !== wasOpen) {
-    setWasOpen(visible);
-    if (visible) {
-      const nextTab = tabForInitial(initial);
-      setTab(nextTab);
-      setText(initial?.text ?? '');
-      setImage(initial?.imageUrl ?? null);
-      setColor(initial?.color ?? colorForNote(randomId()));
-      const matched = expiryIndexFor(initial?.expiresAt);
-      setExpiryIdx(matched >= 0 ? matched : 0);
-      setKeepExpiry(matched >= 0 || !initial?.expiresAt ? null : initial.expiresAt);
-      setExpiryOpen(false);
-      if (nextTab === 'list') {
-        const seed = rowsFromInitial(initial?.text ?? '', initial?.data ?? null);
-        setListTitle(seed.title);
-        setRows(seed.rows);
-      } else {
-        setListTitle('');
-        setRows([]);
-      }
-      setEventAt(eventAtFrom(initial?.data ?? null));
-    }
-  }
-
   const filledRows = rows.filter((r) => r.text.trim().length > 0);
-  const canPost =
-    !submitting &&
-    (tab === 'note'
-      ? text.trim().length > 0
+  const canPost = !submitting && (
+    tab === 'note'
+      ? text.trim().length > 0 || editing
       : tab === 'photo'
-        ? image != null
+        ? photoUri != null || editing
         : tab === 'list'
           ? filledRows.length > 0
-          : text.trim().length > 0);
+          : text.trim().length > 0
+  );
 
   const pickImage = async () => {
     setPicking(true);
     try {
-      const res = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.8,
-      });
+      const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
       if (!res.canceled && res.assets[0]) {
-        setImage(res.assets[0].uri);
-        // Attaching a photo from the Note composer turns it into a photo note.
+        setPhotoUri(res.assets[0].uri);
         setTab('photo');
-        setExpiryOpen(false);
       }
     } finally {
       setPicking(false);
     }
   };
 
-  const updateRow = (id: string, patch: Partial<ListRow>) => {
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
-  };
+  const updateRow = (id: string, value: string) =>
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, text: value } : r)));
 
-  const newRow = (): ListRow => ({ id: randomId(), text: '', done: false });
-
-  const focusRow = (id: string) => {
-    rowInputRefs.current.get(id)?.focus();
-  };
-
-  const submitRow = (index: number) => {
-    if (index < rows.length - 1) {
-      const next = rows[index + 1];
-      if (next) focusRow(next.id);
-      return;
-    }
-    const row = newRow();
-    pendingFocusRowId.current = row.id;
-    setRows((prev) => [...prev, row]);
-  };
+  const focusRow = (id: string) => rowInputRefs.current.get(id)?.focus();
 
   const addRowAndFocus = () => {
-    const row = newRow();
+    const row = { id: randomId(), text: '' };
     pendingFocusRowId.current = row.id;
     setRows((prev) => [...prev, row]);
+  };
+
+  // Enter: jump to the next row when there is one, otherwise add a fresh row
+  // (but never stack a second empty row).
+  const submitRow = (index: number) => {
+    if (index < rows.length - 1) {
+      focusRow(rows[index + 1].id);
+      return;
+    }
+    if (!rows[index]?.text.trim()) return;
+    addRowAndFocus();
   };
 
   const selectTab = (next: ComposerTab) => {
-    // Carry writing across tabs: parse note text into rows when entering the
-    // list tab, and fold rows back into text when leaving it (only when the
-    // destination is empty, so nothing is ever overwritten).
     if (next === 'list' && rows.length === 0) {
-      const { title, items } = parseListItems(text);
-      if (items.length > 0) {
-        setListTitle(title ?? '');
-        setRows(items.map((it) => ({ id: randomId(), text: it.text, done: it.done })));
+      const parsed = parseListItems(text);
+      if (parsed.items.length > 0) {
+        setListTitle(parsed.title ?? '');
+        setRows(parsed.items.map((it) => ({ id: randomId(), text: it.text })));
       } else {
-        setRows([newRow(), newRow(), newRow()]);
+        setRows([{ id: randomId(), text: '' }, { id: randomId(), text: '' }, { id: randomId(), text: '' }]);
       }
-    } else if (tab === 'list' && next !== 'list' && !text.trim()) {
-      const parts = [
-        ...(listTitle.trim() ? [listTitle.trim()] : []),
-        ...rows
-          .filter((r) => r.text.trim())
-          .map((r) => `${r.done ? '☑' : '☐'} ${r.text.trim()}`),
-      ];
-      if (parts.length > 0) setText(parts.join('\n'));
     }
     setTab(next);
-    setExpiryOpen(false);
-  };
-
-  const removeRow = (id: string) => {
-    setRows((prev) => (prev.length <= 1 ? prev : prev.filter((r) => r.id !== id)));
-  };
-
-  const mergeEventDate = (_event: DateTimePickerChangeEvent, selected: Date) => {
-    setEventAt((prev) => {
-      const next = new Date(selected);
-      next.setHours(prev.getHours(), prev.getMinutes(), 0, 0);
-      return next;
-    });
-    // A calendar tap is a definitive pick — close it.
-    setOpenPicker(null);
-    if (Platform.OS === 'ios') setDtKey((k) => k + 1);
-  };
-
-  const mergeEventTime = (_event: DateTimePickerChangeEvent, selected: Date) => {
-    setEventAt((prev) => {
-      const next = new Date(prev);
-      next.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
-      return next;
-    });
-    if (Platform.OS === 'android') setOpenPicker(null);
-    // iOS time wheels fire on every scroll tick — no auto-dismiss here,
-    // the wheels close when tapping the Time button again.
-  };
-
-  const togglePicker = (which: 'date' | 'time') => {
-    setOpenPicker((prev) => (prev === which ? null : which));
   };
 
   const submit = () => {
-    const expiry = expiryDateFor(EXPIRY_OPTIONS[expiryIdx].kind);
-    // A preserved custom date wins over the (defaulted) option index, so
-    // saving without touching the expiry row keeps the original date.
-    const expiresAt = keepExpiry ?? (expiry ? expiry.toISOString() : null);
     if (tab === 'list') {
-      const items = filledRows.map((r) => ({ text: r.text.trim(), done: r.done }));
-      const lines = [
-        ...(listTitle.trim() ? [listTitle.trim()] : []),
-        ...items.map((it) => `${it.done ? '☑' : '☐'} ${it.text}`),
-      ];
       onSubmit({
-        text: lines.join('\n'),
-        imageUrl: null,
-        expiresAt,
-        kind: 'list',
-        data: { items },
+        type: 'list',
         color,
+        body: listNotes.trim(),
+        title: listTitle.trim(),
+        eventAt: null,
+        place: '',
+        entries: filledRows.map((r) => ({ id: r.id, text: r.text.trim() })),
+        photoUri: null,
       });
       return;
     }
     if (tab === 'date') {
       onSubmit({
-        text: text.trim(),
-        imageUrl: null,
-        expiresAt: initial?.expiresAt ?? null,
-        kind: 'appointment',
-        data: { eventAt: eventAt.toISOString() },
+        type: 'date',
         color,
+        body: '',
+        title: text.trim(),
+        eventAt: eventAt.toISOString(),
+        place: place.trim(),
+        entries: [],
+        photoUri: null,
+      });
+      return;
+    }
+    if (tab === 'photo') {
+      onSubmit({
+        type: 'photo',
+        color,
+        body: text.trim(),
+        title: '',
+        eventAt: null,
+        place: '',
+        entries: [],
+        photoUri,
       });
       return;
     }
     onSubmit({
-      text: text.trim(),
-      imageUrl: image,
-      expiresAt,
-      kind: tab === 'photo' ? 'photo' : 'note',
-      data: null,
+      type: 'note',
       color,
+      body: text.trim(),
+      title: '',
+      eventAt: null,
+      place: '',
+      entries: [],
+      photoUri: null,
     });
   };
 
   const palette = noteColors[color];
-  const showExpiry = tab !== 'date';
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -413,19 +261,13 @@ export function AddNoteSheet({
         <Pressable style={styles.scrim} onPress={onClose} />
         <View style={styles.sheet}>
           <View style={styles.header}>
-            <Text style={styles.title}>{initial ? 'Edit note' : 'Add to board'}</Text>
-            <Pressable
-              hitSlop={12}
-              onPress={onClose}
-              style={styles.closeBtn}
-              accessibilityRole="button"
-              accessibilityLabel="Close composer"
-            >
+            <Text style={styles.title}>{editing ? 'Edit' : 'Add to board'}</Text>
+            <Pressable hitSlop={12} onPress={onClose} style={styles.closeBtn}>
               <MaterialCommunityIcons name="close" size={24} color={colors.inkSoft} />
             </Pressable>
           </View>
 
-          {!initial ? (
+          {!editing ? (
             <View style={styles.tabs}>
               {TABS.map((t) => {
                 const active = tab === t.id;
@@ -437,7 +279,7 @@ export function AddNoteSheet({
                   >
                     <MaterialCommunityIcons
                       name={t.icon}
-                      size={28}
+                      size={26}
                       color={active ? colors.ink : colors.inkFaint}
                     />
                     <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{t.label}</Text>
@@ -454,7 +296,7 @@ export function AddNoteSheet({
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
           >
-            {tab === 'note' ? (
+            {(tab === 'note' || (editing && initial?.type === 'note')) ? (
               <View style={[styles.sticky, { backgroundColor: palette.bg }]}>
                 <TextInput
                   style={[styles.stickyInput, { color: palette.ink }]}
@@ -467,91 +309,31 @@ export function AddNoteSheet({
                   textAlignVertical="top"
                   selectionColor={palette.ink}
                 />
-                <View style={styles.stickyFooter}>
-                  <Pressable style={styles.attachBtn} onPress={pickImage} disabled={picking}>
-                    {picking ? (
-                      <ActivityIndicator size="small" color={colors.inkSoft} />
-                    ) : (
-                      <MaterialCommunityIcons
-                        name={image ? 'check-circle' : 'image-outline'}
-                        size={24}
-                        color={image ? colors.accentDeep : colors.inkSoft}
-                      />
-                    )}
-                  </Pressable>
-                  <View style={styles.dots}>
-                    {noteColorKeys.map((k) => {
-                      const p = noteColors[k];
-                      const selected = k === color;
-                      return (
-                        <Pressable
-                          key={k}
-                          hitSlop={8}
-                          onPress={() => setColor(k)}
-                          accessibilityRole="button"
-                          accessibilityLabel={`${k} note color`}
-                          accessibilityState={{ selected }}
-                          style={[
-                            styles.dot,
-                            { backgroundColor: p.bg, borderColor: p.edge },
-                            selected && styles.dotSelected,
-                          ]}
-                        />
-                      );
-                    })}
-                  </View>
-                </View>
-                <View style={styles.stickyCurlShadow} />
-                <View style={[styles.stickyCurl, { borderBottomColor: palette.bg }]} />
-              </View>
-            ) : null}
-
-            {image && tab === 'note' ? (
-              <View style={styles.previewWrap}>
-                <Image source={{ uri: image }} style={styles.preview} resizeMode="cover" />
-                <Pressable
-                  style={styles.remove}
-                  onPress={() => setImage(null)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Remove image"
-                >
-                  <Text style={styles.removeText}>✕</Text>
-                </Pressable>
               </View>
             ) : null}
 
             {tab === 'photo' ? (
               <View>
-                {image ? (
+                {photoUri || initial?.photoPath ? (
                   <View style={styles.previewWrap}>
                     <Image
-                      source={{ uri: image }}
+                      source={{ uri: photoUri ?? undefined }}
                       style={styles.preview}
                       resizeMode="cover"
-                      accessible
-                      accessibilityRole="image"
-                      accessibilityLabel="Selected photo preview"
                     />
-                    <Pressable
-                      style={styles.remove}
-                      onPress={() => setImage(null)}
-                      accessibilityRole="button"
-                      accessibilityLabel="Remove image"
-                    >
-                      <Text style={styles.removeText}>✕</Text>
-                    </Pressable>
+                    {photoUri ? (
+                      <Pressable style={styles.remove} onPress={() => setPhotoUri(null)}>
+                        <Text style={styles.removeText}>✕</Text>
+                      </Pressable>
+                    ) : null}
                   </View>
                 ) : (
                   <Pressable style={styles.photoDrop} onPress={pickImage} disabled={picking}>
                     {picking ? (
-                      <ActivityIndicator size="small" color={colors.inkSoft} />
+                      <ActivityIndicator color={colors.inkSoft} />
                     ) : (
                       <>
-                        <MaterialCommunityIcons
-                          name="image-outline"
-                          size={36}
-                          color={colors.inkFaint}
-                        />
+                        <MaterialCommunityIcons name="image-outline" size={36} color={colors.inkFaint} />
                         <Text style={styles.photoDropText}>Choose a photo</Text>
                       </>
                     )}
@@ -595,19 +377,13 @@ export function AddNoteSheet({
                 <View style={styles.rows}>
                   {rows.map((row, index) => (
                     <View key={row.id} style={styles.npRow}>
-                      <Pressable
-                        hitSlop={8}
-                        onPress={() => updateRow(row.id, { done: !row.done })}
-                        style={[styles.rowCheck, row.done && styles.rowCheckDone]}
-                      >
-                        {row.done ? <Text style={styles.rowCheckMark}>✓</Text> : null}
-                      </Pressable>
+                      <View style={styles.rowBullet} />
                       <TextInput
                         style={styles.rowInput}
                         placeholder="List item..."
                         placeholderTextColor={colors.inkFaint}
                         value={row.text}
-                        onChangeText={(v) => updateRow(row.id, { text: v })}
+                        onChangeText={(v) => updateRow(row.id, v)}
                         onSubmitEditing={() => submitRow(index)}
                         returnKeyType="next"
                         blurOnSubmit={false}
@@ -618,8 +394,7 @@ export function AddNoteSheet({
                       />
                       <Pressable
                         hitSlop={8}
-                        onPress={() => removeRow(row.id)}
-                        accessibilityRole="button"
+                        onPress={() => setRows((prev) => (prev.length <= 1 ? prev : prev.filter((r) => r.id !== row.id)))}
                         accessibilityLabel={`Remove item ${index + 1}`}
                       >
                         <Text style={styles.rowRemove}>✕</Text>
@@ -630,6 +405,14 @@ export function AddNoteSheet({
                 <Pressable onPress={addRowAndFocus} style={styles.addRow}>
                   <Text style={styles.addRowText}>＋ Add item</Text>
                 </Pressable>
+                <TextInput
+                  style={[styles.input, styles.captionInput]}
+                  placeholder="Notes (optional)..."
+                  placeholderTextColor={colors.inkFaint}
+                  value={listNotes}
+                  onChangeText={setListNotes}
+                  multiline
+                />
               </View>
             ) : null}
 
@@ -647,190 +430,65 @@ export function AddNoteSheet({
                     textAlignVertical="top"
                     selectionColor={palette.ink}
                   />
-                  <View style={styles.dots}>
-                    {noteColorKeys.map((k) => {
-                      const p = noteColors[k];
-                      const selected = k === color;
-                      return (
-                        <Pressable
-                          key={k}
-                          hitSlop={8}
-                          onPress={() => setColor(k)}
-                          accessibilityRole="button"
-                          accessibilityLabel={`${k} note color`}
-                          accessibilityState={{ selected }}
-                          style={[
-                            styles.dot,
-                            { backgroundColor: p.bg, borderColor: p.edge },
-                            selected && styles.dotSelected,
-                          ]}
-                        />
-                      );
-                    })}
-                  </View>
-                  <View style={styles.stickyCurlShadow} />
-                  <View style={[styles.stickyCurl, { borderBottomColor: palette.bg }]} />
                 </View>
                 <View style={styles.dtRow}>
                   <Pressable
-                    style={[
-                      styles.dtTrigger,
-                      styles.dtHalf,
-                      openPicker === 'date' && styles.dtTriggerActive,
-                    ]}
-                    onPress={() => togglePicker('date')}
+                    style={[styles.dtTrigger, openPicker === 'date' && styles.dtTriggerActive]}
+                    onPress={() => setOpenPicker((p) => (p === 'date' ? null : 'date'))}
                   >
-                    <MaterialCommunityIcons
-                      name="calendar-month-outline"
-                      size={20}
-                      color={colors.accentDeep}
-                    />
+                    <MaterialCommunityIcons name="calendar-month-outline" size={20} color={colors.accentDeep} />
                     <Text style={styles.dtTriggerText}>
-                      {eventAt.toLocaleDateString(undefined, {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric',
-                      })}
+                      {eventAt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
                     </Text>
                   </Pressable>
                   <Pressable
-                    style={[
-                      styles.dtTrigger,
-                      styles.dtHalf,
-                      openPicker === 'time' && styles.dtTriggerActive,
-                    ]}
-                    onPress={() => togglePicker('time')}
+                    style={[styles.dtTrigger, openPicker === 'time' && styles.dtTriggerActive]}
+                    onPress={() => setOpenPicker((p) => (p === 'time' ? null : 'time'))}
                   >
-                    <MaterialCommunityIcons
-                      name="clock-outline"
-                      size={20}
-                      color={colors.accentDeep}
-                    />
+                    <MaterialCommunityIcons name="clock-outline" size={20} color={colors.accentDeep} />
                     <Text style={styles.dtTriggerText}>
-                      {eventAt.toLocaleTimeString(undefined, {
-                        hour: 'numeric',
-                        minute: '2-digit',
-                      })}
+                      {eventAt.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
                     </Text>
                   </Pressable>
                 </View>
-                {Platform.OS === 'ios' && openPicker === 'date' ? (
-                  <DateTimePicker
-                    key={`date-${dtKey}`}
-                    value={eventAt}
-                    mode="date"
-                    display="inline"
-                    minimumDate={todayStart}
-                    onValueChange={mergeEventDate}
-                    themeVariant="light"
-                    accentColor={colors.accent}
-                    style={styles.iosCalPicker}
-                  />
-                ) : null}
-                {Platform.OS === 'ios' && openPicker === 'time' ? (
-                  <DateTimePicker
-                    value={eventAt}
-                    mode="time"
-                    display="spinner"
-                    onValueChange={mergeEventTime}
-                    themeVariant="light"
-                    style={styles.iosTimePicker}
-                  />
-                ) : null}
-                {Platform.OS === 'android' && openPicker ? (
+                {openPicker ? (
                   <DateTimePicker
                     value={eventAt}
                     mode={openPicker}
-                    display="default"
+                    display={Platform.OS === 'ios' ? 'inline' : 'default'}
                     minimumDate={todayStart}
-                    onValueChange={
-                      openPicker === 'date' ? mergeEventDate : mergeEventTime
-                    }
-                    onDismiss={() => setOpenPicker(null)}
+                    onValueChange={(_e, selected) => {
+                      setEventAt((prev) => {
+                        const next = new Date(prev);
+                        if (openPicker === 'date') {
+                          next.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
+                        } else {
+                          next.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
+                        }
+                        return next;
+                      });
+                      if (Platform.OS === 'android') setOpenPicker(null);
+                    }}
                   />
                 ) : null}
-                <Text style={styles.whenSummary}>📌 {formatEventAt(eventAt.toISOString())}</Text>
+                <TextInput
+                  style={[styles.input, styles.captionInput]}
+                  placeholder="Place (optional)..."
+                  placeholderTextColor={colors.inkFaint}
+                  value={place}
+                  onChangeText={setPlace}
+                />
               </View>
             ) : null}
           </ScrollView>
 
-          {showExpiry ? (
-            <View style={styles.expiryWrap}>
-              {expiryOpen ? (
-                <View style={styles.expiryDropdown}>
-                  {EXPIRY_OPTIONS.map((opt, i) => (
-                    <Pressable
-                      key={opt.label}
-                      style={[styles.expiryOption, i > 0 && styles.expiryOptionBorder]}
-                      onPress={() => {
-                        setExpiryIdx(i);
-                        setKeepExpiry(null);
-                        setExpiryOpen(false);
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.expiryOptionText,
-                          i === expiryIdx && styles.expiryOptionTextActive,
-                        ]}
-                      >
-                        {opt.label}
-                      </Text>
-                      {i === expiryIdx && !keepExpiry ? (
-                        <MaterialCommunityIcons
-                          name="check"
-                          size={20}
-                          color={colors.accentDeep}
-                        />
-                      ) : null}
-                    </Pressable>
-                  ))}
-                  {keepExpiry ? (
-                    <Pressable
-                      style={[styles.expiryOption, styles.expiryOptionBorder]}
-                      onPress={() => setExpiryOpen(false)}
-                    >
-                      <Text style={[styles.expiryOptionText, styles.expiryOptionTextActive]}>
-                        Keep {formatKeptExpiry(keepExpiry)}
-                      </Text>
-                      <MaterialCommunityIcons
-                        name="check"
-                        size={20}
-                        color={colors.accentDeep}
-                      />
-                    </Pressable>
-                  ) : null}
-                </View>
-              ) : null}
-              <Pressable
-                style={[styles.expiryRow, expiryOpen && styles.expiryRowOpen]}
-                onPress={() => setExpiryOpen((v) => !v)}
-              >
-                <MaterialCommunityIcons name="clock-outline" size={22} color={colors.inkSoft} />
-                <Text style={styles.expiryText}>
-                  {keepExpiry
-                    ? `Expires ${formatKeptExpiry(keepExpiry)}`
-                    : expiryRowLabel(expiryIdx)}
-                </Text>
-                <View style={styles.expirySpacer} />
-                <MaterialCommunityIcons
-                    name={expiryOpen ? 'chevron-up' : 'chevron-right'}
-                  size={22}
-                  color={colors.inkFaint}
-                />
-              </Pressable>
-            </View>
-          ) : null}
+          <ColorDots color={color} onPick={setColor} />
 
           <View style={styles.actions}>
             <Pressable onPress={onClose} style={styles.cancelBtn}>
               <Text style={styles.cancelText}>Cancel</Text>
             </Pressable>
-            <Pressable
-              onPress={submit}
-              disabled={!canPost}
-              style={[styles.postBtn, !canPost && styles.postDisabled]}
-            >
+            <Pressable onPress={submit} disabled={!canPost} style={[styles.postBtn, !canPost && styles.postDisabled]}>
               <Text style={styles.postText}>{submitLabel}</Text>
             </Pressable>
           </View>
@@ -840,11 +498,29 @@ export function AddNoteSheet({
   );
 }
 
+function ColorDots({ color, onPick }: { color: ItemColor; onPick: (c: ItemColor) => void }) {
+  return (
+    <View style={styles.dots}>
+      {noteColorKeys.map((k) => {
+        const p = noteColors[k];
+        const selected = k === color;
+        return (
+          <Pressable
+            key={k}
+            hitSlop={8}
+            onPress={() => onPick(k)}
+            accessibilityLabel={`${k} colour`}
+            accessibilityState={{ selected }}
+            style={[styles.dot, { backgroundColor: p.bg, borderColor: p.edge }, selected && styles.dotSelected]}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
+  backdrop: { flex: 1, justifyContent: 'flex-end' },
   scrim: {
     position: 'absolute',
     top: 0,
@@ -868,140 +544,30 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 16,
   },
-  title: {
-    fontFamily: fonts.ui.extraBold,
-    fontSize: 26,
-    color: colors.ink,
-  },
-  closeBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabs: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 16,
-  },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderRadius: 18,
-    gap: 4,
-  },
-  tabActive: {
-    backgroundColor: '#FBEFC3',
-  },
-  tabLabel: {
-    fontFamily: fonts.ui.semibold,
-    fontSize: 13,
-    color: colors.inkFaint,
-  },
-  tabLabelActive: {
-    color: colors.ink,
-  },
-  scroll: {
-    flexGrow: 0,
-    flexShrink: 1,
-  },
-  scrollContent: {
-    paddingBottom: 4,
-  },
-  sticky: {
-    borderRadius: 8,
-    padding: 16,
-    minHeight: 190,
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.28,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 5,
-  },
+  title: { fontFamily: fonts.ui.extraBold, fontSize: 24, color: colors.ink },
+  closeBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  tabs: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  tab: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 18, gap: 4 },
+  tabActive: { backgroundColor: '#FBEFC3' },
+  tabLabel: { fontFamily: fonts.ui.semibold, fontSize: 13, color: colors.inkFaint },
+  tabLabelActive: { color: colors.ink },
+  scroll: { flexGrow: 0, flexShrink: 1 },
+  scrollContent: { paddingBottom: 4 },
+  sticky: { borderRadius: 8, padding: 16, minHeight: 170 },
   stickyInput: {
-    flex: 1,
     minHeight: 110,
     fontFamily: fonts.hand.regular,
     fontSize: 26,
     lineHeight: 32,
     textAlignVertical: 'top',
   },
-  stickyFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  attachBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dots: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'center',
-  },
-  dot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  dotSelected: {
-    borderColor: colors.ink,
-    borderWidth: 2,
-  },
-  stickyCurlShadow: {
-    position: 'absolute',
-    right: 0,
-    bottom: 0,
-    width: 0,
-    height: 0,
-    borderStyle: 'solid',
-    borderTopWidth: 0,
-    borderLeftWidth: 0,
-    borderRightWidth: 30,
-    borderBottomWidth: 30,
-    borderTopColor: 'transparent',
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderBottomColor: 'rgba(62, 54, 46, 0.18)',
-  },
-  stickyCurl: {
-    position: 'absolute',
-    right: 0,
-    bottom: 0,
-    width: 0,
-    height: 0,
-    borderStyle: 'solid',
-    borderTopWidth: 0,
-    borderLeftWidth: 0,
-    borderRightWidth: 24,
-    borderBottomWidth: 24,
-    borderTopColor: 'transparent',
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-  },
-  dateSticky: {
-    minHeight: 150,
-  },
-  dateInput: {
-    minHeight: 64,
-    fontSize: 24,
-  },
-  previewWrap: {
-    marginTop: 12,
-    borderRadius: 14,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  preview: {
-    width: '100%',
-    aspectRatio: 16 / 9,
-  },
+  dateSticky: { minHeight: 130 },
+  dateInput: { minHeight: 64, fontSize: 24 },
+  dots: { flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 12 },
+  dot: { width: 28, height: 28, borderRadius: 14, borderWidth: 1 },
+  dotSelected: { borderColor: colors.ink, borderWidth: 2 },
+  previewWrap: { borderRadius: 14, overflow: 'hidden', position: 'relative' },
+  preview: { width: '100%', aspectRatio: 16 / 9 },
   remove: {
     position: 'absolute',
     top: 8,
@@ -1013,11 +579,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  removeText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
+  removeText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   photoDrop: {
     borderWidth: 1.5,
     borderStyle: 'dashed',
@@ -1029,11 +591,7 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: colors.surface,
   },
-  photoDropText: {
-    fontFamily: fonts.ui.semibold,
-    fontSize: 15,
-    color: colors.inkSoft,
-  },
+  photoDropText: { fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.inkSoft },
   input: {
     minHeight: 96,
     backgroundColor: colors.surface,
@@ -1042,14 +600,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: 16,
     fontFamily: fonts.hand.semibold,
-    fontSize: 22,
+    fontSize: 20,
     color: colors.ink,
   },
-  captionInput: {
-    minHeight: 64,
-    marginTop: 12,
-    fontSize: 20,
-  },
+  captionInput: { minHeight: 60, marginTop: 12, fontSize: 18 },
   notepad: {
     backgroundColor: '#FFFDF7',
     borderRadius: 6,
@@ -1068,16 +622,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-evenly',
   },
-  npTornHole: {
-    alignItems: 'center',
-    width: 12,
-  },
-  npSlit: {
-    width: 5,
-    height: 9,
-    backgroundColor: colors.background,
-    marginBottom: -3,
-  },
+  npTornHole: { alignItems: 'center', width: 12 },
+  npSlit: { width: 5, height: 9, backgroundColor: colors.background, marginBottom: -3 },
   npHole: {
     width: 11,
     height: 11,
@@ -1093,54 +639,13 @@ const styles = StyleSheet.create({
     lineHeight: 30,
     color: colors.ink,
     textDecorationLine: 'underline',
-    marginTop: 2,
     marginBottom: 4,
-    paddingVertical: 2,
   },
-  npRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderBottomWidth: 1,
-    borderColor: 'rgba(62, 54, 46, 0.14)',
-    paddingBottom: 4,
-  },
-  rows: {
-    gap: 4,
-    marginTop: 6,
-  },
-  rowCheck: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: colors.ink,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowCheckDone: {
-    backgroundColor: colors.ink,
-    borderColor: colors.ink,
-  },
-  rowCheckMark: {
-    color: '#FFFDF7',
-    fontSize: 12,
-    fontWeight: '800',
-    marginTop: -1,
-  },
-  rowInput: {
-    flex: 1,
-    minHeight: 44,
-    fontFamily: fonts.hand.regular,
-    fontSize: 22,
-    lineHeight: 24,
-    color: colors.ink,
-  },
-  rowRemove: {
-    fontSize: 14,
-    color: colors.inkFaint,
-    padding: 6,
-  },
+  npRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: 1, borderColor: 'rgba(62, 54, 46, 0.14)', paddingBottom: 4 },
+  rowBullet: { width: 16, height: 16, borderRadius: 8, borderWidth: 1.5, borderColor: colors.ink },
+  rows: { gap: 4, marginTop: 6 },
+  rowInput: { flex: 1, minHeight: 44, fontFamily: fonts.hand.regular, fontSize: 22, lineHeight: 24, color: colors.ink },
+  rowRemove: { fontSize: 14, color: colors.inkFaint, padding: 6 },
   addRow: {
     marginTop: 10,
     paddingVertical: 12,
@@ -1150,28 +655,10 @@ const styles = StyleSheet.create({
     borderColor: colors.inkFaint,
     alignItems: 'center',
   },
-  addRowText: {
-    fontFamily: fonts.ui.semibold,
-    fontSize: 14,
-    color: colors.inkSoft,
-  },
-  dtRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 12,
-  },
-  dtHalf: {
-    flex: 1,
-  },
-  iosCalPicker: {
-    height: 360,
-    backgroundColor: 'transparent',
-  },
-  iosTimePicker: {
-    height: 216,
-    backgroundColor: 'transparent',
-  },
+  addRowText: { fontFamily: fonts.ui.semibold, fontSize: 14, color: colors.inkSoft },
+  dtRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
   dtTrigger: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1183,113 +670,12 @@ const styles = StyleSheet.create({
     minHeight: 52,
     paddingHorizontal: 8,
   },
-  dtTriggerActive: {
-    borderColor: colors.accentDeep,
-    backgroundColor: '#FFF7EC',
-  },
-  dtTriggerText: {
-    fontFamily: fonts.ui.bold,
-    fontSize: 15,
-    color: colors.ink,
-  },
-  whenSummary: {
-    fontFamily: fonts.ui.semibold,
-    fontSize: 13,
-    color: colors.inkSoft,
-    marginTop: 10,
-  },
-  expiryWrap: {
-    marginTop: 14,
-    position: 'relative',
-    zIndex: 10,
-  },
-  expiryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  expiryRowOpen: {
-    borderColor: colors.accentDeep,
-  },
-  expiryDropdown: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: '100%',
-    marginBottom: 8,
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-    zIndex: 20,
-    elevation: 8,
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: -4 },
-  },
-  expiryText: {
-    fontFamily: fonts.ui.semibold,
-    fontSize: 15,
-    color: colors.ink,
-  },
-  expirySpacer: {
-    flex: 1,
-  },
-  expiryOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  expiryOptionBorder: {
-    borderTopWidth: 1,
-    borderColor: colors.border,
-  },
-  expiryOptionText: {
-    fontFamily: fonts.ui.regular,
-    fontSize: 15,
-    color: colors.inkSoft,
-  },
-  expiryOptionTextActive: {
-    fontFamily: fonts.ui.bold,
-    color: colors.ink,
-  },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  cancelBtn: {
-    paddingVertical: 10,
-    paddingRight: 16,
-  },
-  cancelText: {
-    fontFamily: fonts.ui.semibold,
-    fontSize: 16,
-    color: colors.inkSoft,
-  },
-  postBtn: {
-    backgroundColor: colors.ink,
-    borderRadius: 999,
-    paddingHorizontal: 26,
-    paddingVertical: 12,
-  },
-  postDisabled: {
-    opacity: 0.5,
-  },
-  postText: {
-    fontFamily: fonts.ui.bold,
-    fontSize: 16,
-    color: colors.background,
-  },
+  dtTriggerActive: { borderColor: colors.accentDeep, backgroundColor: '#FFF7EC' },
+  dtTriggerText: { fontFamily: fonts.ui.bold, fontSize: 15, color: colors.ink },
+  actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
+  cancelBtn: { paddingVertical: 10, paddingRight: 16 },
+  cancelText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.inkSoft },
+  postBtn: { backgroundColor: colors.ink, borderRadius: 999, paddingHorizontal: 26, paddingVertical: 12 },
+  postDisabled: { opacity: 0.5 },
+  postText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.background },
 });

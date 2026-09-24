@@ -1,99 +1,91 @@
 # API
 
-Two backends behind one app. `getBackend()` (v1, `src/services/`) is the
-legacy contract still used for auth bootstrap and the local demo; `getBackendV2()`
-(`src/services/backendV2.ts`, implemented by `supabaseV2.ts`, with an in-memory
-`localV2.ts` fallback) is what every screen uses. Types live in `src/types/`.
+Two surfaces (docs/plan.md): **reads** via PostgREST (tables + the
+`visible_items` view under RLS), and **writes** via Postgres functions
+(`supabase.rpc`). The app wraps both in `src/lib/api.ts`.
 
-## Write boundary
+## Errors
 
-Clients never send actor fields (`created_by`, `updated_by`, `checked_by`,
-…), timestamps, or versions. Database triggers stamp them from `auth.uid()`.
-The only version a client sends is `expectedVersion`, purely as an
-optimistic-concurrency guard — a mismatch throws `VersionConflictError`
-(`{ entity, id }`), which callers should surface as "changed while you were
-editing".
+Functions raise a stable code as the exception message; `src/lib/api.ts`
+maps it to friendly copy (`ApiError`, `friendlyMessage`).
 
-## Boards & members
-
-- `getBoard(id)` → `BoardDetails | null` (soft-deleted boards read as missing).
-- `getBoards()` → member boards, newest-joined first, excluding deleted.
-- `createBoard(name)` → board + founder-owner membership, atomically (RPC).
-- `updateBoard(id, { name?, settings? }, expectedVersion?)`.
-- `deleteBoard(id)` → soft delete; `restoreBoard(id)` reverses it.
-- `leaveBoard(id)` → removes own membership. UI hides Leave for sole owners.
-- `getMembers(boardId)` → memberships with `role` + joined user, oldest first.
-- Realtime: `onBoardChanged(boardId, cb)`, `onMembersChanged(boardId, cb)`.
-
-## Invites
-
-- `createInvite(boardId, { maxUses?, expiresAt? })` → `{ invite, token }`.
-  The raw `XXXX-XXXX` token is returned **once**; only its hash is stored.
-- `acceptInvite(token)` → joined `boardId`. Normalises case/dashes. Errors:
-  `this invite is not valid` (unknown/revoked/expired),
-  `this invite has already been fully used`. Re-accepts are idempotent and
-  free; concurrent accepts serialise on a row lock.
-- `revokeInvite(inviteId)`, `getInvites(boardId)` (no token hashes — list rows
-  never expose them).
-
-## Items (notes)
-
-- `getItems(boardId)` → live, non-expired items with authors, oldest first.
-- `addItem({ boardId, type, body?, eventAt?, expiresAt?, paper?, layout? })`.
-  Photo bodies are captions; bytes travel separately (below).
-- `updateItem(id, patch, expectedVersion?)` — partial; only defined keys are
-  sent. `deletedAt` set/cleared drives soft-delete/restore (server stamps
-  `deleted_by`); `completedAt` set/cleared drives completion (`completed_by`).
-- `deleteItem(id)` / `restoreItem(id)` — thin wrappers over the above.
-- Realtime: `onItemsChanged(boardId, cb)`.
-
-`paper` defaults to `{ color: 'yellow', rotation: 0 }`; `layout` is
-`{ x, y, manual }` or null (= auto layout). Type enum is
-`note | photo | list | date` (`date` renders as the app's "appointment").
-
-## Entries (checklist rows)
-
-- `getEntries(boardId)` → live rows ordered by item then position.
-- `addEntry({ boardId, itemId, text, position? })` — position defaults to
-  append. For whole lists prefer `addListItem` (below).
-- `updateEntry(id, { text?, position?, isChecked? }, expectedVersion?)` —
-  toggling stamps `checked_by/at` server-side. `deleteEntry`/`restoreEntry`
-  wrap `deletedAt` like items.
-- Realtime: `onEntriesChanged(boardId, cb)`.
-- `addListItem({ boardId, body?, paper?, layout?, expiresAt?, entries: [{ text, position?, done? }] })`
-  creates an item **plus all entries in one RPC**; returns the item id.
-
-## Assets (photos)
-
-- `uploadAsset(boardId, itemId, localUri, mime?)` — reads the file to an
-  `ArrayBuffer` (`expo-file-system`), uploads to
-  `board-media/board/<board>/item/<item>/<file>`, records the row (mime +
-  byte count). If the row insert fails, uploaded bytes are removed again.
-- `getAssets(boardId)`, `deleteAsset(id)` (row + bytes).
-- `getAssetUrl(asset, expiresInSec = 3600)` — time-boxed signed URL. The
-  bucket is private; **never** persist or share these URLs, re-mint on load
-  and refresh before expiry (the board hooks do this on a 50-minute cycle).
-- Realtime: `onAssetsChanged(boardId, cb)`.
-
-## Events & settings
-
-- `getEvents(boardId, limit = 50)` — newest-first audit trail
-  (`insert`/`update`/`delete`/`restore` with before/after snapshots).
-- `getSettings()` → `null` until first save; `updateSettings(patch)` merges.
-
-## Direct RPCs (also callable raw)
-
-| Function | Returns |
+| Code | Meaning |
 |---|---|
-| `create_board(p_name)` | board row |
-| `create_board_invite(p_board_id, p_max_uses?, p_expires_at?)` | `{ invite_id, token }[]` |
-| `accept_board_invite(p_token)` | `board_id uuid` |
-| `revoke_board_invite(p_invite_id)` | void |
-| `create_list_item(p_board_id, p_body?, p_paper?, p_layout?, p_expires_at?, p_entries?)` | item id |
+| `not_authenticated` | no session |
+| `not_member` | caller is not on the board |
+| `not_owner` | owner-only action |
+| `not_author` | only the author may edit text/title/date/place |
+| `not_found` | missing / removed / deleted-board target |
+| `invalid_input` | validation failed |
+| `version_conflict` | `expected_version` did not match |
+| `rate_limited` | over the per-hour cap |
+| `invite_invalid` | invalid/expired/revoked invite |
 
-## Legacy v1 contract (frozen)
+Invalid invites are deliberately **silent**: `preview_invite` returns zero
+rows and `accept_invite` returns `NULL` (so the attempt still counts toward
+the brute-force cap). See `docs/backend-plan-questions.md` #6.
 
-`getBackend()` with `getBoard(s)`, `createBoard`, `joinBoard(code)`,
-`getNotes/addNote/updateNote/deleteNote`, members, and image upload to the
-public `notes` bucket. Still used for auth bootstrap (`init`, `ensureUser`)
-and as the local-demo fallback; no new features go here.
+## Reads (direct, RLS-scoped)
+
+| What | Query |
+|---|---|
+| My boards | `boards` where `deleted_at is null` |
+| Board | `boards` by id |
+| Members | `board_members` + embedded `profiles` |
+| Board content | `items` where live, + `list_entries` for the board |
+| Removed posts | RPC `list_removed_items` |
+
+`src/lib/api.ts`: `getMyBoards`, `getBoard`, `getMembers`,
+`getBoardContent(boardId, since?)`, `getRemovedItems`.
+`since` powers the reconnect delta (`updated_at > since`).
+
+## Functions
+
+### Profile / account
+| Function | Access | Notes |
+|---|---|---|
+| `update_profile(p_display_name, p_avatar_path?)` | any user | own row |
+| `delete_account()` | any user | tidies boards; auth user removed by Edge Function |
+
+### Boards
+| Function | Access | Notes |
+|---|---|---|
+| `create_board(p_name, p_color)` | any user | owner membership; rate limit 10/h |
+| `rename_board(p_board_id, p_name, p_color)` | owner | |
+| `delete_board(p_board_id)` | owner | soft delete + revoke invite |
+| `leave_board(p_board_id)` | member | promotes longest member or soft-deletes empty board |
+| `remove_member(p_board_id, p_user_id)` | owner | cannot remove self |
+
+### Invites
+| Function | Access | Notes |
+|---|---|---|
+| `get_invite_link(p_board_id)` → `{token, code, expires_at}` | member | decrypts the shared link, rotating if expired |
+| `reset_invite_link(p_board_id)` | owner | revoke active invite |
+| `preview_invite(p_token_or_code)` → `{board_name, invited_by, member_first_names, member_count}` | any user | no board content; rate limit 10/h |
+| `accept_invite(p_token_or_code, p_display_name?)` → `board_id \| NULL` | any user | idempotent; same limits |
+
+### Items
+| Function | Access | Notes |
+|---|---|---|
+| `post_item(p_id, p_board_id, p_type, p_color, p_body, p_title, p_event_at, p_place, p_photo_path, p_pinned, p_entries)` → item | member | idempotent on `p_id`; validates photo path `<board_id>/<item_id>/…`; rate limit 300/h |
+| `edit_item(p_id, p_expected_version, p_body, p_title, p_event_at, p_place, p_color)` | author | `version_conflict` on stale version |
+| `set_pinned(p_id, p_pinned)` | member | pinned = `keep_until NULL` |
+| `set_done(p_id, p_done)` | member | notes/dates only |
+| `keep_longer(p_id)` | member | +7 days; not pinned/lists |
+| `remove_item(p_id)` / `restore_item(p_id)` | member | soft delete; restore within 30 days |
+| `list_removed_items(p_board_id)` | member | last 30 days |
+
+### List entries
+| Function | Access | Notes |
+|---|---|---|
+| `add_entry(p_id, p_item_id, p_text)` | member | idempotent; `position = max+1` |
+| `set_entry_checked(p_id, p_checked)` | member | first tick wins; runs list lifetime |
+| `edit_entry(p_id, p_text)` | member | |
+| `remove_entry(p_id)` | member | hard delete; runs list lifetime |
+
+## Realtime
+
+Publication `supabase_realtime` carries only `items`, `list_entries`,
+`board_members`. The app opens one channel per board, filtered by
+`board_id=eq.<id>`, applies row changes in place, and runs a delta read on
+reconnect.

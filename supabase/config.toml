@@ -21,8 +21,8 @@ max_rows = 1000
 # Controls whether new tables, views, sequences and functions created in the `public` schema by
 # `postgres` are reachable through the Data API roles (`anon`, `authenticated`, `service_role`)
 # without explicit GRANTs, matching the cloud default. Set to `false` to require explicit GRANTs
-# instead. Left unset, a fresh project falls back to `true`.
-# auto_expose_new_tables = true
+# instead. The backend relies on explicit grants only (see docs/plan.md).
+auto_expose_new_tables = false
 
 [api.tls]
 # Enable HTTPS endpoints locally using a self-signed certificate.
@@ -67,9 +67,8 @@ schema_paths = []
 [db.seed]
 # If enabled, seeds the database after migrations during a db reset.
 enabled = true
-# Specifies an ordered list of seed files to load during db reset.
-# Supports glob patterns relative to supabase directory: "./seeds/*.sql"
-sql_paths = ["./seed.sql"]
+# No seed files: tests build their own fixtures (see docs/plan.md).
+sql_paths = []
 
 [db.network_restrictions]
 # Enable management of network restrictions.
@@ -179,7 +178,7 @@ enable_signup = true
 # The app signs users in anonymously, so this must stay on.
 enable_anonymous_sign_ins = true
 # Allow/disallow testing manual linking of accounts
-enable_manual_linking = false
+enable_manual_linking = true
 # Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.
 minimum_password_length = 6
 # Passwords that do not meet the following requirements will be rejected as weak. Supported values
@@ -212,11 +211,13 @@ token_verifications = 30
 # Number of Web3 logins that can be made in a 5 minute interval per IP address.
 web3 = 30
 
-# Configure one of the supported captcha providers: `hcaptcha`, `turnstile`.
-# [auth.captcha]
-# enabled = true
-# provider = "hcaptcha"
-# secret = ""
+# Captcha for auth: Turnstile, secret from env. Off locally, on in
+# production (see docs/plan.md). `supabase start`/`db reset` must keep
+# working with the secret unset.
+[auth.captcha]
+enabled = false
+provider = "turnstile"
+secret = "env(TURNSTILE_SECRET)"
 
 [auth.email]
 # Allow/disallow new user signups via email to your project.
@@ -372,6 +373,11 @@ enabled = false
 authorization_url_path = "/oauth/consent"
 # Allow dynamic client registration
 allow_dynamic_registration = false
+
+[functions.delete-account]
+# Called by the app with the caller's JWT after delete_account(); the function
+# uses the admin API to remove the auth user. JWT verification stays on.
+verify_jwt = true
 
 [edge_runtime]
 enabled = true
