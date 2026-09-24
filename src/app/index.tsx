@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
@@ -8,8 +8,6 @@ import { Button } from '../components/Button';
 import { IdentitySheet } from '../components/IdentitySheet';
 import { useSession } from '../store/session';
 import { useMyBoards } from '../hooks/useBoards';
-import { Turnstile } from '../components/Turnstile';
-import { turnstileSiteKey } from '../lib/supabase';
 
 type Deco = { text: string; color: keyof typeof noteColors; top: string; left: string; rotate: string; size: number };
 
@@ -23,9 +21,6 @@ const DECOS: Deco[] = [
 export default function StartScreen() {
   const user = useSession((s) => s.user);
   const status = useSession((s) => s.status);
-  const error = useSession((s) => s.error);
-  const init = useSession((s) => s.init);
-  const signOut = useSession((s) => s.signOut);
   const setDisplayName = useSession((s) => s.setDisplayName);
   const { boards, error: boardsError } = useMyBoards();
   const [identityFor, setIdentityFor] = useState<'create' | 'join' | null>(null);
@@ -93,60 +88,6 @@ export default function StartScreen() {
     if (target === 'create') router.push('/create');
     else if (target === 'join') router.push('/join');
   };
-
-  if (status === 'loading') {
-    return (
-      <SafeAreaView style={[styles.safe, styles.loading]}>
-        <ActivityIndicator color={colors.accent} />
-      </SafeAreaView>
-    );
-  }
-
-  if (status === 'needsCaptcha' && turnstileSiteKey) {
-    return (
-      <SafeAreaView style={[styles.safe, styles.loading]}>
-        <Text style={styles.offlineTitle}>One quick check</Text>
-        <Text style={styles.offlineSub}>Confirm you’re human to join.</Text>
-        <Turnstile
-          siteKey={turnstileSiteKey}
-          onToken={(token) => void init(token)}
-          onError={() => void init()}
-        />
-      </SafeAreaView>
-    );
-  }
-
-  if (status === 'expired') {
-    return (
-      <SafeAreaView style={[styles.safe, styles.loading]}>
-        <Text style={styles.offlineTitle}>Session expired</Text>
-        <Text style={styles.offlineSub}>
-          {error ?? 'Please sign out and start again.'}
-        </Text>
-        <Button
-          label="Sign out"
-          onPress={() => void signOut().then(() => init())}
-          style={styles.retry}
-        />
-      </SafeAreaView>
-    );
-  }
-
-  if (status === 'offline') {
-    return (
-      <SafeAreaView style={[styles.safe, styles.loading]}>
-        <Text style={styles.offlineTitle}>Can’t reach the board</Text>
-        <Text style={styles.offlineSub}>{error ?? 'Check your connection and try again.'}</Text>
-        <Button label="Retry" onPress={() => void init()} style={styles.retry} />
-        <Button
-          label="Sign out"
-          variant="soft"
-          onPress={() => void signOut().then(() => init())}
-          style={styles.retry}
-        />
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -237,16 +178,6 @@ export default function StartScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
-  loading: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  offlineTitle: { fontFamily: fonts.hand.bold, fontSize: 30, color: colors.ink },
-  offlineSub: {
-    fontFamily: fonts.ui.regular,
-    fontSize: 15,
-    color: colors.inkSoft,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  retry: { marginTop: 22, alignSelf: 'stretch' },
   scroll: { flexGrow: 1, justifyContent: 'space-between', paddingHorizontal: 24 },
   hero: { flex: 1, justifyContent: 'center', paddingVertical: 60 },
   deco: {

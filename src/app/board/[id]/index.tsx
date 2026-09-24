@@ -125,23 +125,20 @@ export default function BoardScreen() {
         (p): p is string => !!p && !(p in photoUrls) && !attemptedRef.current.has(p),
       );
     if (toTry.length === 0) return;
-    let alive = true;
+    for (const p of toTry) attemptedRef.current.add(p);
+    // No cancelled/`alive` guard: applyUrls is a functional update, so letting
+    // a batch land after `items` changed is safe. Discarding it (as before)
+    // left those paths marked tried forever, so they stayed blank.
     void (async () => {
-      for (const p of toTry) attemptedRef.current.add(p);
       const pairs = await Promise.all(
         toTry.map(async (path) => [path, await signedPhotoUrl(path)] as const),
       );
-      if (!alive) return;
       applyUrls(pairs);
     })();
-    return () => {
-      alive = false;
-    };
   }, [items, photoUrls, applyUrls]);
 
-  // URLs expire after an hour: re-sign everything every ~50 minutes and when
-  // the app returns to the foreground. Clearing the attempts lets previously
-  // failed paths retry.
+  // URLs are signed for 24h, so re-sign everything well before that — every
+  // 12 hours and on foreground (which also retries previously failed paths).
   useEffect(() => {
     const refreshAll = () => {
       attemptedRef.current.clear();
@@ -150,7 +147,7 @@ export default function BoardScreen() {
         true,
       );
     };
-    const timer = setInterval(refreshAll, 50 * 60 * 1000);
+    const timer = setInterval(refreshAll, 12 * 60 * 60 * 1000);
     const sub = AppState.addEventListener('change', (next) => {
       if (next === 'active') refreshAll();
     });

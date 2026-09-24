@@ -500,15 +500,12 @@ export async function acceptInvite(
 // ---------------------------------------------------------------------------
 
 export async function deleteAccount(): Promise<void> {
-  const { error } = await supabase.rpc('delete_account');
-  if (error) raise(error);
-  // Remove the auth user. `functions.invoke` returns { error } rather than
-  // throwing, so check it — otherwise we'd sign out and report success while
-  // the user (e.g. a linked Apple/Google account) still exists.
-  const { error: fnError } = await supabase.functions.invoke('delete-account', {
-    method: 'POST',
-  });
-  if (fnError) raise(fnError as { message?: string });
+  // The `delete-account` Edge Function runs `delete_account()` as the user
+  // (board cleanup) and then removes the auth user. Calling the RPC here too
+  // would leave the caller's boards tidy but the account alive if the function
+  // then failed, so the app only invokes the function.
+  const { error } = await supabase.functions.invoke('delete-account', { method: 'POST' });
+  if (error) raise(error as { message?: string });
   await supabase.auth.signOut();
 }
 
@@ -542,7 +539,7 @@ export async function linkEmail(email: string): Promise<void> {
 // Storage (signed URLs for private buckets)
 // ---------------------------------------------------------------------------
 
-export async function signedPhotoUrl(path: string, expiresIn = 3600): Promise<string | null> {
+export async function signedPhotoUrl(path: string, expiresIn = 86400): Promise<string | null> {
   const { data, error } = await supabase.storage.from('board-photos').createSignedUrl(path, expiresIn);
   if (error || !data?.signedUrl) return null;
   return data.signedUrl;

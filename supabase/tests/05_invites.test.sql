@@ -1,14 +1,15 @@
 -- Phase 1d: invite links — issue/reuse/rotate/revoke, preview, accept, limits.
 -- Roles: O owner, M member, S joiner, T probe, U probe.
 begin;
-select plan(39);
+select plan(50);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000041', 'authenticated', 'authenticated'),
   ('a0000000-0000-0000-0000-000000000042', 'authenticated', 'authenticated'),
   ('a0000000-0000-0000-0000-000000000043', 'authenticated', 'authenticated'),
   ('a0000000-0000-0000-0000-000000000044', 'authenticated', 'authenticated'),
-  ('a0000000-0000-0000-0000-000000000045', 'authenticated', 'authenticated');
+  ('a0000000-0000-0000-0000-000000000045', 'authenticated', 'authenticated'),
+  ('a0000000-0000-0000-0000-000000000046', 'authenticated', 'authenticated');
 delete from vault.secrets where name = 'invite';
 select vault.create_secret('test-invite-key-0123456789abcdef', 'invite');
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000041', true);
@@ -187,6 +188,22 @@ select ok((select public.accept_invite('Q8') is null), 'wrong try 8');
 select ok((select public.accept_invite('Q9') is null), 'wrong try 9');
 select ok((select public.accept_invite('Q10') is null), 'wrong try 10');
 select throws_ok($$select public.accept_invite('Q11')$$, 'P0001', 'rate_limited', '11th wrong try is rate-limited');
+reset role;
+
+-- invite_try also throttles scripted guessing through preview.
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000046', true);
+set role authenticated;
+select is((select count(*)::integer from public.preview_invite('P1')), 0, 'preview guess 1');
+select is((select count(*)::integer from public.preview_invite('P2')), 0, 'preview guess 2');
+select is((select count(*)::integer from public.preview_invite('P3')), 0, 'preview guess 3');
+select is((select count(*)::integer from public.preview_invite('P4')), 0, 'preview guess 4');
+select is((select count(*)::integer from public.preview_invite('P5')), 0, 'preview guess 5');
+select is((select count(*)::integer from public.preview_invite('P6')), 0, 'preview guess 6');
+select is((select count(*)::integer from public.preview_invite('P7')), 0, 'preview guess 7');
+select is((select count(*)::integer from public.preview_invite('P8')), 0, 'preview guess 8');
+select is((select count(*)::integer from public.preview_invite('P9')), 0, 'preview guess 9');
+select is((select count(*)::integer from public.preview_invite('P10')), 0, 'preview guess 10');
+select throws_ok($$select public.preview_invite('P11')$$, 'P0001', 'rate_limited', '11th preview guess is rate-limited');
 reset role;
 
 select * from finish();

@@ -96,8 +96,11 @@ implemented slightly differently. Appended as work proceeds.
     deploy workflow is manual and unused). If it has, this history is already
     applied and the changed migrations must be squashed into a fresh baseline
     before shipping.
-17. **preview_invite no longer counts toward `invite_try`.** Plan §5 has
-    preview count toward the limit, but a join calls preview *then* accept, so
-    counting both charged the limit twice per join. Only `accept_invite` (the
-    action that grants membership) counts now.
+17. **`invite_try` counts only failed lookups.** Plan §5 had both
+    `preview_invite` and `accept_invite` count, but a join calls preview *then*
+    accept, so the limit was charged twice per join. Both now count **only when
+    the lookup fails** (wrong/expired/revoked code, or a deleted board): a valid
+    join is free, while scripted guessing through either function is still
+    throttled. Unusable invitations return empty/NULL rather than raising so the
+    count commits (see #6); the 11th wrong guess raises `rate_limited`.
 

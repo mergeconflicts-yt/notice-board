@@ -9,6 +9,7 @@ import { colors } from '../theme';
 import { useSession } from '../store/session';
 import { supabase } from '../lib/supabase';
 import { ToastHost } from '../components/Toast';
+import { SessionGate } from '../components/SessionGate';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -70,6 +71,8 @@ export default function RootLayout() {
         />
       </Stack>
       <ToastHost />
+      {/* Covers every route until the session is ready (incl. deep links). */}
+      <SessionGate />
     </GestureHandlerRootView>
   );
 }

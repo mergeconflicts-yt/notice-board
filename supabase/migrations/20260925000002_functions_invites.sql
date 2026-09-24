@@ -190,26 +190,22 @@ begin
   if auth.uid() is null then
     raise exception 'not_authenticated';
   end if;
-  -- No rate-limit here: a join calls preview then accept, so counting both
-  -- would charge invite_try twice per join. accept_invite (the action that
-  -- actually grants membership) is the one that counts.
   select * into v_inv
   from public.invites
   where token_hash = extensions.digest(coalesce(p_token_or_code, ''), 'sha256')
      or code_hash = extensions.digest(v_norm, 'sha256');
-  -- Every failure looks identical: an empty set. Returning (instead of
-  -- raising) is load-bearing: the attempt row above must COMMIT so wrong
-  -- guesses count toward the rate limit. A raise would roll the count
-  -- back with the failed call, making brute force unthrottleable.
-  if v_inv.id is null
-     or v_inv.revoked_at is not null
-     or v_inv.expires_at <= now() then
-    return;
-  end if;
   select * into v_board
   from public.boards
   where id = v_inv.board_id and deleted_at is null;
-  if v_board.id is null then
+  -- Only failed lookups count toward invite_try. A valid preview costs
+  -- nothing, so a join (preview then accept) isn't charged; scripted guessing
+  -- still is. Returning (rather than raising) lets the count commit — a raise
+  -- would roll it back and make brute force unthrottleable.
+  if v_inv.id is null
+     or v_inv.revoked_at is not null
+     or v_inv.expires_at <= now()
+     or v_board.id is null then
+    perform public.hit_rate_limit('invite_try', 10, interval '1 hour');
     return;
   end if;
   -- No board content: name, inviter, member first names and count only.
@@ -241,25 +237,23 @@ begin
   if auth.uid() is null then
     raise exception 'not_authenticated';
   end if;
-  perform public.hit_rate_limit('invite_try', 10, interval '1 hour');
   select * into v_inv
   from public.invites
   where token_hash = extensions.digest(coalesce(p_token_or_code, ''), 'sha256')
      or code_hash = extensions.digest(v_norm, 'sha256')
   for update;
-  -- Every failure returns NULL (see preview_invite: raising would roll back
-  -- the rate-limit count this call just consumed).
+  -- Serialise with leaves/promotions on this board, then check liveness.
+  perform 1 from public.boards where id = v_inv.board_id for update;
+  -- Only failed lookups count toward invite_try (see preview_invite). A valid
+  -- accept costs nothing; a wrong/expired/revoked code or a deleted board does.
   if v_inv.id is null
      or v_inv.revoked_at is not null
-     or v_inv.expires_at <= now() then
-    return null;
-  end if;
-  -- Serialise with leaves/promotions on this board, then re-check liveness.
-  perform 1 from public.boards where id = v_inv.board_id for update;
-  if not exists (
-    select 1 from public.boards
-    where id = v_inv.board_id and deleted_at is null
-  ) then
+     or v_inv.expires_at <= now()
+     or not exists (
+       select 1 from public.boards
+       where id = v_inv.board_id and deleted_at is null
+     ) then
+    perform public.hit_rate_limit('invite_try', 10, interval '1 hour');
     return null;
   end if;
   insert into public.board_members (board_id, user_id, role)

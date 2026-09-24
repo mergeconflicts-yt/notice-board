@@ -96,7 +96,8 @@ board view: `deleted_at is null and (keep_until is null or keep_until > now())`.
 | `avatars` | private | path `<user_id>/<uuid>.jpg`; read = self or someone sharing a board; write = self |
 
 Photo bytes are resized/re-encoded client-side (stripping EXIF) before upload.
-Display uses 1h signed URLs.
+Display uses 24h signed URLs (re-signed every 12h / on foreground, so images
+aren't reloaded often).
 
 ## Functions
 
