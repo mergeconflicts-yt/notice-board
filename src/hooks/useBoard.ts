@@ -5,7 +5,6 @@ import { supabase } from '../lib/supabase';
 import {
   addEntry as apiAddEntry,
   ApiError,
-  editEntry as apiEditEntry,
   editItem as apiEditItem,
   friendlyMessage,
   getBoard,
@@ -16,7 +15,6 @@ import {
   NewItem,
   postItem as apiPostItem,
   keepLonger as apiKeepLonger,
-  removeEntry as apiRemoveEntry,
   removeItem as apiRemoveItem,
   restoreItem as apiRestoreItem,
   setDone as apiSetDone,
@@ -361,10 +359,16 @@ export function useBoard(boardId: string) {
 
   const restoreItem = useCallback(
     async (item: ItemWithAuthor) => {
-      await apiRestoreItem(item.id);
-      setItems((prev) => prev.filter((i) => i.id !== item.id));
+      // Put it straight back on the board, then persist (undo path).
+      setItems((prev) => (prev.some((i) => i.id === item.id) ? prev : [...prev, item]));
+      try {
+        await apiRestoreItem(item.id);
+      } catch (e) {
+        onError(e, () => setItems((prev) => prev.filter((i) => i.id !== item.id)));
+        throw e;
+      }
     },
-    [],
+    [onError],
   );
 
   const toggleEntry = useCallback(
@@ -414,34 +418,6 @@ export function useBoard(boardId: string) {
     [boardId, entries, onError],
   );
 
-  const editListEntry = useCallback(
-    async (entry: ListEntry, text: string) => {
-      const before = entries;
-      setEntries((prev) => prev.map((e) => (e.id === entry.id ? { ...e, text } : e)));
-      try {
-        await apiEditEntry(entry.id, text);
-      } catch (e) {
-        onError(e, () => setEntries(before));
-        throw e;
-      }
-    },
-    [entries, onError],
-  );
-
-  const removeListEntry = useCallback(
-    async (entry: ListEntry) => {
-      const before = entries;
-      setEntries((prev) => prev.filter((e) => e.id !== entry.id));
-      try {
-        await apiRemoveEntry(entry.id);
-      } catch (e) {
-        onError(e, () => setEntries(before));
-        throw e;
-      }
-    },
-    [entries, onError],
-  );
-
   return {
     board,
     members,
@@ -460,8 +436,6 @@ export function useBoard(boardId: string) {
     restoreItem,
     toggleEntry,
     addListEntry,
-    editListEntry,
-    removeListEntry,
   };
 }
 

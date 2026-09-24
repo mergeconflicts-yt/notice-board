@@ -1,4 +1,4 @@
-import { ItemColor, ItemType, ItemWithAuthor } from '../types';
+import { ItemColor, ItemType } from '../types';
 import { noteColorKeys } from '../theme';
 
 /** Deterministic colour deal for an item id (used when the user doesn't pick). */
@@ -82,12 +82,6 @@ export function keepUntilLabel(keepUntil: string | null): string | null {
     month: 'short',
   });
   return `Leaves the board ${label}`;
-}
-
-/** Caption / body preview used for accessibility labels. */
-export function itemPreview(item: ItemWithAuthor): string {
-  const text = (item.body ?? item.title ?? '').trim().replace(/\s+/g, ' ');
-  return text.length > 80 ? `${text.slice(0, 80)}…` : text;
 }
 
 export const AVATAR_EMOJIS = [

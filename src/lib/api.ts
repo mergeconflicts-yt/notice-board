@@ -414,16 +414,6 @@ export async function setEntryChecked(id: string, checked: boolean): Promise<voi
   if (error) raise(error);
 }
 
-export async function editEntry(id: string, text: string): Promise<void> {
-  const { error } = await supabase.rpc('edit_entry', { p_id: id, p_text: text });
-  if (error) raise(error);
-}
-
-export async function removeEntry(id: string): Promise<void> {
-  const { error } = await supabase.rpc('remove_entry', { p_id: id });
-  if (error) raise(error);
-}
-
 // ---------------------------------------------------------------------------
 // Invites
 // ---------------------------------------------------------------------------
@@ -434,11 +424,6 @@ export async function getInviteLink(boardId: string): Promise<InviteLink> {
   const row = data?.[0];
   if (!row) raise({ message: 'invite_invalid' });
   return { token: row!.token, code: row!.code, expiresAt: row!.expires_at };
-}
-
-export async function resetInviteLink(boardId: string): Promise<void> {
-  const { error } = await supabase.rpc('reset_invite_link', { p_board_id: boardId });
-  if (error) raise(error);
 }
 
 export async function previewInvite(tokenOrCode: string): Promise<InvitePreview | null> {
@@ -511,10 +496,4 @@ export async function uploadPhoto(boardId: string, itemId: string, fileUri: stri
     .upload(path, bytes, { contentType: 'image/jpeg', upsert: false });
   if (error) raise(error);
   return path;
-}
-
-export async function signedAvatarUrl(path: string, expiresIn = 3600): Promise<string | null> {
-  const { data, error } = await supabase.storage.from('avatars').createSignedUrl(path, expiresIn);
-  if (error || !data?.signedUrl) return null;
-  return data.signedUrl;
 }

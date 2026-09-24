@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
   idName: { flex: 1, fontFamily: fonts.hand.bold, fontSize: 30, lineHeight: 32, color: colors.ink },
   idPeople: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
   stack: { flexDirection: 'row', alignItems: 'center' },
-  stackAvatar: { borderRadius: 17, borderWidth: 2, borderColor: 'rgba(255,255,255,0.85)' },
+  stackAvatar: { borderRadius: 17, borderWidth: 2, borderColor: colors.avatarRing },
   stackOverlap: { marginLeft: -10 },
   idCount: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.inkSoft },
   editor: { marginTop: 14, gap: 10 },

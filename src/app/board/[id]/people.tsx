@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.ui.semibold,
     fontSize: 11,
     color: colors.accentDeep,
-    backgroundColor: '#FFF0E4',
+    backgroundColor: colors.highlight,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 999,

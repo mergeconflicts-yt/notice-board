@@ -115,10 +115,10 @@ const styles = StyleSheet.create({
   },
   photoCard: {
     flex: 1,
-    backgroundColor: '#FFFDF7',
+    backgroundColor: colors.paper,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#EAE0CC',
+    borderColor: colors.paperEdge,
     padding: 8,
   },
   photo: { flex: 1, width: '100%' },

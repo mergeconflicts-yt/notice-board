@@ -1,29 +1,19 @@
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import type { PaperVariant } from '../utils/note';
 import { seeded } from '../utils/id';
+import { colors, fastenerColors } from '../theme';
 
-export type PinAlign = 'left' | 'center' | 'right';
+type PinAlign = 'left' | 'center' | 'right';
 
-export type FastenerKind = 'pin' | 'tape' | 'scotch' | 'clip' | 'sticker' | 'tack';
+type FastenerKind = 'pin' | 'tape' | 'scotch' | 'clip' | 'sticker' | 'tack';
 
-export type Fastener = {
+type Fastener = {
   kind: FastenerKind;
   color: string;
   align: PinAlign;
   rotate: number;
   emoji?: string;
 };
-
-const PIN_COLORS = ['#E2574C', '#3E7CB1', '#F2B134', '#6AA84F', '#8E7CC3'];
-
-const TAPE_COLORS = [
-  'rgba(244, 227, 178, 0.92)',
-  'rgba(238, 196, 205, 0.88)',
-  'rgba(186, 212, 238, 0.88)',
-  'rgba(201, 221, 190, 0.88)',
-];
-
-const STICKER_BG = ['#F6C445', '#F194B4', '#9CCB86', '#8FB8DE', '#C3B2E8', '#F49E4C'];
 
 const STICKER_EMOJI = ['❤️', '⭐', '🌸', '🔥', '🎈', '🍀'];
 
@@ -43,19 +33,22 @@ export function fastenerForItem(seed: string, variant: PaperVariant): Fastener {
   const set = SETS[variant] ?? SETS.note;
   const kind = set[Math.floor(rand() * set.length)];
   const pick = (n: number) => Math.floor(rand() * n);
+  const palette =
+    kind === 'pin'
+      ? fastenerColors.pins
+      : kind === 'tape'
+        ? fastenerColors.tapes
+        : kind === 'sticker'
+          ? fastenerColors.stickers
+          : null;
 
   const color =
-    kind === 'pin'
-      ? PIN_COLORS[pick(PIN_COLORS.length)]
-      : kind === 'tape'
-        ? TAPE_COLORS[pick(TAPE_COLORS.length)]
-        : kind === 'sticker'
-          ? STICKER_BG[pick(STICKER_BG.length)]
-          : kind === 'clip'
-            ? '#3E362E'
-            : kind === 'tack'
-              ? '#C9CFD6'
-              : 'rgba(238, 242, 246, 0.65)';
+    palette?.[pick(palette.length)] ??
+    (kind === 'clip'
+      ? fastenerColors.clip
+      : kind === 'tack'
+        ? fastenerColors.metal
+        : fastenerColors.scotch);
 
   return {
     kind,
@@ -97,7 +90,7 @@ export function FastenerView({ fastener }: { fastener: Fastener }) {
 }
 
 /** A chunky 3D pushpin like the ones holding real fridge notes. */
-export function Pushpin({ color, align = 'center' }: { color: string; align?: PinAlign }) {
+function Pushpin({ color, align = 'center' }: { color: string; align?: PinAlign }) {
   return (
     <View style={[styles.pinWrap, alignPos(align)]} pointerEvents="none">
       <View style={styles.pinShadow} />
@@ -109,7 +102,7 @@ export function Pushpin({ color, align = 'center' }: { color: string; align?: Pi
 }
 
 /** A translucent washi-tape strip. */
-export function WashiTape({
+function WashiTape({
   color,
   rotate = 0,
   width = 64,
@@ -206,15 +199,15 @@ const styles = StyleSheet.create({
     width: 20,
     height: 9,
     borderRadius: 5,
-    backgroundColor: 'rgba(62, 54, 46, 0.28)',
+    backgroundColor: fastenerColors.shadow,
   },
   pinHead: {
     width: 22,
     height: 22,
     borderRadius: 11,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.14)',
-    shadowColor: '#000',
+    borderColor: fastenerColors.outline,
+    shadowColor: colors.black,
     shadowOpacity: 0.35,
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 2 },
@@ -227,7 +220,7 @@ const styles = StyleSheet.create({
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.75)',
+    backgroundColor: fastenerColors.glint,
   },
   tape: {
     position: 'absolute',
@@ -236,7 +229,7 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 2,
     opacity: 0.95,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOpacity: 0.08,
     shadowRadius: 2,
     shadowOffset: { width: 0, height: 1 },
@@ -249,15 +242,15 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.35)',
+    borderColor: fastenerColors.tapeEdge,
     borderRadius: 2,
   },
   scotch: {
     width: 78,
     height: 24,
-    backgroundColor: 'rgba(238, 242, 246, 0.6)',
+    backgroundColor: fastenerColors.scotchBody,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.7)',
+    borderColor: fastenerColors.scotchEdge,
     opacity: 1,
   },
   scotchSheen: {
@@ -267,7 +260,7 @@ const styles = StyleSheet.create({
     right: 6,
     height: 5,
     borderRadius: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.55)',
+    backgroundColor: fastenerColors.sheen,
   },
   clipWrap: {
     position: 'absolute',
@@ -280,9 +273,9 @@ const styles = StyleSheet.create({
     width: 20,
     height: 6,
     borderRadius: 2,
-    backgroundColor: '#C9CFD6',
+    backgroundColor: fastenerColors.metal,
     borderWidth: 1,
-    borderColor: '#9AA1A9',
+    borderColor: fastenerColors.metalEdge,
     marginBottom: -3,
     zIndex: 1,
   },
@@ -291,8 +284,8 @@ const styles = StyleSheet.create({
     height: 15,
     borderRadius: 3,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.3)',
-    shadowColor: '#000',
+    borderColor: fastenerColors.outlineStrong,
+    shadowColor: colors.black,
     shadowOpacity: 0.3,
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 2 },
@@ -310,10 +303,10 @@ const styles = StyleSheet.create({
     height: 26,
     borderRadius: 13,
     borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.08)',
+    borderColor: fastenerColors.outlineFaint,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOpacity: 0.25,
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 2 },
@@ -336,18 +329,18 @@ const styles = StyleSheet.create({
     width: 16,
     height: 7,
     borderRadius: 4,
-    backgroundColor: 'rgba(62, 54, 46, 0.25)',
+    backgroundColor: fastenerColors.shadowSoft,
   },
   tackHead: {
     width: 19,
     height: 19,
     borderRadius: 10,
-    backgroundColor: '#C9CFD6',
+    backgroundColor: fastenerColors.metal,
     borderWidth: 1,
-    borderColor: '#9AA1A9',
+    borderColor: fastenerColors.metalEdge,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOpacity: 0.3,
     shadowRadius: 2,
     shadowOffset: { width: 0, height: 1 },
@@ -357,6 +350,6 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#7C838C',
+    backgroundColor: fastenerColors.metalDark,
   },
 });

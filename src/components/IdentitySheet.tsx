@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(62,54,46,0.35)',
+    backgroundColor: colors.scrim,
   },
   sheet: {
     backgroundColor: colors.background,
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   emojiActive: {
     borderColor: colors.accent,
     borderWidth: 2,
-    backgroundColor: '#FFF7EC',
+    backgroundColor: colors.accentWash,
   },
   emojiText: { fontSize: 22 },
   error: {

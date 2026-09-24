@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet } from 'react-native';
-import { noteColorKeys, noteColors } from '../theme';
+import { colors, noteColorKeys, noteColors } from '../theme';
 
 function hash(s: string): number {
   let h = 0;
@@ -9,18 +9,17 @@ function hash(s: string): number {
 
 const FALLBACK = ['🐻', '🦊', '🐰', '🐼', '🐨', '🦁', '🐸', '🦉', '🐳', '🐢'];
 
-export function emojiFor(name: string): string {
+function emojiFor(name: string): string {
   return FALLBACK[hash(name) % FALLBACK.length];
 }
 
 type Props = {
   name: string;
-  emoji?: string | null;
   size?: number;
 };
 
-export function Avatar({ name, emoji, size = 26 }: Props) {
-  const glyph = emoji ?? emojiFor(name);
+export function Avatar({ name, size = 26 }: Props) {
+  const glyph = emojiFor(name);
   const bg = noteColors[noteColorKeys[hash(name) % noteColorKeys.length]].bg;
   return (
     <View
@@ -44,6 +43,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.85)',
+    borderColor: colors.avatarRing,
   },
 });

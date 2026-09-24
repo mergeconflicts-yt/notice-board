@@ -13,7 +13,6 @@ import {
 type Props = {
   item: ItemWithAuthor;
   large?: boolean;
-  showAttribution?: boolean;
   /** Floor for the rendered height, so small papers still fill their slot. */
   minHeight?: number;
   /** Show every checklist row instead of the first few. */
@@ -39,7 +38,6 @@ const ENTRY_LIMIT = 6;
 export function NotePaper({
   item,
   large = false,
-  showAttribution = true,
   minHeight,
   showAllEntries = false,
   maxEntries,
@@ -54,8 +52,8 @@ export function NotePaper({
 
   const isPhoto = variant === 'photo';
   const isList = variant === 'list';
-  const cardBg = item.color === 'paper' ? '#FFFDF7' : palette.bg;
-  const borderColor = item.color === 'paper' ? '#EAE0CC' : palette.edge;
+  const cardBg = item.color === 'paper' ? colors.paper : palette.bg;
+  const borderColor = item.color === 'paper' ? colors.paperEdge : palette.edge;
 
   const bodyFontSize = large ? 26 : item.type === 'note' ? 20 : 18;
 
@@ -174,7 +172,7 @@ export function NotePaper({
         )}
       </View>
 
-      {showAttribution && (authorName || expiry) ? (
+      {authorName || expiry ? (
         <View style={styles.attribution}>
           {authorName ? (
             <Text
@@ -295,9 +293,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: colors.background,
     borderWidth: 1,
-    borderColor: 'rgba(62, 54, 46, 0.28)',
+    borderColor: colors.divider,
   },
-  image: { width: '100%', marginBottom: 10, marginTop: 6, backgroundColor: 'rgba(0,0,0,0.04)' },
+  image: { width: '100%', marginBottom: 10, marginTop: 6, backgroundColor: colors.imageWash },
   text: { fontFamily: fonts.hand.semibold },
   photoCaption: { textAlign: 'center' },
   ticketText: { fontFamily: fonts.hand.bold },
@@ -319,7 +317,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     borderBottomWidth: 1,
-    borderColor: 'rgba(62, 54, 46, 0.14)',
+    borderColor: colors.hairline,
     paddingBottom: 4,
   },
   checkbox: {
@@ -331,7 +329,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxDone: { backgroundColor: colors.ink, borderColor: colors.ink },
-  checkmark: { color: '#FFFDF7', fontSize: 12, fontWeight: '800', marginTop: -1 },
+  checkmark: { color: colors.paper, fontSize: 12, fontWeight: '800', marginTop: -1 },
   listText: { flex: 1, fontFamily: fonts.hand.regular, fontSize: 22, lineHeight: 24 },
   listMore: { fontFamily: fonts.ui.semibold, fontSize: 12, opacity: 0.6, marginTop: 8 },
   attribution: {

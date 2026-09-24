@@ -17,6 +17,10 @@ type Props = {
   photoUrl?: string | null;
   onPress: (item: ItemWithAuthor) => void;
   onToggleEntry?: (entry: ListEntry) => void;
+  /** A note was picked up and is following the finger. */
+  onDragStart?: (item: ItemWithAuthor) => void;
+  /** The held note moved; `screenY` is the finger's position in the window. */
+  onDragUpdate?: (item: ItemWithAuthor, screenY: number) => void;
   /** Called on drop with the note's new top-left corner, in canvas pixels. */
   onMove?: (item: ItemWithAuthor, left: number, top: number) => void;
 };
@@ -45,6 +49,8 @@ export function BoardNote({
   photoUrl,
   onPress,
   onToggleEntry,
+  onDragStart,
+  onDragUpdate,
   onMove,
 }: Props) {
   const [enter] = useState(() => new Animated.Value(animateIn ? 0 : 1));
@@ -58,9 +64,9 @@ export function BoardNote({
   const startRef = useRef({ x: left, y: top });
 
   // Latest props for the (stable) gesture callbacks.
-  const handlers = useRef({ item, onPress, onMove });
+  const handlers = useRef({ item, onPress, onMove, onDragStart, onDragUpdate });
   useEffect(() => {
-    handlers.current = { item, onPress, onMove };
+    handlers.current = { item, onPress, onMove, onDragStart, onDragUpdate };
   });
 
   // Follow the layout unless the note is in hand (so a saved position settles
@@ -87,6 +93,7 @@ export function BoardNote({
         startRef.current = { ...posRef.current };
         setDragging(true);
         Animated.spring(lift, { toValue: 1, friction: 7, tension: 90, useNativeDriver: false }).start();
+        handlers.current.onDragStart?.(handlers.current.item);
       })
       // eslint-disable-next-line react-hooks/refs -- gesture callbacks run off-render
       .onUpdate((e) => {
@@ -95,6 +102,7 @@ export function BoardNote({
         posRef.current = { x, y };
         posX.setValue(x);
         posY.setValue(y);
+        handlers.current.onDragUpdate?.(handlers.current.item, e.absoluteY);
       })
       // eslint-disable-next-line react-hooks/refs -- gesture callbacks run off-render
       .onFinalize(() => {

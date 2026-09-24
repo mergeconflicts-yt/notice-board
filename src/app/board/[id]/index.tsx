@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  ActivityIndicator,
+  useWindowDimensions,
+} from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { colors, boardColors, fonts } from '../../../theme';
@@ -16,10 +24,14 @@ import { ItemWithAuthor } from '../../../types';
 const PINNED_FLEX = 2;
 const REST_FLEX = 8;
 
+/** Height of the drag-to-delete target at the bottom of the screen. */
+const DELETE_ZONE_HEIGHT = 96;
+
 export default function BoardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const boardId = id as string;
   const insets = useSafeAreaInsets();
+  const { height: windowH } = useWindowDimensions();
   const {
     board,
     members,
@@ -29,13 +41,18 @@ export default function BoardScreen() {
     error,
     createItem,
     moveItem,
+    removeItem,
+    restoreItem,
   } = useBoard(boardId);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [entering, setEntering] = useState<Set<string>>(() => new Set());
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  const [dragActive, setDragActive] = useState(false);
+  const [overDelete, setOverDelete] = useState(false);
   const seenIdsRef = useRef<Set<string>>(new Set());
   const firstLoadRef = useRef(true);
+  const overDeleteRef = useRef(false);
 
   const openItem = (item: ItemWithAuthor) => router.push(`/board/${boardId}/note/${item.id}`);
 
@@ -79,7 +96,40 @@ export default function BoardScreen() {
     };
   }, [items, photoUrls]);
 
-  const handleMove = (item: ItemWithAuthor, x: number, y: number) => {
+  const handleDragStart = () => {
+    overDeleteRef.current = false;
+    setOverDelete(false);
+    setDragActive(true);
+  };
+
+  // The finger counts as "over delete" once it reaches the bottom zone.
+  const handleDragUpdate = (_item: ItemWithAuthor, screenY: number) => {
+    const over = screenY >= windowH - insets.bottom - DELETE_ZONE_HEIGHT;
+    if (over !== overDeleteRef.current) {
+      overDeleteRef.current = over;
+      setOverDelete(over);
+    }
+  };
+
+  // A held note was dropped: delete it if it landed in the zone (with undo),
+  // otherwise remember the new spot.
+  const handleDrop = (item: ItemWithAuthor, x: number, y: number) => {
+    const shouldDelete = overDeleteRef.current;
+    overDeleteRef.current = false;
+    setOverDelete(false);
+    setDragActive(false);
+
+    if (shouldDelete) {
+      removeItem(item)
+        .then(() =>
+          useToast.getState().show('Note deleted', {
+            label: 'Undo',
+            onPress: () => restoreItem(item).catch(() => {}),
+          }),
+        )
+        .catch((e) => useToast.getState().show(friendlyMessage(e)));
+      return;
+    }
     moveItem(item, x, y).catch(() => {});
   };
 
@@ -105,7 +155,6 @@ export default function BoardScreen() {
       });
       setSheetOpen(false);
     } catch (e) {
-      console.error('add post failed', e);
       useToast.getState().show(friendlyMessage(e));
     } finally {
       setSubmitting(false);
@@ -207,14 +256,36 @@ export default function BoardScreen() {
               photoUrls={photoUrls}
               entering={entering}
               onOpen={openItem}
-              onMove={handleMove}
+              onMove={handleDrop}
+              onDragStart={handleDragStart}
+              onDragUpdate={handleDragUpdate}
               emptyHint="Everything else lives here."
             />
           </View>
         </View>
       )}
 
-      {!isEmpty ? (
+      {dragActive ? (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.deleteZone,
+            { bottom: insets.bottom + 20 },
+            overDelete && styles.deleteZoneOver,
+          ]}
+        >
+          <MaterialCommunityIcons
+            name="trash-can-outline"
+            size={22}
+            color={overDelete ? colors.white : colors.inkSoft}
+          />
+          <Text style={[styles.deleteZoneText, overDelete && styles.deleteZoneTextOver]}>
+            {overDelete ? 'Release to delete' : 'Drag here to delete'}
+          </Text>
+        </View>
+      ) : null}
+
+      {!isEmpty && !dragActive ? (
         <Pressable
           onPress={() => setSheetOpen(true)}
           accessibilityRole="button"
@@ -250,7 +321,7 @@ const styles = StyleSheet.create({
     height: 56,
   },
   peopleBtn: { flexDirection: 'row', alignItems: 'center', width: 96 },
-  avatarStack: { borderRadius: 15, borderWidth: 2, borderColor: 'rgba(255,255,255,0.85)' },
+  avatarStack: { borderRadius: 15, borderWidth: 2, borderColor: colors.avatarRing },
   moreStack: {
     width: 26,
     height: 26,
@@ -303,7 +374,7 @@ const styles = StyleSheet.create({
   },
   sectionDivider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(62, 54, 46, 0.28)',
+    backgroundColor: colors.divider,
     marginHorizontal: 16,
     marginVertical: 6,
   },
@@ -319,6 +390,36 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   emptyBtnText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.background },
+  deleteZone: {
+    position: 'absolute',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 999,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  deleteZoneOver: {
+    backgroundColor: colors.danger,
+    borderColor: colors.danger,
+  },
+  deleteZoneText: {
+    fontFamily: fonts.ui.bold,
+    fontSize: 15,
+    color: colors.inkSoft,
+  },
+  deleteZoneTextOver: {
+    color: colors.white,
+  },
   fab: {
     position: 'absolute',
     right: 22,
@@ -335,7 +436,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   fabPressed: { transform: [{ scale: 0.94 }] },
-  fabGlyph: { fontSize: 34, lineHeight: 38, color: '#fff', marginTop: -2 },
+  fabGlyph: { fontSize: 34, lineHeight: 38, color: colors.white, marginTop: -2 },
   missingTitle: { fontFamily: fonts.hand.bold, fontSize: 30, color: colors.ink },
   missingSub: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.inkSoft, marginTop: 6 },
   missingBtn: {

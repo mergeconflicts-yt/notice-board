@@ -86,14 +86,6 @@ export type ListEntry = {
   updatedAt: string;
 };
 
-export type UserSettings = {
-  lastBoardId: string | null;
-  locale: string | null;
-  timezone: string | null;
-  theme: 'system' | 'light' | 'dark';
-  reduceMotion: boolean;
-};
-
 export type InviteLink = {
   token: string;
   code: string;

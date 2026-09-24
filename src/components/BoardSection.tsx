@@ -14,6 +14,8 @@ type Props = {
   onOpen: (item: ItemWithAuthor) => void;
   /** Called with the drop point normalized (x = fraction of width, y = ref points). */
   onMove: (item: ItemWithAuthor, x: number, y: number) => void;
+  onDragStart?: (item: ItemWithAuthor) => void;
+  onDragUpdate?: (item: ItemWithAuthor, screenY: number) => void;
   /** Shown in place of the canvas when the section has no items. */
   emptyHint?: string;
 };
@@ -23,7 +25,17 @@ type Props = {
  * rest). It owns its own width measurement and deterministic layout, and
  * converts a note's drop point back into stored coordinates.
  */
-export function BoardSection({ items, entries, photoUrls, entering, onOpen, onMove, emptyHint }: Props) {
+export function BoardSection({
+  items,
+  entries,
+  photoUrls,
+  entering,
+  onOpen,
+  onMove,
+  onDragStart,
+  onDragUpdate,
+  emptyHint,
+}: Props) {
   const [boardW, setBoardW] = useState(0);
   const layout = useMemo(() => computeBoardLayout(items), [items]);
   const scale = boardW > 0 ? boardW / REF_W : 1;
@@ -64,6 +76,8 @@ export function BoardSection({ items, entries, photoUrls, entering, onOpen, onMo
                   entries={entries.filter((e) => e.itemId === item.id)}
                   photoUrl={item.photoPath ? photoUrls[item.photoPath] ?? null : null}
                   onPress={onOpen}
+                  onDragStart={onDragStart}
+                  onDragUpdate={onDragUpdate}
                   onMove={handleMove}
                 />
               );

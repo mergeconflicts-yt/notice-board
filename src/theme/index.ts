@@ -1,3 +1,9 @@
-export { boardColors, boardColorKeys, colors, noteColors, noteColorKeys } from './colors';
-export type { NoteColorKey } from './colors';
+export {
+  boardColors,
+  boardColorKeys,
+  colors,
+  fastenerColors,
+  noteColors,
+  noteColorKeys,
+} from './colors';
 export { fonts } from './fonts';

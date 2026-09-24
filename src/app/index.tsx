@@ -82,8 +82,7 @@ export default function StartScreen() {
     setIdentityError(null);
     try {
       await setDisplayName(name);
-    } catch (e) {
-      console.error('set identity failed', e);
+    } catch {
       setIdentityError('Couldn’t reach the board server. Check your connection and try again.');
       setIdentitySaving(false);
       return;
@@ -273,7 +272,7 @@ const styles = StyleSheet.create({
   boardRowName: { flex: 1, fontFamily: fonts.hand.bold, fontSize: 22, color: colors.ink },
   boardRowChevron: { fontSize: 22, color: colors.inkFaint },
   prompt: {
-    backgroundColor: '#FFF0E4',
+    backgroundColor: colors.highlight,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
