@@ -18,6 +18,8 @@ export const supabase = createClient<Database>(url, anonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    // PKCE is required for `linkIdentity`/OAuth in a native app.
+    flowType: 'pkce',
   },
 });
 

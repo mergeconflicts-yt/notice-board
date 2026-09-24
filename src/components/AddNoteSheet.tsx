@@ -106,7 +106,14 @@ export function AddNoteSheet({
         const nextTab = tabForItem(initial);
         setTab(nextTab);
         setColor(initial.color);
-        setText(initial.type === 'note' || initial.type === 'photo' ? (initial.body ?? '') : '');
+        // The text box is the body for notes/photos and the title for dates.
+        setText(
+          initial.type === 'date'
+            ? (initial.title ?? '')
+            : initial.type === 'note' || initial.type === 'photo'
+              ? (initial.body ?? '')
+              : '',
+        );
         setListTitle(initial.type === 'list' ? (initial.title ?? '') : '');
         setListNotes('');
         setRows(initial.type === 'list' ? entries.map((e) => ({ id: e.id, text: e.text })) : []);

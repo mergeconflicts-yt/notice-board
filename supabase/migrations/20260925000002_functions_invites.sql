@@ -124,7 +124,22 @@ begin
       return next;
       return;
     exception when unique_violation then
-      -- Lost a race (or an astronomical hash collision): retry with new bytes.
+      -- Lost a race: another caller just created the active invite. Return
+      -- theirs rather than erroring.
+      select * into v_inv
+      from public.invites
+      where board_id = p_board_id and revoked_at is null
+      for update;
+      if v_inv.id is not null and v_inv.expires_at > now() then
+        v_plain := extensions.pgp_sym_decrypt(v_inv.secret_enc, public.invite_key());
+        token := split_part(v_plain, ':', 1);
+        v_code := split_part(v_plain, ':', 2);
+        code := substr(v_code, 1, 5) || '-' || substr(v_code, 6, 5);
+        expires_at := v_inv.expires_at;
+        return next;
+        return;
+      end if;
+      -- Otherwise retry with fresh bytes (or an astronomical hash collision).
       if v_attempt >= 3 then
         raise;
       end if;

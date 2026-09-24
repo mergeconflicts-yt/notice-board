@@ -39,10 +39,12 @@ returns setof public.items
 language sql
 security definer
 set search_path = '' as $$
-  select * from public.items
-  where deleted_at is not null
-    and deleted_at < now() - interval '30 days'
-  order by deleted_at
+  select i.*
+  from public.items i
+  join public.boards b on b.id = i.board_id
+  where (i.deleted_at is not null and i.deleted_at < now() - interval '30 days')
+     or (b.deleted_at is not null and b.deleted_at < now() - interval '30 days')
+  order by i.deleted_at nulls last
   limit p_limit;
 $$;
 

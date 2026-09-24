@@ -61,6 +61,9 @@ export default function ProfileScreen() {
           onPress: async () => {
             try {
               await deleteAccount();
+              // deleteAccount signs out; start a fresh anonymous session so
+              // the app isn't left as the deleted user.
+              await useSession.getState().init();
               router.replace('/');
             } catch (e) {
               useToast.getState().show(friendlyMessage(e));

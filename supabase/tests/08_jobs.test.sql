@@ -1,6 +1,6 @@
 -- Phase 6: maintenance jobs (expire + rate-limit cleanup) and their schedule.
 begin;
-select plan(9);
+select plan(10);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000071', 'authenticated', 'authenticated');
@@ -51,6 +51,18 @@ select ok(
   (select deleted_at < now() - interval '30 days'
    from public.expired_for_purge() where id = 'c0000000-0000-0000-0000-000000000073'),
   'the old item is included');
+
+-- Items on a board deleted over 30 days ago are candidates too.
+insert into public.boards (id, name, created_by, deleted_at)
+values ('b0000000-0000-0000-0000-000000000072', 'Gone', 'a0000000-0000-0000-0000-000000000071',
+        now() - interval '31 days');
+insert into public.items (id, board_id, type, body, created_by, deleted_at)
+values ('c0000000-0000-0000-0000-000000000075', 'b0000000-0000-0000-0000-000000000072',
+        'note', 'on a dead board', 'a0000000-0000-0000-0000-000000000071', now());
+select is(
+  (select count(*)::integer from public.expired_for_purge()
+   where id = 'c0000000-0000-0000-0000-000000000075'),
+  1, 'items on a long-deleted board are purge candidates');
 
 -- Schedule present.
 select is(

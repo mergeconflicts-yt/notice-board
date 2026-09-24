@@ -37,6 +37,22 @@ begin
   if v_row.deleted_at is not null then
     raise exception 'not_found';
   end if;
+  -- Reject NaN / Infinity (Postgres orders NaN as equal to itself and above
+  -- all numbers, so GREATEST/LEAST would happily keep it).
+  if p_x is not null and (
+    p_x = 'NaN'::double precision
+    or p_x = 'Infinity'::double precision
+    or p_x = '-Infinity'::double precision
+  ) then
+    raise exception 'invalid_input';
+  end if;
+  if p_y is not null and (
+    p_y = 'NaN'::double precision
+    or p_y = 'Infinity'::double precision
+    or p_y = '-Infinity'::double precision
+  ) then
+    raise exception 'invalid_input';
+  end if;
 
   -- Position is presentation metadata: bump updated_at but NOT version, so a
   -- member dragging a note never invalidates the author's in-flight edit.

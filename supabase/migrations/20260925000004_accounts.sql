@@ -32,6 +32,8 @@ begin
     where user_id = v_uid
     for update
   loop
+    -- Lock the board too, so this can't race a concurrent leave/promote.
+    perform 1 from public.boards where id = v_board.board_id for update;
     v_was_owner := v_board.role = 'owner';
     delete from public.board_members
     where board_id = v_board.board_id and user_id = v_uid;

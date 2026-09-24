@@ -1,6 +1,6 @@
 -- Manual note positions: any member may move a note; the spot persists.
 begin;
-select plan(8);
+select plan(9);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000081', 'authenticated', 'authenticated'),
@@ -45,6 +45,11 @@ select is(
   (select (layout ->> 'manual')::boolean from public.items
    where id = 'c0000000-0000-0000-0000-000000000081'),
   true, 'marked manual');
+
+-- NaN / Infinity are rejected (they survive GREATEST/LEAST).
+select throws_ok(
+  $$select public.set_item_position('c0000000-0000-0000-0000-000000000081', 'NaN'::double precision, 10)$$,
+  'P0001', 'invalid_input', 'NaN position rejected');
 
 -- Stranger cannot move.
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000083', true);

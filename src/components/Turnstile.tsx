@@ -18,12 +18,13 @@ export function Turnstile({ siteKey, onToken, onError }: Props) {
   const html = useMemo(
     () => `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>html,body{margin:0;padding:0;background:${colors.background};display:flex;align-items:center;justify-content:center;height:100%}</style>
-<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback" async defer></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head><body>
-<div class="cf-turnstile" data-sitekey="${siteKey}" data-callback="onToken" data-error-callback="onError"></div>
+<div class="cf-turnstile" data-sitekey="${siteKey}" data-callback="onToken" data-error-callback="onError" data-expired-callback="onExpired"></div>
 <script>
   function onToken(token) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'token', token })); }
   function onError(code) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', code })); }
+  function onExpired() { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'expired' })); }
 </script>
 </body></html>`,
     [siteKey],
@@ -33,6 +34,7 @@ export function Turnstile({ siteKey, onToken, onError }: Props) {
     try {
       const data = JSON.parse(event.nativeEvent.data) as { type: string; token?: string; code?: string };
       if (data.type === 'token' && data.token) onToken(data.token);
+      else if (data.type === 'expired') onError?.('captcha expired');
       else if (data.type === 'error') onError?.(data.code ?? 'captcha failed');
     } catch {
       // ignore non-JSON messages

@@ -74,24 +74,16 @@ export default function BoardScreen() {
     if (added.length > 0) setEntering(new Set(added.map((i) => i.id)));
   }, [items]);
 
-  // Signed photo URLs expire after an hour, so re-sign on mount, every ~50
-  // minutes, and whenever the app returns to the foreground.
   const itemsRef = useRef(items);
   useEffect(() => {
     itemsRef.current = items;
   }, [items]);
 
-  const refreshPhotos = useCallback(async () => {
-    const paths = [
-      ...new Set(
-        itemsRef.current
-          .filter((i) => i.photoPath)
-          .map((i) => i.photoPath as string),
-      ),
-    ];
-    if (paths.length === 0) return;
+  const signPaths = useCallback(async (paths: string[]) => {
+    const unique = [...new Set(paths)];
+    if (unique.length === 0) return;
     const pairs = await Promise.all(
-      paths.map(async (path) => [path, await signedPhotoUrl(path)] as const),
+      unique.map(async (path) => [path, await signedPhotoUrl(path)] as const),
     );
     setPhotoUrls((prev) => {
       const next = { ...prev };
@@ -100,22 +92,46 @@ export default function BoardScreen() {
     });
   }, []);
 
+  // Sign only photos we don't already have a URL for, so a live update never
+  // re-signs (and flickers) every image on the board.
   useEffect(() => {
-    void refreshPhotos();
-    const timer = setInterval(() => void refreshPhotos(), 50 * 60 * 1000);
+    const missing = items
+      .filter((i) => i.photoPath && !(i.photoPath in photoUrls))
+      .map((i) => i.photoPath as string);
+    if (missing.length === 0) return;
+    let alive = true;
+    void (async () => {
+      const pairs = await Promise.all(
+        missing.map(async (path) => [path, await signedPhotoUrl(path)] as const),
+      );
+      if (!alive) return;
+      setPhotoUrls((prev) => {
+        const next = { ...prev };
+        for (const [path, url] of pairs) if (url) next[path] = url;
+        return next;
+      });
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [items, photoUrls]);
+
+  // URLs expire after an hour: re-sign everything every ~50 minutes and when
+  // the app returns to the foreground.
+  useEffect(() => {
+    const refreshAll = () =>
+      void signPaths(
+        itemsRef.current.filter((i) => i.photoPath).map((i) => i.photoPath as string),
+      );
+    const timer = setInterval(refreshAll, 50 * 60 * 1000);
     const sub = AppState.addEventListener('change', (next) => {
-      if (next === 'active') void refreshPhotos();
+      if (next === 'active') refreshAll();
     });
     return () => {
       clearInterval(timer);
       sub.remove();
     };
-  }, [refreshPhotos]);
-
-  // Sign any newly-arrived photo as soon as it appears.
-  useEffect(() => {
-    void refreshPhotos();
-  }, [items, refreshPhotos]);
+  }, [signPaths]);
 
   const handleDragStart = () => {
     overDeleteRef.current = false;

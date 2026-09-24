@@ -21,6 +21,24 @@ async function hasStoredSession(): Promise<boolean> {
   return keys.some((k) => k.endsWith('-auth-token'));
 }
 
+// Offline auto-retry with backoff (2s → 4s → … capped at 30s).
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+let retryDelay = 2000;
+
+function clearRetry() {
+  if (retryTimer) clearTimeout(retryTimer);
+  retryTimer = null;
+  retryDelay = 2000;
+}
+
+function scheduleRetry() {
+  if (retryTimer) return;
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    void useSession.getState().init();
+  }, retryDelay);
+  retryDelay = Math.min(retryDelay * 2, 30000);
+}
 
 
 async function loadProfile(id: string): Promise<User | null> {
@@ -50,6 +68,7 @@ export const useSession = create<SessionState>((set) => ({
   error: null,
 
   init: async (captchaToken) => {
+    clearRetry();
     set({ status: 'loading', error: null });
     try {
       const {
@@ -63,6 +82,7 @@ export const useSession = create<SessionState>((set) => ({
         // clearing a bad session is the user's explicit choice (Sign out).
         if (await hasStoredSession()) {
           set({ status: 'offline', error: 'Can\'t reach the board. Check your connection.' });
+          scheduleRetry();
           return;
         }
         // Production needs a Turnstile token; ask the UI to collect one first.
@@ -98,6 +118,7 @@ export const useSession = create<SessionState>((set) => ({
           ? 'Can\'t reach the board. Check your connection.'
           : friendlyMessage(e);
       set({ status: 'offline', error: message });
+      scheduleRetry();
     }
   },
 
@@ -109,6 +130,7 @@ export const useSession = create<SessionState>((set) => ({
   },
 
   signOut: async () => {
+    clearRetry();
     await supabase.auth.signOut();
     set({ user: null, status: 'loading', error: null });
   },

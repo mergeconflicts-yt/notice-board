@@ -25,6 +25,13 @@ Deno.serve(async (req: Request) => {
     return new Response('not authenticated', { status: 401 });
   }
 
+  // Tidy board state first (as the user), so this can't orphan boards even if
+  // the function is invoked directly rather than after the app's RPC call.
+  const { error: cleanupError } = await anon.rpc('delete_account');
+  if (cleanupError) {
+    return new Response(cleanupError.message, { status: 500 });
+  }
+
   const admin = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,

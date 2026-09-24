@@ -7,8 +7,9 @@ const PER_PAGE = 200;
 
 Deno.serve(async (req: Request) => {
   const auth = req.headers.get('Authorization') ?? '';
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  if (!auth.endsWith(serviceKey)) {
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  // Exact compare — an empty key must never let a caller through.
+  if (!serviceKey || auth !== `Bearer ${serviceKey}`) {
     return new Response('forbidden', { status: 403 });
   }
 
@@ -36,13 +37,15 @@ Deno.serve(async (req: Request) => {
 
   let deleted = 0;
   for (const id of candidates) {
-    const { count } = await admin
+    const { count, error } = await admin
       .from('board_members')
       .select('user_id', { count: 'exact', head: true })
       .eq('user_id', id);
+    // If we can't confirm the user has no boards, don't delete them.
+    if (error) continue;
     if (count && count > 0) continue;
-    const { error } = await admin.auth.admin.deleteUser(id);
-    if (!error) deleted += 1;
+    const { error: delError } = await admin.auth.admin.deleteUser(id);
+    if (!delError) deleted += 1;
   }
 
   return Response.json({ deleted });

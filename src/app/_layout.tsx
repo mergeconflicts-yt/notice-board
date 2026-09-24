@@ -1,12 +1,13 @@
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, StyleSheet } from 'react-native';
+import { AppState, View, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useFonts, Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold } from '@expo-google-fonts/nunito';
 import { Caveat_400Regular, Caveat_600SemiBold, Caveat_700Bold } from '@expo-google-fonts/caveat';
 import { colors } from '../theme';
 import { useSession } from '../store/session';
+import { supabase } from '../lib/supabase';
 import { ToastHost } from '../components/Toast';
 
 export default function RootLayout() {
@@ -22,6 +23,16 @@ export default function RootLayout() {
 
   useEffect(() => {
     useSession.getState().init();
+  }, []);
+
+  // Refresh the session token while foregrounded; pause while backgrounded so
+  // it doesn't burn battery or fail offline.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void supabase.auth.startAutoRefresh();
+      else void supabase.auth.stopAutoRefresh();
+    });
+    return () => sub.remove();
   }, []);
 
   if (!fontsLoaded) {

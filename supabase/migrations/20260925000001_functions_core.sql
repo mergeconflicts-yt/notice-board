@@ -459,12 +459,21 @@ begin
     raise exception 'invalid_input';
   end if;
   select timezone into v_tz from public.boards where id = v_row.board_id;
-  if v_row.done_at is not null then
-    v_keep := v_row.done_at + interval '2 days';
-  else
-    v_keep := public.default_keep_until(
-      v_row.type, coalesce(p_event_at, v_row.event_at), v_row.pinned, now(), v_tz
-    );
+  -- Only dates recompute their expiry (day after the event). Everything else
+  -- keeps its current keep_until, so editing a note doesn't undo "keep
+  -- longer", editing a ticked list doesn't stop it expiring, and a pinned/
+  -- done item keeps its own rule.
+  v_keep := v_row.keep_until;
+  if v_row.type = 'date' then
+    if v_row.done_at is not null then
+      v_keep := v_row.done_at + interval '2 days';
+    elsif v_row.pinned then
+      v_keep := null;
+    else
+      v_keep := public.default_keep_until(
+        'date', coalesce(p_event_at, v_row.event_at), false, now(), v_tz
+      );
+    end if;
   end if;
   update public.items
   set body = p_body,

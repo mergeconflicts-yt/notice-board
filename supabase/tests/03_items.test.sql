@@ -1,7 +1,7 @@
 -- Phase 1d: item RPCs — validation, authorship, versions, lifetimes.
 -- Roles: O owner/author, M member, S stranger.
 begin;
-select plan(54);
+select plan(59);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000021', 'authenticated', 'authenticated'),
@@ -238,6 +238,26 @@ select throws_ok(
     'note', 'butter', 'sneaky', null, null, null,
     'b0000000-0000-0000-0000-000000000099/c0000000-0000-0000-0000-000000000092/x.jpg', false, null)$$,
   'P0001', 'invalid_input', 'a note cannot carry a photo path');
+
+-- Editing a note must not undo "keep longer" (only dates recompute expiry).
+select lives_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-000000000093', (select id from t_b),
+    'note', 'butter', 'keep', null, null, null, null, false, null)$$,
+  'post a note to keep longer');
+select lives_ok(
+  $$select public.keep_longer('c0000000-0000-0000-0000-000000000093')$$,
+  'keep it longer');
+select ok(
+  (select keep_until > now() + interval '13 days' from public.items
+   where id = 'c0000000-0000-0000-0000-000000000093'),
+  'keep_longer extends the lifetime');
+select lives_ok(
+  $$select public.edit_item('c0000000-0000-0000-0000-000000000093', 2, 'edited', null, null, null, 'butter')$$,
+  'edit the note');
+select ok(
+  (select keep_until > now() + interval '13 days' from public.items
+   where id = 'c0000000-0000-0000-0000-000000000093'),
+  'editing the note keeps the extended lifetime');
 reset role;
 
 select * from finish();

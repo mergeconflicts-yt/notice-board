@@ -79,6 +79,15 @@ function mapRealtimeEntry(row: Record<string, unknown>): ListEntry {
   };
 }
 
+/** Newest server timestamp across items/entries — a clock-skew-proof cursor
+ *  for delta reads (never the device clock). */
+function latestUpdated(items: ItemWithAuthor[], entries: ListEntry[]): string {
+  let max = '';
+  for (const i of items) if (i.updatedAt > max) max = i.updatedAt;
+  for (const e of entries) if (e.updatedAt > max) max = e.updatedAt;
+  return max;
+}
+
 /** Live board state: board, people, posts and checklist rows. */
 export function useBoard(boardId: string) {
   const [board, setBoard] = useState<Board | null>(null);
@@ -89,9 +98,13 @@ export function useBoard(boardId: string) {
   const [error, setError] = useState<string | null>(null);
   const lastSeenRef = useRef<string | null>(null);
   const membersRef = useRef<BoardMember[]>([]);
+  const itemsRef = useRef<ItemWithAuthor[]>([]);
   useEffect(() => {
     membersRef.current = members;
   }, [members]);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   /** Resolve an item's author from the loaded members (realtime rows have no
    *  profile embed, so without this the author shows as unknown). */
@@ -115,7 +128,7 @@ export function useBoard(boardId: string) {
       setMembers(nextMembers);
       setItems(content.items);
       setEntries(content.entries);
-      lastSeenRef.current = new Date().toISOString();
+      lastSeenRef.current = latestUpdated(content.items, content.entries);
       setError(null);
     } catch (e) {
       setError(friendlyMessage(e));
@@ -141,7 +154,7 @@ export function useBoard(boardId: string) {
         setMembers(nextMembers);
         setItems(content.items);
         setEntries(content.entries);
-        lastSeenRef.current = new Date().toISOString();
+        lastSeenRef.current = latestUpdated(content.items, content.entries);
         setError(null);
       } catch (e) {
         if (alive) setError(friendlyMessage(e));
@@ -249,7 +262,7 @@ export function useBoard(boardId: string) {
             .then((delta) => {
               setItems((prev) => mergeItems(prev, delta.items));
               setEntries((prev) => mergeEntries(prev, delta.entries));
-              lastSeenRef.current = new Date().toISOString();
+              lastSeenRef.current = latestUpdated(delta.items, delta.entries);
             })
             .catch(() => {});
         }
@@ -272,8 +285,7 @@ export function useBoard(boardId: string) {
   const toast = useToast.getState();
 
   const onError = useCallback(
-    (e: unknown, rollback?: () => void) => {
-      rollback?.();
+    (e: unknown) => {
       if (e instanceof ApiError && e.code === 'version_conflict') {
         toast.show(friendlyMessage(e));
         void load();
@@ -316,7 +328,8 @@ export function useBoard(boardId: string) {
         setItems((prev) => prev.map((i) => (i.id === input.id ? { ...saved, author: saved.author ?? temp.author } : i)));
         // Entries for a fresh list arrive via realtime; nothing else to do.
       } catch (e) {
-        onError(e, () => setItems((prev) => prev.filter((i) => i.id !== input.id)));
+        setItems((prev) => prev.filter((i) => i.id !== input.id));
+        onError(e);
         throw e;
       }
     },
@@ -325,16 +338,19 @@ export function useBoard(boardId: string) {
 
   const patchItem = useCallback(
     async (id: string, patch: Partial<ItemWithAuthor>, run: () => Promise<void>) => {
-      const before = items;
+      // Roll back only this item (not the whole array), so a failure can't
+      // clobber unrelated concurrent changes.
+      const previous = itemsRef.current.find((i) => i.id === id);
       setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
       try {
         await run();
       } catch (e) {
-        onError(e, () => setItems(before));
+        if (previous) setItems((prev) => prev.map((i) => (i.id === id ? previous : i)));
+        onError(e);
         throw e;
       }
     },
-    [items, onError],
+    [onError],
   );
 
   const editItem = useCallback(
@@ -397,7 +413,8 @@ export function useBoard(boardId: string) {
       try {
         await apiRestoreItem(item.id);
       } catch (e) {
-        onError(e, () => setItems((prev) => prev.filter((i) => i.id !== item.id)));
+        setItems((prev) => prev.filter((i) => i.id !== item.id));
+        onError(e);
         throw e;
       }
     },
@@ -407,7 +424,7 @@ export function useBoard(boardId: string) {
   const toggleEntry = useCallback(
     (entry: ListEntry) => {
       const next = entry.checkedAt === null;
-      const before = entries;
+      const previous = entry;
       setEntries((prev) =>
         prev.map((e) =>
           e.id === entry.id
@@ -416,11 +433,12 @@ export function useBoard(boardId: string) {
         ),
       );
       apiSetEntryChecked(entry.id, next).catch((e) => {
-        setEntries(before);
+        // Restore just this row.
+        setEntries((prev) => prev.map((cur) => (cur.id === entry.id ? previous : cur)));
         onError(e);
       });
     },
-    [entries, onError],
+    [onError],
   );
 
   const addListEntry = useCallback(
@@ -444,7 +462,8 @@ export function useBoard(boardId: string) {
         const saved = await apiAddEntry(id, itemId, text);
         setEntries((prev) => prev.map((e) => (e.id === id ? saved : e)));
       } catch (e) {
-        onError(e, () => setEntries((prev) => prev.filter((e) => e.id !== id)));
+        setEntries((prev) => prev.filter((e) => e.id !== id));
+        onError(e);
         throw e;
       }
     },

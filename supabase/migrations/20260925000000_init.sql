@@ -256,6 +256,8 @@ create view public.visible_items with (security_invoker = true) as
   where deleted_at is null
     and (keep_until is null or keep_until > now());
 
+-- Explicit grants only (views get no PUBLIC access by default, but be explicit).
+revoke all on public.visible_items from public, anon;
 grant select on public.visible_items to authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -299,11 +301,15 @@ on conflict (id) do update set
   file_size_limit = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
 
-insert into storage.buckets (id, name, public, file_size_limit)
-values ('avatars', 'avatars', false, 5242880)
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'avatars', 'avatars', false, 5242880,
+  '{image/jpeg,image/webp,image/png,image/heic}'::text[]
+)
 on conflict (id) do update set
   public = excluded.public,
-  file_size_limit = excluded.file_size_limit;
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
 
 -- ---------------------------------------------------------------------------
 -- Lifetime rules: single source of truth for keep_until defaults.
