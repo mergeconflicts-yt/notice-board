@@ -8,6 +8,8 @@ insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000012', 'authenticated', 'authenticated'),
   ('a0000000-0000-0000-0000-000000000013', 'authenticated', 'authenticated'),
   ('a0000000-0000-0000-0000-000000000014', 'authenticated', 'authenticated');
+-- The local seed creates an `invite` key; replace it for this rolled-back run.
+delete from vault.secrets where name = 'invite';
 select vault.create_secret('test-invite-key-0123456789abcdef', 'invite');
 
 -- create_board as O.

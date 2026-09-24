@@ -45,18 +45,12 @@ EXPO_PUBLIC_TURNSTILE_SITE_KEY=         # empty locally => captcha off
 - Without the Supabase vars the app throws at startup (there is no local
   demo backend anymore).
 
-### One-time local step: the invite Vault secret
+### Invite Vault secret
 
 The invite functions encrypt links under a Vault secret named `invite`.
-`supabase db reset` does not create it (tests create and roll back their own).
-Run once after a reset:
-
-```sql
-select vault.create_secret('any-dev-key', 'invite');
-```
-
-Until then, invite calls fail with "invite service not configured". See
-`docs/backend-plan-questions.md` #7.
+`supabase/seed.sql` generates a fresh random key on every `supabase db reset`,
+so invites work locally with no manual step. Production sets its own key via
+the Vault/dashboard (`db push` does not run seeds).
 
 ### Edge Functions
 

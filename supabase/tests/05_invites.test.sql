@@ -9,6 +9,7 @@ insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000043', 'authenticated', 'authenticated'),
   ('a0000000-0000-0000-0000-000000000044', 'authenticated', 'authenticated'),
   ('a0000000-0000-0000-0000-000000000045', 'authenticated', 'authenticated');
+delete from vault.secrets where name = 'invite';
 select vault.create_secret('test-invite-key-0123456789abcdef', 'invite');
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000041', true);
 set role authenticated;

@@ -67,8 +67,9 @@ schema_paths = []
 [db.seed]
 # If enabled, seeds the database after migrations during a db reset.
 enabled = true
-# No seed files: tests build their own fixtures (see docs/plan.md).
-sql_paths = []
+# Local-only: generates the Vault `invite` key so invites work after a reset.
+# Not run by `db push`, so production config is unaffected.
+sql_paths = ["./seed.sql"]
 
 [db.network_restrictions]
 # Enable management of network restrictions.
