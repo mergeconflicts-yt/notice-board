@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getBackendV2 } from '../services';
 import {
   BoardDetails,
@@ -15,6 +15,7 @@ import {
 import { useSession } from '../store/session';
 import { useToast } from '../store/toast';
 import { colorForNote, parseListItems, rotationForNote } from '../utils/note';
+import { adaptItemToNote } from '../utils/adapt';
 import { randomId } from '../utils/id';
 
 /** Input shape for adding a note (mirrors the composer output). */
@@ -26,53 +27,6 @@ export type BoardNoteInput = {
   data?: Record<string, unknown> | null;
   color?: NoteWithAuthor['color'];
 };
-
-/**
- * Rebuild a board-style note from a v2 item. Lists are rehydrated from their
- * entries (title + marked lines), photos resolve to a signed URL, and the
- * paper/layout map back onto color/rotation/position so the existing layout,
- * estimation and rendering keep working untouched.
- */
-export function adaptItemToNote(
-  item: BoardItemWithAuthor,
-  entries: ListEntry[],
-  imageUrl: string | null,
-): NoteWithAuthor {
-  const sorted = [...entries].sort((a, b) => a.position - b.position);
-  const isList = item.type === 'list';
-  const text = isList
-    ? [
-        ...(item.body ? [item.body] : []),
-        ...sorted.map((e) => `${e.isChecked ? '☑' : '☐'} ${e.text}`),
-      ].join('\n')
-    : (item.body ?? '');
-
-  const data: Record<string, unknown> = {};
-  if (item.layout?.manual) data.manual = true;
-  if (item.eventAt) data.eventAt = item.eventAt;
-  if (isList) {
-    data.items = sorted.map((e) => ({ text: e.text, done: e.isChecked }));
-  }
-
-  return {
-    id: item.id,
-    boardId: item.boardId,
-    authorId: item.createdBy,
-    text,
-    imageUrl,
-    color: item.paper.color,
-    rotation: item.paper.rotation,
-    positionX: item.layout?.x ?? 0.5,
-    positionY: item.layout?.y ?? 0.5,
-    kind: item.type === 'date' ? 'appointment' : item.type,
-    data: Object.keys(data).length > 0 ? data : null,
-    createdAt: item.createdAt,
-    updatedAt: item.updatedAt ?? item.createdAt,
-    expiresAt: item.expiresAt,
-    completedAt: item.completedAt,
-    author: item.author,
-  };
-}
 
 export function useBoardDetails(boardId: string) {
   const [board, setBoard] = useState<BoardDetails | null>(null);
@@ -256,6 +210,7 @@ export function useBoardNotes(boardId: string) {
           boardId,
           type: 'photo',
           body: text || null,
+          expiresAt: input.expiresAt ?? null,
           paper: { color, rotation },
         });
         if (localImage) {
@@ -270,24 +225,15 @@ export function useBoardNotes(boardId: string) {
       }
 
       if (kind === 'list') {
+        // One transactional call — the item plus its entries land together.
         const { title, items: parsed } = parseListItems(text);
-        const item = await backend.addItem({
+        await backend.addListItem({
           boardId,
-          type: 'list',
           body: title,
+          expiresAt: input.expiresAt ?? null,
           paper: { color, rotation },
+          entries: parsed.map((it, i) => ({ text: it.text, position: i, done: it.done })),
         });
-        for (const [i, it] of parsed.entries()) {
-          const entry = await backend.addEntry({
-            boardId,
-            itemId: item.id,
-            text: it.text,
-            position: i,
-          });
-          if (it.done) {
-            await backend.updateEntry(entry.id, { isChecked: true }).catch(() => {});
-          }
-        }
         return;
       }
 
@@ -360,24 +306,130 @@ export function useBoardNotes(boardId: string) {
     [boardId, items],
   );
 
+  const refreshItems = useCallback(async () => {
+    try {
+      setItems(await getBackendV2().getItems(boardId));
+    } catch (e) {
+      console.error('refresh items failed', e);
+    }
+  }, [boardId]);
+
+  // In-flight soft-deletes, so Undo waits for its delete to land first and a
+  // failed delete puts the note back instead of losing it.
+  const pendingDeletes = useRef(new Map<string, Promise<void>>());
+
   const restoreNote = useCallback(async (id: string) => {
-    await getBackendV2().restoreItem(id);
-    useToast.getState().hide();
+    const pending = pendingDeletes.current.get(id);
+    if (pending) {
+      try {
+        await pending;
+      } catch {
+        // The delete itself failed; restoring is still safe to attempt.
+      }
+    }
+    try {
+      await getBackendV2().restoreItem(id);
+    } catch (e) {
+      console.error('restore failed', e);
+    } finally {
+      useToast.getState().hide();
+    }
   }, []);
 
   const deleteNote = useCallback(
     (id: string) => {
       // Optimistic hide; the backend soft-deletes, so Undo restores in place.
       setItems((prev) => (prev ? prev.filter((n) => n.id !== id) : prev));
-      getBackendV2()
+      const request = getBackendV2()
         .deleteItem(id)
-        .catch((e) => console.error('delete note failed', e));
+        .then(
+          () => {},
+          (e) => {
+            console.error('delete note failed', e);
+            refreshItems();
+          },
+        );
+      pendingDeletes.current.set(id, request);
+      request.finally(() => {
+        if (pendingDeletes.current.get(id) === request) pendingDeletes.current.delete(id);
+      });
       useToast.getState().show('Note deleted', {
         label: 'Undo',
         onPress: () => restoreNote(id),
       });
     },
-    [restoreNote],
+    [restoreNote, refreshItems],
+  );
+
+  // Persist a composer edit: item fields plus entry/asset reconciliation.
+  const saveEdit = useCallback(
+    async (noteId: string, input: BoardNoteInput) => {
+      const backend = getBackendV2();
+      const item = items?.find((n) => n.id === noteId);
+      if (!item) throw new Error('Item not found');
+      const kind = input.kind ?? 'note';
+      const text = input.text.trim();
+      const color = input.color ?? item.paper.color;
+
+      if (kind === 'list' && item.type === 'list') {
+        const { title, items: parsed } = parseListItems(text);
+        await backend.updateItem(item.id, { body: title, paper: { ...item.paper, color } });
+        const existing = (entries ?? [])
+          .filter((e) => e.itemId === item.id)
+          .sort((a, b) => a.position - b.position);
+        const n = Math.max(existing.length, parsed.length);
+        for (let i = 0; i < n; i++) {
+          const old = existing[i];
+          const next = parsed[i];
+          if (old && next) {
+            if (old.text !== next.text || old.isChecked !== next.done || old.position !== i) {
+              await backend.updateEntry(old.id, {
+                text: next.text,
+                isChecked: next.done,
+                position: i,
+              });
+            }
+          } else if (next) {
+            const created = await backend.addEntry({
+              boardId,
+              itemId: item.id,
+              text: next.text,
+              position: i,
+            });
+            if (next.done) await backend.updateEntry(created.id, { isChecked: true });
+          } else if (old) {
+            await backend.deleteEntry(old.id);
+          }
+        }
+        return;
+      }
+
+      const rawEventAt =
+        kind === 'appointment'
+          ? (input.data as { eventAt?: unknown } | null)?.eventAt
+          : undefined;
+      await backend.updateItem(item.id, {
+        body: text,
+        eventAt: typeof rawEventAt === 'string' ? rawEventAt : undefined,
+        expiresAt: input.expiresAt ?? null,
+        paper: { ...item.paper, color },
+      });
+
+      const localImage =
+        input.imageUrl && !input.imageUrl.startsWith('http') ? input.imageUrl : null;
+      const currentAssets = (assets ?? []).filter((a) => a.itemId === item.id);
+      if (localImage) {
+        const uploaded = await backend.uploadAsset(boardId, item.id, localImage);
+        for (const a of currentAssets) {
+          if (a.id !== uploaded.id) await backend.deleteAsset(a.id).catch(() => {});
+        }
+      } else if (input.imageUrl == null) {
+        for (const a of currentAssets) {
+          await backend.deleteAsset(a.id).catch(() => {});
+        }
+      }
+    },
+    [boardId, items, entries, assets],
   );
 
   const toggleEntry = useCallback(
@@ -400,7 +452,7 @@ export function useBoardNotes(boardId: string) {
     [entries],
   );
 
-  return { notes, loading, addNote, updateNote, deleteNote, restoreNote, toggleEntry };
+  return { notes, loading, addNote, updateNote, deleteNote, restoreNote, toggleEntry, saveEdit };
 }
 
 export function useBoardsV2() {

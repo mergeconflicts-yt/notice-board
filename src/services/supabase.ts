@@ -145,10 +145,17 @@ export class SupabaseBackend implements NoticeBackend {
   }
 
   async ensureUser(displayName: string, avatar?: string | null): Promise<User> {
-    const {
+    let {
       data: { user },
     } = await this.client.auth.getUser();
-    if (!user) throw new Error('Not signed in');
+    if (!user) {
+      // No session (fresh install, cleared storage, or a refresh that fell
+      // over) — establish an anonymous one instead of failing the signup.
+      const { data: signIn, error: signInError } = await this.client.auth.signInAnonymously();
+      if (signInError) throw signInError;
+      user = signIn.user;
+    }
+    if (!user) throw new Error('Could not start a session. Check your connection and try again.');
     const { data, error } = await this.client
       .from('profiles')
       .upsert(

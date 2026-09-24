@@ -8,6 +8,8 @@ import {
   BoardMembership,
   CreatedInvite,
   ItemAsset,
+  ItemLayout,
+  ItemPaper,
   ListEntry,
   ListEntryPatch,
   NewBoardItem,
@@ -43,7 +45,7 @@ export class VersionConflictError extends Error {
  * stays live until the app is ported.
  */
 export interface NoticeBackendV2 {
-  readonly mode: 'supabase';
+  readonly mode: 'supabase' | 'local';
 
   ensureProfile(displayName: string, avatar?: string | null): Promise<User>;
 
@@ -82,6 +84,18 @@ export interface NoticeBackendV2 {
   /** Live entries, ordered for display. */
   getEntries(boardId: string): Promise<ListEntry[]>;
   addEntry(input: NewListEntry): Promise<ListEntry>;
+  /**
+   * Create a list item with all of its entries atomically (single RPC), so a
+   * list can never be left half-written. Returns the new item id.
+   */
+  addListItem(input: {
+    boardId: string;
+    body?: string | null;
+    paper?: Partial<ItemPaper> | null;
+    layout?: ItemLayout;
+    expiresAt?: string | null;
+    entries: { text: string; position?: number; done?: boolean }[];
+  }): Promise<string>;
   updateEntry(id: string, patch: ListEntryPatch, expectedVersion?: number): Promise<void>;
   deleteEntry(id: string): Promise<void>;
   restoreEntry(id: string): Promise<void>;
@@ -95,6 +109,8 @@ export interface NoticeBackendV2 {
     localUri: string,
     mime?: string,
   ): Promise<ItemAsset>;
+  /** Remove an asset row and its bytes. */
+  deleteAsset(id: string): Promise<void>;
   /** Time-boxed URL for a private asset. */
   getAssetUrl(asset: ItemAsset, expiresInSec?: number): Promise<string>;
 

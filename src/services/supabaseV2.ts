@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { File as ExpoFile } from 'expo-file-system';
 import {
   BoardDetails,
   BoardEvent,
@@ -12,6 +13,7 @@ import {
   BoardRole,
   CreatedInvite,
   ItemAsset,
+  ItemLayout,
   ItemPaper,
   ListEntry,
   ListEntryPatch,
@@ -349,10 +351,18 @@ export class SupabaseBackendV2 implements NoticeBackendV2 {
   }
 
   private async requireUser() {
-    const {
+    let {
       data: { user },
     } = await this.client.auth.getUser();
-    if (!user) throw new Error('Not signed in');
+    if (!user) {
+      // Same recovery as v1: a missing session means a fresh anonymous
+      // identity (the old one is unrecoverable by design).
+      console.warn('v2: session missing, signing in anonymously');
+      const { data: signIn, error: signInError } = await this.client.auth.signInAnonymously();
+      if (signInError) throw signInError;
+      user = signIn.user;
+    }
+    if (!user) throw new Error('Could not start a session. Check your connection and try again.');
     return user;
   }
 
@@ -390,19 +400,13 @@ export class SupabaseBackendV2 implements NoticeBackendV2 {
   }
 
   async createBoard(name: string): Promise<BoardDetails> {
-    const user = await this.requireUser();
-    const { data, error } = await this.client
-      .from('boards')
-      .insert({ name })
-      .select('*')
-      .single();
+    await this.requireUser();
+    // Membership is created server-side by the RPC; clients cannot insert it.
+    const { data, error } = await this.client.rpc('create_board', { p_name: name });
     if (error) throw error;
-    const board = mapBoard(data as BoardRow);
-    const { error: memError } = await this.client
-      .from('board_members')
-      .insert({ board_id: board.id, user_id: user.id, role: 'owner' });
-    if (memError) throw memError;
-    return board;
+    const row = (Array.isArray(data) ? data[0] : data) as BoardRow;
+    if (!row) throw new Error('Board was not created');
+    return mapBoard(row);
   }
 
   async updateBoard(
@@ -524,6 +528,7 @@ export class SupabaseBackendV2 implements NoticeBackendV2 {
       .select('*, profiles(*)')
       .eq('board_id', boardId)
       .is('deleted_at', null)
+      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
       .order('created_at', { ascending: true });
     if (error) throw error;
     return ((data as ItemRow[]) ?? []).map(mapItem);
@@ -590,6 +595,30 @@ export class SupabaseBackendV2 implements NoticeBackendV2 {
     return ((data as EntryRow[]) ?? []).map(mapEntry);
   }
 
+  async addListItem(input: {
+    boardId: string;
+    body?: string | null;
+    paper?: Partial<ItemPaper> | null;
+    layout?: ItemLayout;
+    expiresAt?: string | null;
+    entries: { text: string; position?: number; done?: boolean }[];
+  }): Promise<string> {
+    const { data, error } = await this.client.rpc('create_list_item', {
+      p_board_id: input.boardId,
+      p_body: input.body ?? null,
+      p_paper: input.paper ?? {},
+      p_layout: input.layout ?? null,
+      p_expires_at: input.expiresAt ?? null,
+      p_entries: input.entries.map((e, i) => ({
+        text: e.text,
+        position: e.position ?? i,
+        done: e.done ?? false,
+      })),
+    });
+    if (error) throw error;
+    return data as string;
+  }
+
   async addEntry(input: NewListEntry): Promise<ListEntry> {
     let position = input.position;
     if (position === undefined) {
@@ -651,25 +680,48 @@ export class SupabaseBackendV2 implements NoticeBackendV2 {
     mime?: string,
   ): Promise<ItemAsset> {
     const ext = localUri.split('.').pop()?.split('?')[0] || 'jpg';
+    const type = mime ?? `image/${ext === 'png' ? 'png' : 'jpeg'}`;
     const name = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
     const path = `board/${boardId}/item/${itemId}/${name}`;
-    const form = new FormData();
-    form.append('file', {
-      uri: localUri,
-      name,
-      type: mime ?? `image/${ext === 'png' ? 'png' : 'jpeg'}`,
-    } as unknown as Blob);
-    const { error } = await this.client.storage.from('board-media').upload(path, form, {
+    // Read the bytes up front and upload a real binary body — no FormData
+    // `{uri}` hacks.
+    const bytes = await new ExpoFile(localUri).arrayBuffer();
+    const { error } = await this.client.storage.from('board-media').upload(path, bytes, {
+      contentType: type,
       upsert: false,
     });
     if (error) throw error;
     const { data, error: rowError } = await this.client
       .from('item_assets')
-      .insert({ board_id: boardId, item_id: itemId, storage_path: path, mime: mime ?? null })
+      .insert({
+        board_id: boardId,
+        item_id: itemId,
+        storage_path: path,
+        mime: type,
+        bytes: bytes.byteLength,
+      })
       .select('*')
       .single();
-    if (rowError) throw rowError;
+    if (rowError) {
+      // Don't orphan bytes when the row insert fails.
+      await this.client.storage.from('board-media').remove([path]).catch(() => {});
+      throw rowError;
+    }
     return mapAsset(data as AssetRow);
+  }
+
+  async deleteAsset(id: string): Promise<void> {
+    const { data, error } = await this.client
+      .from('item_assets')
+      .select('storage_path')
+      .eq('id', id)
+      .single();
+    if (error) throw error;
+    const path = (data as { storage_path: string }).storage_path;
+    const { error: storageError } = await this.client.storage.from('board-media').remove([path]);
+    if (storageError) console.error('remove asset bytes failed', storageError);
+    const { error: rowError } = await this.client.from('item_assets').delete().eq('id', id);
+    if (rowError) throw rowError;
   }
 
   async getAssetUrl(asset: ItemAsset, expiresInSec = 3600): Promise<string> {

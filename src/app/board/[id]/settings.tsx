@@ -22,7 +22,15 @@ export default function BoardSettingsScreen() {
   const [saving, setSaving] = useState(false);
 
   const name = draftName ?? board?.name ?? '';
-  const isOwner = board && user && board.ownerId === user.id;
+  const myMembership = user ? (members ?? []).find((m) => m.userId === user.id) : undefined;
+  const isOwner = myMembership
+    ? myMembership.role === 'owner'
+    : Boolean(board && user && board.ownerId === user.id);
+  // A sole owner can't leave (that would orphan the board) — they delete it.
+  const isSoleOwner =
+    isOwner &&
+    !!members &&
+    members.every((m) => m.role !== 'owner' || (user && m.userId === user.id));
   const memberCount = members?.length ?? 0;
 
   const openEditor = () => {
@@ -228,16 +236,18 @@ export default function BoardSettingsScreen() {
 
         <Text style={styles.sectionLabel}>Board access</Text>
         <View style={styles.group}>
-          <Pressable style={styles.row} onPress={confirmLeave}>
-            <View style={styles.accessLeft}>
-              <MaterialCommunityIcons name="logout" size={22} color={colors.danger} />
-              <Text style={[styles.rowLabel, styles.dangerText]}>Leave board</Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </Pressable>
+          {!isSoleOwner ? (
+            <Pressable style={styles.row} onPress={confirmLeave}>
+              <View style={styles.accessLeft}>
+                <MaterialCommunityIcons name="logout" size={22} color={colors.danger} />
+                <Text style={[styles.rowLabel, styles.dangerText]}>Leave board</Text>
+              </View>
+              <Text style={styles.chevron}>›</Text>
+            </Pressable>
+          ) : null}
           {isOwner ? (
             <>
-              <View style={styles.divider} />
+              {!isSoleOwner ? <View style={styles.divider} /> : null}
               <Pressable style={styles.row} onPress={confirmDelete}>
                 <View style={styles.accessLeft}>
                   <MaterialCommunityIcons

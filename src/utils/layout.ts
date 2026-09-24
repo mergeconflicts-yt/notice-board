@@ -143,6 +143,41 @@ export function manualPlacement(note: NoteWithAuthor): { x: number; y: number } 
  *  may cover. Kept low so the dense board barely overlaps. */
 export const MAX_OVERLAP_FRAC = 0.05;
 
+/** Looser cap for hand-placed notes: they may lap neighbours, but never bury them. */
+export const MAX_MANUAL_OVERLAP_FRAC = 0.4;
+
+/**
+ * Settle a dropped note: keep it on the board using its own width, then nudge
+ * it down while it covers too much of a neighbour. Returns normalized coords.
+ */
+export function settleManual(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  others: PlacedNote[],
+): { x: number; y: number } {
+  const edge = 0.02;
+  const nx = Math.max(edge, Math.min(1 - edge - w, x));
+  let ny = Math.max(TOP_Y, y);
+  for (let guard = 0; guard < 20; guard++) {
+    let target = ny;
+    for (const q of others) {
+      const ix = Math.max(0, Math.min(nx + w, q.x + q.w) - Math.max(nx, q.x));
+      if (ix <= 0) continue;
+      const minArea = Math.min(w * h, q.w * q.h);
+      if (minArea <= 0) continue;
+      const cap = (MAX_MANUAL_OVERLAP_FRAC * minArea) / ix;
+      if (h <= cap) continue;
+      const bottom = Math.min(ny + h, q.y + q.h);
+      if (bottom - ny > cap) target = Math.max(target, q.y + q.h - cap);
+    }
+    if (target === ny) break;
+    ny = target;
+  }
+  return { x: nx, y: ny };
+}
+
 /**
  * Push a rect straight down the minimum needed so it overlaps no other rect
  * by more than MAX_OVERLAP_FRAC. Small overlaps stay as-is.

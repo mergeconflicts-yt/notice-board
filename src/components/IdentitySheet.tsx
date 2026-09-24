@@ -16,9 +16,11 @@ import { AVATAR_EMOJIS } from '../utils/note';
 type Props = {
   visible: boolean;
   onDone: (name: string, avatar: string) => void;
+  submitting?: boolean;
+  error?: string | null;
 };
 
-export function IdentitySheet({ visible, onDone }: Props) {
+export function IdentitySheet({ visible, onDone, submitting = false, error = null }: Props) {
   const [name, setName] = useState('');
   const [avatar, setAvatar] = useState(AVATAR_EMOJIS[0]);
   const [wasOpen, setWasOpen] = useState(false);
@@ -64,10 +66,12 @@ export function IdentitySheet({ visible, onDone }: Props) {
             ))}
           </View>
 
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+
           <Button
-            label="Let's go"
+            label={submitting ? 'Joining…' : "Let's go"}
             onPress={() => onDone(name.trim(), avatar)}
-            disabled={!canSubmit}
+            disabled={!canSubmit || submitting}
             style={styles.done}
           />
         </View>
@@ -156,5 +160,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF7EC',
   },
   emojiText: { fontSize: 22 },
+  error: {
+    fontFamily: fonts.ui.regular,
+    fontSize: 13,
+    color: colors.danger,
+    marginBottom: 10,
+  },
   done: { marginTop: 4 },
 });

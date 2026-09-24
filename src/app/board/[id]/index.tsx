@@ -24,6 +24,7 @@ import {
   TWO_COLUMN_MAX,
   TWO_COL_MIN_H,
   computeBoardLayout,
+  settleManual,
 } from '../../../utils/layout';
 import { NoteWithAuthor } from '../../../types';
 
@@ -164,9 +165,17 @@ export default function BoardScreen() {
     }
     if (boardW <= 0) return;
     const refScale = boardW / REF_W;
+    const placed = layout.get(note.id);
+    const w = placed?.w ?? 0.4;
+    const h = placed?.h ?? 150;
+    const others: { x: number; y: number; w: number; h: number }[] = [];
+    layout.forEach((q, id) => {
+      if (id !== note.id) others.push(q);
+    });
+    const settled = settleManual(x / boardW, y / refScale, w, h, others);
     updateNote(note.id, {
-      positionX: Math.max(0, Math.min(1, x / boardW)),
-      positionY: Math.max(0, y / refScale),
+      positionX: settled.x,
+      positionY: settled.y,
       data: { ...((note.data as Record<string, unknown> | null) ?? {}), manual: true },
     }).catch((e) => console.error('move note failed', e));
   };
@@ -240,6 +249,8 @@ export default function BoardScreen() {
           hitSlop={8}
           onPress={() => router.push(`/board/${boardId}/people`)}
           style={styles.peopleBtn}
+          accessibilityRole="button"
+          accessibilityLabel="View board members"
         >
           {(members ?? []).slice(0, 3).map((m, i) => (
             <View key={m.userId} style={[styles.avatarStack, { zIndex: 10 - i, marginLeft: i === 0 ? 0 : -8 }]}>
@@ -265,6 +276,8 @@ export default function BoardScreen() {
           hitSlop={8}
           onPress={() => router.push(`/board/${boardId}/settings`)}
           style={styles.settingsBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Board settings"
         >
           <Text style={styles.settingsGlyph}>⚙︎</Text>
         </Pressable>
@@ -352,6 +365,9 @@ export default function BoardScreen() {
       {!isEmpty && !dragActive && !toastVisible && (
         <Pressable
           onPress={() => setSheetOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Add note"
+          accessibilityHint="Opens the composer to pin a new note."
           style={({ pressed }) => [
             styles.fab,
             { bottom: insets.bottom + 24 },

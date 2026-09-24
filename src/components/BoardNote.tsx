@@ -3,6 +3,7 @@ import { Animated, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { NoteWithAuthor } from '../types';
 import { NotePaper } from './NotePaper';
+import { useReduceMotion } from '../hooks/useReduceMotion';
 
 type Props = {
   note: NoteWithAuthor;
@@ -54,6 +55,7 @@ export function BoardNote({
   const [press] = useState(() => new Animated.Value(0));
   const [shake] = useState(() => new Animated.Value(0));
   const [dragging, setDragging] = useState(false);
+  const reduceMotion = useReduceMotion();
 
   const draggingRef = useRef(false);
   const startRef = useRef({ x: left, y: top });
@@ -71,6 +73,11 @@ export function BoardNote({
 
   useEffect(() => {
     if (!animateIn) return;
+    if (reduceMotion) {
+      enter.setValue(1);
+      shake.setValue(0);
+      return;
+    }
     // Drop the paper onto the board, then give it a quick damped wobble so a
     // fresh note catches the eye.
     Animated.sequence([
@@ -87,7 +94,7 @@ export function BoardNote({
       Animated.timing(shake, { toValue: 0.25, duration: 45, useNativeDriver: false }),
       Animated.timing(shake, { toValue: 0, duration: 45, useNativeDriver: false }),
     ]).start();
-  }, [animateIn, enter, shake]);
+  }, [animateIn, enter, shake, reduceMotion]);
 
   const pan = Gesture.Pan()
     .activateAfterLongPress(LIFT_MS)
@@ -155,8 +162,14 @@ export function BoardNote({
     outputRange: [`${rotation}deg`, '0deg'],
   });
 
+  const preview = note.text.trim().split('\n')[0]?.slice(0, 80) ?? '';
+  const author = note.author?.displayName;
   return (
     <Animated.View
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={`Note${author ? ` by ${author}` : ''}${preview ? `: ${preview}` : ''}`}
+      accessibilityHint="Double tap to open. Touch and hold to drag."
       style={[
         styles.pin,
         { left: posX, top: posY, width, opacity: enter, zIndex: dragging ? 20 : 0 },

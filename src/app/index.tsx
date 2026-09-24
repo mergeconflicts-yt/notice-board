@@ -23,20 +23,39 @@ export default function StartScreen() {
   const setIdentity = useSession((s) => s.setIdentity);
   const { boards } = useBoardsV2();
   const [identityFor, setIdentityFor] = useState<'create' | 'join' | null>(null);
+  const [identitySaving, setIdentitySaving] = useState(false);
+  const [identityError, setIdentityError] = useState<string | null>(null);
 
   const startCreate = () => {
     if (user) router.push('/create');
-    else setIdentityFor('create');
+    else {
+      setIdentityError(null);
+      setIdentityFor('create');
+    }
   };
   const startJoin = () => {
     if (user) router.push('/join');
-    else setIdentityFor('join');
+    else {
+      setIdentityError(null);
+      setIdentityFor('join');
+    }
   };
 
   const handleIdentity = async (name: string, avatar: string) => {
     const target = identityFor;
+    if (identitySaving) return;
+    setIdentitySaving(true);
+    setIdentityError(null);
+    try {
+      await setIdentity(name, avatar);
+    } catch (e) {
+      console.error('set identity failed', e);
+      setIdentityError('Couldn’t reach the board server. Check your connection and try again.');
+      setIdentitySaving(false);
+      return;
+    }
+    setIdentitySaving(false);
     setIdentityFor(null);
-    await setIdentity(name, avatar);
     if (target === 'create') router.push('/create');
     else if (target === 'join') router.push('/join');
   };
@@ -108,6 +127,8 @@ export default function StartScreen() {
       <IdentitySheet
         visible={identityFor !== null}
         onDone={handleIdentity}
+        submitting={identitySaving}
+        error={identityError}
       />
     </SafeAreaView>
   );

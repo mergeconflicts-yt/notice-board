@@ -142,10 +142,12 @@ export function NotePaper({
         },
       ]}
     >
-      <FastenerView fastener={fastenerForNote(note.id, variant)} />
+      <View accessible={false}>
+        <FastenerView fastener={fastenerForNote(note.id, variant)} />
+      </View>
 
       {isList ? (
-        <View style={styles.holes} pointerEvents="none">
+        <View style={styles.holes} pointerEvents="none" accessible={false}>
           {[0, 1, 2, 3, 4].map((i) => (
             <View key={i} style={styles.tornHole}>
               <View style={styles.tornSlit} />
@@ -161,6 +163,9 @@ export function NotePaper({
           source={{ uri: note.imageUrl }}
           style={[styles.image, { borderRadius: 2, aspectRatio: photoRatio ?? 4 / 3 }]}
           resizeMode="cover"
+          accessible
+          accessibilityLabel={note.text.trim() ? note.text.trim() : 'Attached photo'}
+          accessibilityRole="image"
         />
       ) : null}
 
@@ -321,8 +326,9 @@ function ListBody({
               key={`${item.text}-${i}`}
               style={styles.listRow}
               onPress={() => onToggleItem(i)}
-              hitSlop={4}
+              hitSlop={8}
               accessibilityRole="checkbox"
+              accessibilityLabel={item.text}
               accessibilityState={{ checked }}
             >
               {rowBody}

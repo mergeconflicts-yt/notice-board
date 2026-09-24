@@ -288,11 +288,28 @@ export function AddNoteSheet({
   };
 
   const selectTab = (next: ComposerTab) => {
+    // Carry writing across tabs: parse note text into rows when entering the
+    // list tab, and fold rows back into text when leaving it (only when the
+    // destination is empty, so nothing is ever overwritten).
+    if (next === 'list' && rows.length === 0) {
+      const { title, items } = parseListItems(text);
+      if (items.length > 0) {
+        setListTitle(title ?? '');
+        setRows(items.map((it) => ({ id: randomId(), text: it.text, done: it.done })));
+      } else {
+        setRows([newRow(), newRow(), newRow()]);
+      }
+    } else if (tab === 'list' && next !== 'list' && !text.trim()) {
+      const parts = [
+        ...(listTitle.trim() ? [listTitle.trim()] : []),
+        ...rows
+          .filter((r) => r.text.trim())
+          .map((r) => `${r.done ? '☑' : '☐'} ${r.text.trim()}`),
+      ];
+      if (parts.length > 0) setText(parts.join('\n'));
+    }
     setTab(next);
     setExpiryOpen(false);
-    if (next === 'list') {
-      setRows((prev) => (prev.length === 0 ? [newRow(), newRow(), newRow()] : prev));
-    }
   };
 
   const removeRow = (id: string) => {
@@ -378,30 +395,38 @@ export function AddNoteSheet({
         <View style={styles.sheet}>
           <View style={styles.header}>
             <Text style={styles.title}>{initial ? 'Edit note' : 'Add to board'}</Text>
-            <Pressable hitSlop={12} onPress={onClose} style={styles.closeBtn}>
+            <Pressable
+              hitSlop={12}
+              onPress={onClose}
+              style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close composer"
+            >
               <MaterialCommunityIcons name="close" size={24} color={colors.inkSoft} />
             </Pressable>
           </View>
 
-          <View style={styles.tabs}>
-            {TABS.map((t) => {
-              const active = tab === t.id;
-              return (
-                <Pressable
-                  key={t.id}
-                  onPress={() => selectTab(t.id)}
-                  style={[styles.tab, active && styles.tabActive]}
-                >
-                  <MaterialCommunityIcons
-                    name={t.icon}
-                    size={28}
-                    color={active ? colors.ink : colors.inkFaint}
-                  />
-                  <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{t.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          {!initial ? (
+            <View style={styles.tabs}>
+              {TABS.map((t) => {
+                const active = tab === t.id;
+                return (
+                  <Pressable
+                    key={t.id}
+                    onPress={() => selectTab(t.id)}
+                    style={[styles.tab, active && styles.tabActive]}
+                  >
+                    <MaterialCommunityIcons
+                      name={t.icon}
+                      size={28}
+                      color={active ? colors.ink : colors.inkFaint}
+                    />
+                    <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{t.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
 
           <ScrollView
             ref={scrollRef}
@@ -442,8 +467,11 @@ export function AddNoteSheet({
                       return (
                         <Pressable
                           key={k}
-                          hitSlop={6}
+                          hitSlop={8}
                           onPress={() => setColor(k)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${k} note color`}
+                          accessibilityState={{ selected }}
                           style={[
                             styles.dot,
                             { backgroundColor: p.bg, borderColor: p.edge },
@@ -462,7 +490,12 @@ export function AddNoteSheet({
             {image && tab === 'note' ? (
               <View style={styles.previewWrap}>
                 <Image source={{ uri: image }} style={styles.preview} resizeMode="cover" />
-                <Pressable style={styles.remove} onPress={() => setImage(null)}>
+                <Pressable
+                  style={styles.remove}
+                  onPress={() => setImage(null)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Remove image"
+                >
                   <Text style={styles.removeText}>✕</Text>
                 </Pressable>
               </View>
@@ -472,8 +505,20 @@ export function AddNoteSheet({
               <View>
                 {image ? (
                   <View style={styles.previewWrap}>
-                    <Image source={{ uri: image }} style={styles.preview} resizeMode="cover" />
-                    <Pressable style={styles.remove} onPress={() => setImage(null)}>
+                    <Image
+                      source={{ uri: image }}
+                      style={styles.preview}
+                      resizeMode="cover"
+                      accessible
+                      accessibilityRole="image"
+                      accessibilityLabel="Selected photo preview"
+                    />
+                    <Pressable
+                      style={styles.remove}
+                      onPress={() => setImage(null)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Remove image"
+                    >
                       <Text style={styles.removeText}>✕</Text>
                     </Pressable>
                   </View>
@@ -552,7 +597,12 @@ export function AddNoteSheet({
                           else rowInputRefs.current.delete(row.id);
                         }}
                       />
-                      <Pressable hitSlop={8} onPress={() => removeRow(row.id)}>
+                      <Pressable
+                        hitSlop={8}
+                        onPress={() => removeRow(row.id)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Remove item ${index + 1}`}
+                      >
                         <Text style={styles.rowRemove}>✕</Text>
                       </Pressable>
                     </View>
@@ -585,8 +635,11 @@ export function AddNoteSheet({
                       return (
                         <Pressable
                           key={k}
-                          hitSlop={6}
+                          hitSlop={8}
                           onPress={() => setColor(k)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${k} note color`}
+                          accessibilityState={{ selected }}
                           style={[
                             styles.dot,
                             { backgroundColor: p.bg, borderColor: p.edge },
@@ -853,9 +906,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dot: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 1,
   },
   dotSelected: {
