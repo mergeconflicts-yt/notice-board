@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { colors, fonts } from '../theme';
 import { Button } from '../components/Button';
 import { ScreenHeader } from '../components/ScreenHeader';
-import { getBackend } from '../services';
+import { getBackendV2 } from '../services';
 import { normalizeInviteCode } from '../utils/id';
 
 export default function JoinBoardScreen() {
@@ -19,10 +19,14 @@ export default function JoinBoardScreen() {
     setJoining(true);
     setError(null);
     try {
-      const board = await getBackend().joinBoard(clean);
-      router.replace(`/board/${board.id}`);
-    } catch {
-      setError('Hmm, that code doesn’t match any board.');
+      const boardId = await getBackendV2().acceptInvite(clean);
+      router.replace(`/board/${boardId}`);
+    } catch (e) {
+      setError(
+        e instanceof Error && /fully used/.test(e.message)
+          ? 'That invite has already been fully used.'
+          : 'Hmm, that code doesn’t match any board.',
+      );
       setJoining(false);
     }
   };
@@ -38,7 +42,7 @@ export default function JoinBoardScreen() {
           <Text style={styles.label}>Invite code</Text>
           <TextInput
             style={styles.input}
-            placeholder="FAMILY-27"
+            placeholder="AB12-CD34"
             placeholderTextColor={colors.inkFaint}
             value={code}
             onChangeText={setCode}

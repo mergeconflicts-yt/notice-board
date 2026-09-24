@@ -1,7 +1,6 @@
 -- Notice Board — Supabase schema
--- LEGACY: supabase/migrations/ is now the source of truth (this file's
--- content lives on as 20260923032532_initial_schema.sql). Kept for reference;
--- do not run this against a database managed by the Supabase CLI.
+-- Run this in the Supabase SQL editor once to create the tables, RLS
+-- policies, and realtime publications. Auth uses anonymous sign-ins.
 
 -- ---------------------------------------------------------------------------
 -- Tables

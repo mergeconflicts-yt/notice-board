@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { colors, fonts } from '../theme';
 import { Button } from '../components/Button';
 import { ScreenHeader } from '../components/ScreenHeader';
-import { getBackend } from '../services';
+import { getBackendV2 } from '../services';
 
 export default function CreateBoardScreen() {
   const [name, setName] = useState('');
@@ -17,7 +17,7 @@ export default function CreateBoardScreen() {
     setCreating(true);
     setError(null);
     try {
-      const board = await getBackend().createBoard(name.trim());
+      const board = await getBackendV2().createBoard(name.trim());
       router.replace(`/board/${board.id}`);
     } catch {
       setError('Could not create the board. Please try again.');

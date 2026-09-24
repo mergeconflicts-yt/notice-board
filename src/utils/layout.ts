@@ -26,7 +26,7 @@ const TWO_COL_W = (1 - 2 * TWO_COL_EDGE - TWO_COL_GUTTER) / 2;
 /** Negative: each paper laps a little over the one above it. */
 const TWO_COL_ROW_GAP = -10;
 /** Total tilt spread applied to a note, either direction. */
-const TWO_COL_ROTATION_SPREAD = 14;
+const TWO_COL_ROTATION_SPREAD = 24;
 /** Total horizontal drift applied to a note, so the sides aren't aligned. */
 const TWO_COL_X_JITTER = 0.05;
 

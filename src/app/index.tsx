@@ -6,7 +6,7 @@ import { colors, fonts, noteColors } from '../theme';
 import { Button } from '../components/Button';
 import { IdentitySheet } from '../components/IdentitySheet';
 import { useSession } from '../store/session';
-import { useBoards } from '../hooks/useBoard';
+import { useBoardsV2 } from '../hooks/useBoardV2';
 
 type Deco = { text: string; color: keyof typeof noteColors; top: string; left: string; rotate: string; size: number };
 
@@ -21,7 +21,7 @@ export default function StartScreen() {
   const user = useSession((s) => s.user);
   const status = useSession((s) => s.status);
   const setIdentity = useSession((s) => s.setIdentity);
-  const { boards } = useBoards();
+  const { boards } = useBoardsV2();
   const [identityFor, setIdentityFor] = useState<'create' | 'join' | null>(null);
 
   const startCreate = () => {
@@ -95,7 +95,6 @@ export default function StartScreen() {
                   <Text style={styles.boardRowName} numberOfLines={1}>
                     {b.name}
                   </Text>
-                  <Text style={styles.boardRowCode}>{b.inviteCode}</Text>
                   <Text style={styles.boardRowChevron}>›</Text>
                 </Pressable>
               ))}
@@ -194,12 +193,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.hand.bold,
     fontSize: 22,
     color: colors.ink,
-  },
-  boardRowCode: {
-    fontFamily: fonts.ui.bold,
-    fontSize: 11,
-    letterSpacing: 1,
-    color: colors.inkFaint,
   },
   boardRowChevron: {
     fontSize: 22,

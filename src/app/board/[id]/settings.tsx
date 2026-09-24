@@ -6,15 +6,16 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, fonts, noteColors } from '../../../theme';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { Avatar } from '../../../components/Avatar';
-import { useBoard, useBoards, useMembers } from '../../../hooks/useBoard';
+import { useBoardDetails, useBoardMembers, useBoardsV2 } from '../../../hooks/useBoardV2';
 import { useSession } from '../../../store/session';
+import { getBackendV2 } from '../../../services';
 
 export default function BoardSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const boardId = id as string;
-  const { board, updateName, deleteBoard, leaveBoard } = useBoard(boardId);
-  const { boards } = useBoards();
-  const { members } = useMembers(boardId);
+  const { board, updateName, deleteBoard, leaveBoard } = useBoardDetails(boardId);
+  const { boards } = useBoardsV2();
+  const { members } = useBoardMembers(boardId);
   const user = useSession((s) => s.user);
   const [draftName, setDraftName] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
@@ -43,9 +44,14 @@ export default function BoardSettingsScreen() {
 
   const shareInvite = async () => {
     if (!board) return;
-    await Share.share({
-      message: `Join my board "${board.name}" on Notice Board! Invite code: ${board.inviteCode}`,
-    });
+    try {
+      const { token } = await getBackendV2().createInvite(boardId, {});
+      await Share.share({
+        message: `Join my board "${board.name}" on Notice Board! Invite code: ${token}`,
+      });
+    } catch (e) {
+      console.error('share invite failed', e);
+    }
   };
 
   const confirmLeave = () => {
@@ -63,7 +69,7 @@ export default function BoardSettingsScreen() {
   };
 
   const confirmDelete = () => {
-    Alert.alert('Delete this board?', 'All notes will be permanently removed for everyone.', [
+    Alert.alert('Delete this board?', 'The board and all its notes will be removed for everyone.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete board',
@@ -239,12 +245,12 @@ export default function BoardSettingsScreen() {
                     size={22}
                     color={colors.danger}
                   />
-                  <View>
-                    <Text style={[styles.rowLabel, styles.dangerText]}>Delete board</Text>
-                    <Text style={styles.deleteSub}>
-                      Permanently removes the board for everyone.
-                    </Text>
-                  </View>
+                    <View>
+                      <Text style={[styles.rowLabel, styles.dangerText]}>Delete board</Text>
+                      <Text style={styles.deleteSub}>
+                        Removes the board for everyone.
+                      </Text>
+                    </View>
                 </View>
                 <Text style={styles.chevron}>›</Text>
               </Pressable>

@@ -17,6 +17,8 @@ type Props = {
   showAttribution?: boolean;
   /** Floor for the rendered height, so small papers still fill their slot. */
   minHeight?: number;
+  /** Show every list item instead of trimming to the first few. */
+  showAllItems?: boolean;
   /** When provided (detail screen), list checkboxes become tappable for everyone. */
   onToggleItem?: (index: number) => void;
 };
@@ -80,6 +82,7 @@ export function NotePaper({
   large = false,
   showAttribution = true,
   minHeight,
+  showAllItems = false,
   onToggleItem,
 }: Props) {
   const variant = pinVariantForNote(note);
@@ -162,7 +165,13 @@ export function NotePaper({
       ) : null}
 
       {variant === 'list' ? (
-        <ListBody note={note} large={large} ink={ink} done={done} onToggleItem={onToggleItem} />
+        <ListBody
+          note={note}
+          large={large || showAllItems}
+          ink={ink}
+          done={done}
+          onToggleItem={onToggleItem}
+        />
       ) : variant === 'appointment' ? (
         <View>
           <Text

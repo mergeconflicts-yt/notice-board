@@ -16,7 +16,7 @@ import { colors, fonts } from '../../../theme';
 import { BoardNote } from '../../../components/BoardNote';
 import { Avatar } from '../../../components/Avatar';
 import { AddNoteSheet, NoteSheetInput } from '../../../components/AddNoteSheet';
-import { useBoard, useNotes, useMembers } from '../../../hooks/useBoard';
+import { useBoardDetails, useBoardMembers, useBoardNotes } from '../../../hooks/useBoardV2';
 import { useSession } from '../../../store/session';
 import { useToast } from '../../../store/toast';
 import {
@@ -25,7 +25,6 @@ import {
   TWO_COL_MIN_H,
   computeBoardLayout,
 } from '../../../utils/layout';
-import { getBackend } from '../../../services';
 import { NoteWithAuthor } from '../../../types';
 
 /** Scroll distance below which the viewer counts as "already at the top". */
@@ -39,9 +38,9 @@ export default function BoardScreen() {
   const boardId = id as string;
   const insets = useSafeAreaInsets();
   const { height: windowH } = useWindowDimensions();
-  const { board, loading: boardLoading, missing } = useBoard(boardId);
-  const { notes, loading: notesLoading, addNote, updateNote, deleteNote } = useNotes(boardId);
-  const { members } = useMembers(boardId);
+  const { board, loading: boardLoading, missing } = useBoardDetails(boardId);
+  const { notes, loading: notesLoading, addNote, updateNote, deleteNote } = useBoardNotes(boardId);
+  const { members } = useBoardMembers(boardId);
   const user = useSession((s) => s.user);
   const toastVisible = useToast((s) => s.message !== null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -124,11 +123,9 @@ export default function BoardScreen() {
   const handleAdd = async (input: NoteSheetInput) => {
     setSubmitting(true);
     try {
-      let imageUrl = input.imageUrl;
-      if (imageUrl && !imageUrl.startsWith('http')) {
-        imageUrl = await getBackend().uploadImage(imageUrl);
-      }
-      await addNote({ ...input, imageUrl });
+      // Photos upload straight from the composer input; the hook attaches the
+      // bytes to the new item (no pre-upload step).
+      await addNote({ ...input });
       setSheetOpen(false);
       requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: 0, animated: true }));
     } catch (e) {
