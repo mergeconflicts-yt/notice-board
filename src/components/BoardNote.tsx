@@ -96,7 +96,12 @@ export function BoardNote({
     ]).start();
   }, [animateIn, enter, shake, reduceMotion]);
 
+  // `runOnJS(true)` keeps every callback on the JS thread. Reanimated is
+  // installed (via expo-router), so without it gesture callbacks are
+  // workletized onto the UI thread — where touching navigation or React state
+  // crashes the native app with no JS error.
   const pan = Gesture.Pan()
+    .runOnJS(true)
     .activateAfterLongPress(LIFT_MS)
     // eslint-disable-next-line react-hooks/refs -- gesture callbacks run off-render
     .onStart(() => {
@@ -135,6 +140,7 @@ export function BoardNote({
     });
 
   const tap = Gesture.Tap()
+    .runOnJS(true)
     .maxDuration(LIFT_MS)
     .onBegin(() => {
       Animated.timing(press, { toValue: 1, duration: 90, useNativeDriver: false }).start();
