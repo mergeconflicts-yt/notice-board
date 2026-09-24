@@ -8,6 +8,9 @@
 grant usage on schema public to service_role;
 
 grant execute on function public.expired_for_purge(integer) to service_role;
+grant execute on function public.photo_paths_in_use() to service_role;
+grant execute on function public.purge_items(uuid[]) to service_role;
+grant execute on function public.purge_boards() to service_role;
 
 grant select, delete on public.items to service_role;
 grant select on public.board_members to service_role;

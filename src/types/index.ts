@@ -15,6 +15,8 @@ export type User = {
   displayName: string;
   avatarPath: string | null;
   createdAt: string;
+  /** True for an anonymous (not-yet-linked) account. */
+  isAnonymous?: boolean;
 };
 
 export type Board = {

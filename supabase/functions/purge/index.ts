@@ -1,20 +1,29 @@
 // Edge Function: purge (docs/plan.md §10). Service-role only (invoked by
 // pg_cron via pg_net). Nightly, it:
 //   1. hard-deletes items soft-deleted > 30 days ago (and their photos);
-//   2. sweeps orphan photo files older than 24h;
-//   3. hard-deletes boards soft-deleted > 30 days ago (cascade);
+//   2. hard-deletes boards soft-deleted > 30 days ago (cascade);
+//   3. sweeps orphan photo files older than 24h;
 //   4. deletes avatars belonging to accounts that no longer exist.
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 
 const PHOTOS = 'board-photos';
 const AVATARS = 'avatars';
-const RETENTION_DAYS = 30;
 const ORPHAN_HOURS = 24;
 const BATCH = 1000;
+const CHUNK = 100; // per storage/`in()` request, to stay within URL/body limits
 
-/** Every object path in a bucket, recursing through folders. */
-async function listAll(admin: SupabaseClient, bucket: string, prefix = ''): Promise<string[]> {
-  const out: string[] = [];
+type Obj = { path: string; createdAt: number };
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+/** Every object in a bucket, recursing folders; carries created_at so callers
+ *  don't need a second List() per file. */
+async function listAll(admin: SupabaseClient, bucket: string, prefix = ''): Promise<Obj[]> {
+  const out: Obj[] = [];
   let offset = 0;
   for (;;) {
     const { data, error } = await admin.storage.from(bucket).list(prefix, { limit: 100, offset });
@@ -22,13 +31,34 @@ async function listAll(admin: SupabaseClient, bucket: string, prefix = ''): Prom
     if (!data || data.length === 0) break;
     for (const entry of data) {
       const path = prefix ? `${prefix}/${entry.name}` : entry.name;
-      if (entry.id == null) out.push(...(await listAll(admin, bucket, path)));
-      else out.push(path);
+      if (entry.id == null) {
+        out.push(...(await listAll(admin, bucket, path)));
+      } else {
+        out.push({ path, createdAt: entry.created_at ? Date.parse(entry.created_at) : Date.now() });
+      }
     }
     if (data.length < 100) break;
     offset += data.length;
   }
   return out;
+}
+
+/** Remove storage objects in chunks; throw on the first failure (never
+ *  proceed as if it worked). */
+async function removeObjects(admin: SupabaseClient, bucket: string, paths: string[]): Promise<number> {
+  let removed = 0;
+  for (const part of chunk(paths, CHUNK)) {
+    const { error } = await admin.storage.from(bucket).remove(part);
+    if (error) throw new Error(`storage remove failed (${bucket}): ${error.message}`);
+    removed += part.length;
+  }
+  return removed;
+}
+
+async function requireCount(query: PromiseLike<{ count: number | null; error: unknown }>): Promise<number> {
+  const { count, error } = await query;
+  if (error || count == null) throw new Error('count query failed');
+  return count;
 }
 
 Deno.serve(async (req: Request) => {
@@ -40,75 +70,64 @@ Deno.serve(async (req: Request) => {
   }
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, serviceKey);
-  const cutoff = new Date(Date.now() - RETENTION_DAYS * 864e5).toISOString();
 
-  // --- 1. Purge expired items (batched) ---------------------------------
-  let purged = 0;
-  for (let batch = 0; batch < 50; batch++) {
-    const { data: stale, error } = await admin.rpc('expired_for_purge', { p_limit: BATCH });
-    if (error) return new Response(`expired_for_purge failed: ${error.message}`, { status: 500 });
-    if (!stale || stale.length === 0) break;
-    const paths = stale.map((i) => i.photo_path).filter((p): p is string => !!p);
-    if (paths.length > 0) {
-      const { error: rmError } = await admin.storage.from(PHOTOS).remove(paths);
-      if (rmError) return new Response(`storage remove failed: ${rmError.message}`, { status: 500 });
+  try {
+    // --- 1. Purge expired items (batched) -------------------------------
+    let purged = 0;
+    for (let batch = 0; batch < 50; batch++) {
+      const { data: stale, error } = await admin.rpc('expired_for_purge', { p_limit: BATCH });
+      if (error) throw new Error(`expired_for_purge failed: ${error.message}`);
+      if (!stale || stale.length === 0) break;
+      const paths = stale.map((i) => i.photo_path).filter((p): p is string => !!p);
+      if (paths.length > 0) await removeObjects(admin, PHOTOS, paths);
+      const { error: delError } = await admin.rpc('purge_items', {
+        p_ids: stale.map((i) => i.id),
+      });
+      if (delError) throw new Error(`purge_items failed: ${delError.message}`);
+      purged += stale.length;
+      if (stale.length < BATCH) break;
     }
-    const { error: delError } = await admin.from('items').delete().in('id', stale.map((i) => i.id));
-    if (delError) return new Response(`item delete failed: ${delError.message}`, { status: 500 });
-    purged += stale.length;
-    if (stale.length < BATCH) break;
-  }
 
-  // --- 2. Orphan photos: one query for all in-use paths, one pass over the
-  //        bucket. Never sign/remove based on a per-file count. ----------
-  const used = new Set<string>();
-  for (let from = 0; ; from += BATCH) {
-    const { data, error } = await admin
-      .from('items')
-      .select('photo_path')
-      .not('photo_path', 'is', null)
-      .range(from, from + BATCH - 1);
-    if (error) return new Response(`items read failed: ${error.message}`, { status: 500 });
-    for (const row of data ?? []) if (row.photo_path) used.add(row.photo_path);
-    if (!data || data.length < BATCH) break;
-  }
-  let orphans = 0;
-  const orphanCutoff = Date.now() - ORPHAN_HOURS * 3600 * 1000;
-  const toRemove: string[] = [];
-  for (const path of await listAll(admin, PHOTOS)) {
-    if (used.has(path)) continue;
-    const dir = path.split('/').slice(0, -1).join('/');
-    const name = path.split('/').pop()!;
-    const { data: info, error } = await admin.storage.from(PHOTOS).list(dir, { search: name, limit: 1 });
-    if (error) continue; // don't delete on uncertainty
-    const created = info?.[0]?.created_at ? new Date(info[0].created_at).getTime() : Date.now();
-    if (created <= orphanCutoff) toRemove.push(path);
-  }
-  if (toRemove.length > 0) {
-    const { error } = await admin.storage.from(PHOTOS).remove(toRemove);
-    if (!error) orphans = toRemove.length;
-  }
+    // --- 2. Boards soft-deleted > 30 days ago, with no items left -------
+    const { data: boardsDeleted, error: boardError } = await admin.rpc('purge_boards');
+    if (boardError) throw new Error(`purge_boards failed: ${boardError.message}`);
 
-  // --- 3. Boards soft-deleted beyond the window (cascades to content) ---
-  const { error: boardError } = await admin.from('boards').delete().lt('deleted_at', cutoff);
-  if (boardError) return new Response(`board delete failed: ${boardError.message}`, { status: 500 });
+    // --- 3. Orphan photos ------------------------------------------------
+    // One call for every in-use path; abort if it doesn't match the exact
+    // count (a truncated list would delete live photos).
+    const { data: inUse, error: inUseError } = await admin.rpc('photo_paths_in_use');
+    if (inUseError) throw new Error(`photo_paths_in_use failed: ${inUseError.message}`);
+    const exact = await requireCount(
+      admin.from('items').select('id', { count: 'exact', head: true }).not('photo_path', 'is', null),
+    );
+    if ((inUse ?? []).length !== exact) {
+      throw new Error(`in-use path count mismatch (${(inUse ?? []).length} vs ${exact})`);
+    }
+    const used = new Set<string>(inUse ?? []);
+    const orphanCutoff = Date.now() - ORPHAN_HOURS * 3600 * 1000;
+    const toRemove = (await listAll(admin, PHOTOS))
+      .filter((o) => !used.has(o.path) && o.createdAt <= orphanCutoff)
+      .map((o) => o.path);
+    const orphans = toRemove.length > 0 ? await removeObjects(admin, PHOTOS, toRemove) : 0;
 
-  // --- 4. Avatars of accounts that no longer exist ---------------------
-  let avatars = 0;
-  const avatarPaths = await listAll(admin, AVATARS);
-  const folders = new Set(avatarPaths.map((p) => p.split('/')[0]).filter(Boolean));
-  for (const userId of folders) {
-    const { count, error } = await admin
-      .from('profiles')
-      .select('id', { count: 'exact', head: true })
-      .eq('id', userId);
-    if (error) continue; // don't delete on uncertainty
-    if (count && count > 0) continue;
-    const owned = avatarPaths.filter((p) => p.startsWith(`${userId}/`));
-    if (owned.length === 0) continue;
-    const { error: rmError } = await admin.storage.from(AVATARS).remove(owned);
-    if (!rmError) avatars += owned.length;
+    // --- 4. Avatars of accounts that no longer exist ---------------------
+    const avatarObjects = await listAll(admin, AVATARS);
+    const folders = [...new Set(avatarObjects.map((o) => o.path.split('/')[0]).filter(Boolean))];
+    let avatars = 0;
+    for (const part of chunk(folders, CHUNK)) {
+      const { data: existing, error } = await admin.from('profiles').select('id').in('id', part);
+      if (error) throw new Error(`profiles read failed: ${error.message}`);
+      const alive = new Set((existing ?? []).map((p) => p.id));
+      const gone = part.filter((id) => !alive.has(id));
+      if (gone.length === 0) continue;
+      const owned = avatarObjects
+        .filter((o) => gone.includes(o.path.split('/')[0]))
+        .map((o) => o.path);
+      if (owned.length > 0) avatars += await removeObjects(admin, AVATARS, owned);
+    }
+
+    return Response.json({ purged, boards: boardsDeleted ?? 0, orphans, avatars });
+  } catch (e) {
+    return new Response(e instanceof Error ? e.message : String(e), { status: 500 });
   }
-
-  return Response.json({ purged, orphans, avatars });
 });

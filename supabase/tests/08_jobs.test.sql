@@ -1,6 +1,6 @@
 -- Phase 6: maintenance jobs (expire + rate-limit cleanup) and their schedule.
 begin;
-select plan(10);
+select plan(15);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000071', 'authenticated', 'authenticated');
@@ -63,6 +63,35 @@ select is(
   (select count(*)::integer from public.expired_for_purge()
    where id = 'c0000000-0000-0000-0000-000000000075'),
   1, 'items on a long-deleted board are purge candidates');
+
+-- Purge RPCs.
+insert into public.items (id, board_id, type, body, photo_path, created_by)
+values ('c0000000-0000-0000-0000-000000000076', 'b0000000-0000-0000-0000-000000000071',
+        'photo', 'p', 'b0000000-0000-0000-0000-000000000071/c0000000-0000-0000-0000-000000000076/x.jpg',
+        'a0000000-0000-0000-0000-000000000071');
+select ok(
+  'b0000000-0000-0000-0000-000000000071/c0000000-0000-0000-0000-000000000076/x.jpg'
+    = any(public.photo_paths_in_use()),
+  'photo_paths_in_use lists an in-use path');
+select is(
+  public.purge_items(array['c0000000-0000-0000-0000-000000000076']::uuid[]),
+  1, 'purge_items deletes the batch');
+select is(
+  (select count(*)::integer from public.items where id = 'c0000000-0000-0000-0000-000000000076'),
+  0, 'purged item is gone');
+
+-- purge_boards: only boards with no items left.
+insert into public.boards (id, name, created_by, deleted_at) values
+  ('b0000000-0000-0000-0000-000000000073', 'NoItems', 'a0000000-0000-0000-0000-000000000071', now() - interval '31 days'),
+  ('b0000000-0000-0000-0000-000000000074', 'HasItems', 'a0000000-0000-0000-0000-000000000071', now() - interval '31 days');
+insert into public.items (id, board_id, type, body, created_by)
+values ('c0000000-0000-0000-0000-000000000077', 'b0000000-0000-0000-0000-000000000074',
+        'note', 'x', 'a0000000-0000-0000-0000-000000000071');
+select is(public.purge_boards(), 1, 'purge_boards deletes the itemless deleted board');
+select ok(
+  (select count(*)::integer from public.boards
+   where id in ('b0000000-0000-0000-0000-000000000073', 'b0000000-0000-0000-0000-000000000074')) = 1,
+  'a deleted board that still has items is kept');
 
 -- Schedule present.
 select is(

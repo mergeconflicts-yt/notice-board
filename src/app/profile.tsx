@@ -8,11 +8,13 @@ import { ScreenHeader } from '../components/ScreenHeader';
 import { Avatar } from '../components/Avatar';
 import { useSession } from '../store/session';
 import { useToast } from '../store/toast';
-import { deleteAccount, friendlyMessage, linkEmail, linkProvider } from '../lib/api';
+import { AuthCancelledError, friendlyMessage, linkEmail, linkProvider } from '../lib/api';
 
 export default function ProfileScreen() {
   const user = useSession((s) => s.user);
   const setDisplayName = useSession((s) => s.setDisplayName);
+  const deleteAccount = useSession((s) => s.deleteAccount);
+  const init = useSession((s) => s.init);
   const [name, setName] = useState(user?.displayName ?? '');
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
@@ -32,9 +34,13 @@ export default function ProfileScreen() {
 
   const link = async (provider: 'apple' | 'google') => {
     try {
+      // linkProvider verifies the session with getUser() before resolving.
       await linkProvider(provider);
+      await init();
+      useToast.getState().show('Account saved');
     } catch (e) {
-      useToast.getState().show(friendlyMessage(e));
+      // A dismissed browser isn't an error.
+      if (!(e instanceof AuthCancelledError)) useToast.getState().show(friendlyMessage(e));
     }
   };
 
@@ -61,9 +67,9 @@ export default function ProfileScreen() {
           onPress: async () => {
             try {
               await deleteAccount();
-              // deleteAccount signs out; start a fresh anonymous session so
-              // the app isn't left as the deleted user.
-              await useSession.getState().init();
+              // The account is gone; start a fresh anonymous session so the app
+              // isn't left as the deleted user.
+              await init();
               router.replace('/');
             } catch (e) {
               useToast.getState().show(friendlyMessage(e));

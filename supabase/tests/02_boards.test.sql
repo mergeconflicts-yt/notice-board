@@ -1,7 +1,7 @@
 -- Phase 1d: board RPCs — roles, validation, ownership transfer, cleanup.
 -- Roles: O owner, M member, S stranger, R rate-limit probe.
 begin;
-select plan(45);
+select plan(47);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000011', 'authenticated', 'authenticated'),
@@ -193,8 +193,18 @@ select throws_ok(
   $$select public.remove_member((select id from t_b4), 'a0000000-0000-0000-0000-000000000011')$$,
   'P0001', 'invalid_input', 'cannot remove yourself');
 select lives_ok(
+  $$select public.get_invite_link((select id from t_b4))$$,
+  'invite issued before removing the member');
+select lives_ok(
   $$select public.remove_member((select id from t_b4), 'a0000000-0000-0000-0000-000000000012')$$,
   'owner removes member');
+reset role;
+select is(
+  (select count(*)::integer from public.invites
+   where board_id = (select id from t_b4) and revoked_at is not null),
+  1, 'removing a member revokes the active invite');
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000011', true);
+set role authenticated;
 select is(
   (select count(*)::integer from public.board_members where board_id = (select id from t_b4)),
   1, 'target membership gone');

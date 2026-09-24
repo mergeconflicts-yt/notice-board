@@ -29,6 +29,8 @@ export default function RootLayout() {
   // Refresh the session token while foregrounded; pause while backgrounded so
   // it doesn't burn battery or fail offline.
   useEffect(() => {
+    // If launched in the background, don't run the refresh timer until active.
+    if (AppState.currentState !== 'active') void supabase.auth.stopAutoRefresh();
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') void supabase.auth.startAutoRefresh();
       else void supabase.auth.stopAutoRefresh();

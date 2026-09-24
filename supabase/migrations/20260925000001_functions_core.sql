@@ -303,6 +303,10 @@ begin
   where board_id = p_board_id and user_id = p_user_id;
   -- The caller stays, so the board never empties here; just keep an owner.
   perform public.promote_longest_member(p_board_id);
+  -- Revoke the active invite so a removed member can't rejoin with the old link.
+  update public.invites
+  set revoked_at = now()
+  where board_id = p_board_id and revoked_at is null;
 end;
 $$;
 

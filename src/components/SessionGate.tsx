@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router, usePathname } from 'expo-router';
 import { colors, fonts } from '../theme';
 import { Button } from './Button';
 import { Turnstile } from './Turnstile';
@@ -15,15 +16,25 @@ import { useSession } from '../store/session';
 export function SessionGate() {
   const status = useSession((s) => s.status);
   const error = useSession((s) => s.error);
+  const user = useSession((s) => s.user);
   const init = useSession((s) => s.init);
   const signOut = useSession((s) => s.signOut);
+  const startFresh = useSession((s) => s.startFresh);
+  const pathname = usePathname();
 
-  if (status === 'ready') return null;
+  // The overlay must not cover the screens that resolve it.
+  const exempt = pathname === '/sign-in' || pathname === '/auth';
+  if (status === 'ready' || exempt) return null;
 
   const confirmSignOut = () => {
+    // Wording depends on whether signing out loses boards (anonymous) or just
+    // ends the session (linked).
+    const anonymous = user?.isAnonymous ?? true;
     Alert.alert(
       'Sign out?',
-      'You’ll lose this account and every board you’re on. This can’t be undone.',
+      anonymous
+        ? 'You’ll lose this account and every board you’re on. This can’t be undone.'
+        : 'You’ll be signed out. Sign back in to get your boards again.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -31,6 +42,17 @@ export function SessionGate() {
           style: 'destructive',
           onPress: () => void signOut().then(() => init()),
         },
+      ],
+    );
+  };
+
+  const confirmStartFresh = () => {
+    Alert.alert(
+      'Start fresh?',
+      'You won’t be able to get the old account’s boards back. This can’t be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Start fresh', style: 'destructive', onPress: () => void startFresh() },
       ],
     );
   };
@@ -49,12 +71,15 @@ export function SessionGate() {
     );
   }
 
-  if (status === 'expired') {
+  if (status === 'signedout') {
     return (
       <SafeAreaView style={[styles.overlay, styles.center]}>
-        <Text style={styles.title}>Session expired</Text>
-        <Text style={styles.sub}>{error ?? 'Please sign out and start again.'}</Text>
-        <Button label="Sign out" onPress={confirmSignOut} style={styles.btn} />
+        <Text style={styles.title}>Sign in to restore your boards</Text>
+        <Text style={styles.sub}>
+          {error ?? 'This device was signed in before. Sign in to get your boards back.'}
+        </Text>
+        <Button label="Sign in" onPress={() => router.push('/sign-in')} style={styles.btn} />
+        <Button label="Start fresh" variant="soft" onPress={confirmStartFresh} style={styles.btn} />
       </SafeAreaView>
     );
   }
@@ -65,6 +90,7 @@ export function SessionGate() {
         <Text style={styles.title}>Can’t reach the board</Text>
         <Text style={styles.sub}>{error ?? 'Check your connection and try again.'}</Text>
         <Button label="Retry" onPress={() => void init()} style={styles.btn} />
+        <Button label="Sign in" variant="soft" onPress={() => router.push('/sign-in')} style={styles.btn} />
         <Button label="Sign out" variant="soft" onPress={confirmSignOut} style={styles.btn} />
       </SafeAreaView>
     );

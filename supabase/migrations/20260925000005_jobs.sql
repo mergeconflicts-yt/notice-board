@@ -48,6 +48,51 @@ set search_path = '' as $$
   limit p_limit;
 $$;
 
+-- Every photo path currently referenced by an item (one call, no paging).
+create function public.photo_paths_in_use()
+returns text[]
+language sql
+security definer
+set search_path = '' as $$
+  select coalesce(array_agg(photo_path), '{}')
+  from public.items
+  where photo_path is not null;
+$$;
+
+-- Hard-delete a batch of items (ids passed in the POST body, not the URL).
+create function public.purge_items(p_ids uuid[])
+returns integer
+language plpgsql
+security definer
+set search_path = '' as $$
+declare
+  v_deleted integer;
+begin
+  delete from public.items where id = any(p_ids);
+  get diagnostics v_deleted = row_count;
+  return v_deleted;
+end;
+$$;
+
+-- Hard-delete boards soft-deleted > 30 days ago that have no items left (so
+-- no photo can be orphaned by clock skew).
+create function public.purge_boards()
+returns integer
+language plpgsql
+security definer
+set search_path = '' as $$
+declare
+  v_deleted integer;
+begin
+  delete from public.boards b
+  where b.deleted_at is not null
+    and b.deleted_at < now() - interval '30 days'
+    and not exists (select 1 from public.items i where i.board_id = b.id);
+  get diagnostics v_deleted = row_count;
+  return v_deleted;
+end;
+$$;
+
 -- Clear rate-limit windows older than two hours.
 create function public.cleanup_rate_limits()
 returns integer

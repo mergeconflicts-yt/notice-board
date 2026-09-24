@@ -111,4 +111,19 @@ implemented slightly differently. Appended as work proceeds.
 19. **`board_members` removed from Realtime.** Supabase does not apply RLS to
     DELETE events, so publishing the table leaked who left any board to every
     subscriber. The member list refreshes on focus/foreground instead.
+20. **Persistent identity marker (`notice.lastUserId`).** Supabase's auth
+    library can delete the stored session on a failed refresh — before `init()`,
+    or while the app is open (the `SIGNED_OUT` event) — and Android backup
+    restore can restore the ciphertext without the keychain key. Any of these
+    used to look like "no session" and silently mint a new anonymous user
+    (losing every board). Now the user id is persisted on every session save
+    and cleared only by explicit Sign out / Delete account. `init()` with no
+    session but a marker enters a new `signedout` state ("Sign in to restore
+    your boards" + a separate "Start fresh"), and the store subscribes once to
+    `onAuthStateChange` so a non-app-initiated `SIGNED_OUT` does the same.
+    429/5xx refresh failures are treated as retryable (offline), not expired.
+21. **`remove_member` revokes the active invite.** The plan didn't say so, but
+    without it a removed member could rejoin with the still-valid link. The
+    optional `board_removals` allow/deny table was **not** added; revoking the
+    invite is the whole fix here.
 

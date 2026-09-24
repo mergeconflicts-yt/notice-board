@@ -25,6 +25,9 @@ revoke execute on function public.expire_items() from public, anon, authenticate
 revoke execute on function public.cleanup_rate_limits() from public, anon, authenticated;
 revoke execute on function public.run_edge_job(text) from public, anon, authenticated;
 revoke execute on function public.expired_for_purge(integer) from public, anon, authenticated;
+revoke execute on function public.photo_paths_in_use() from public, anon, authenticated;
+revoke execute on function public.purge_items(uuid[]) from public, anon, authenticated;
+revoke execute on function public.purge_boards() from public, anon, authenticated;
 revoke execute on function public.default_keep_until(item_type, timestamptz, boolean, timestamptz, text) from public, anon, authenticated;
 
 -- Policy helpers: authenticated only (they run inside RLS/storage policies).

@@ -44,6 +44,14 @@ export class ApiError extends Error {
   }
 }
 
+/** Thrown when the user dismisses the auth browser. Callers should ignore it. */
+export class AuthCancelledError extends Error {
+  constructor() {
+    super('auth_cancelled');
+    this.name = 'AuthCancelledError';
+  }
+}
+
 const CODES: ApiErrorCode[] = [
   'not_authenticated',
   'not_member',
@@ -65,6 +73,16 @@ function classify(message: string | undefined): ApiErrorCode | 'unknown' {
 export function friendlyMessage(error: unknown): string {
   if (!(error instanceof ApiError)) {
     return 'Something went wrong. Please try again.';
+  }
+  // Auth-server errors arrive as unknown codes; give a couple of useful ones
+  // plain-English copy instead of the generic message.
+  if (error.code === 'unknown') {
+    if (/identity_already_exists/i.test(error.message)) {
+      return 'That sign-in is already linked to another account.';
+    }
+    if (/signups? not allowed|user not found|otp_disabled|no user/i.test(error.message)) {
+      return 'No account found for that email.';
+    }
   }
   switch (error.code) {
     case 'not_authenticated':
@@ -513,7 +531,8 @@ type OAuthProvider = 'apple' | 'google';
 
 /** Shared native OAuth flow for `linkIdentity` / `signInWithOAuth`. In RN the
  *  call returns the provider URL instead of redirecting, so we open it in an
- *  auth session and exchange the returned code. */
+ *  auth session and exchange the returned code. Throws `AuthCancelledError`
+ *  when the user dismisses the browser; raises the provider error otherwise. */
 async function oauthFlow(mode: 'link' | 'signin', provider: OAuthProvider): Promise<void> {
   const redirectTo = Linking.createURL('auth');
   const options = { redirectTo, skipBrowserRedirect: true };
@@ -524,13 +543,22 @@ async function oauthFlow(mode: 'link' | 'signin', provider: OAuthProvider): Prom
   if (error) raise(error);
   if (!data?.url) return;
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-  if (result.type === 'success' && result.url) {
-    const code = new URL(result.url).searchParams.get('code');
-    if (code) {
-      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-      if (exchangeError) raise(exchangeError);
-    }
+  if (result.type !== 'success' || !result.url) throw new AuthCancelledError();
+  const url = new URL(result.url);
+  const providerError =
+    url.searchParams.get('error_description') || url.searchParams.get('error');
+  if (providerError) raise({ message: providerError });
+  const code = url.searchParams.get('code');
+  if (code) {
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+    if (exchangeError) raise(exchangeError);
   }
+  // Confirm the change actually took effect before reporting success.
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError || !user) raise({ message: userError?.message ?? 'not_authenticated' });
 }
 
 /** Add a sign-in method to the current (anonymous) account. */
@@ -548,11 +576,16 @@ export async function linkEmail(email: string): Promise<void> {
   if (error) raise(error);
 }
 
-/** Email magic-link sign-in to an existing account. */
-export async function signInEmail(email: string): Promise<void> {
+/** Email magic-link sign-in to an existing account. Never creates an account
+ *  (a typo must not spawn an empty one). Production captcha is passed through. */
+export async function signInEmail(email: string, captchaToken?: string): Promise<void> {
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: Linking.createURL('auth') },
+    options: {
+      shouldCreateUser: false,
+      emailRedirectTo: Linking.createURL('auth'),
+      captchaToken,
+    },
   });
   if (error) raise(error);
 }

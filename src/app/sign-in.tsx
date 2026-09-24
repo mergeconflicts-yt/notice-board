@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Platform,
   KeyboardAvoidingView,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -14,19 +15,27 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, fonts } from '../theme';
 import { Button } from '../components/Button';
 import { ScreenHeader } from '../components/ScreenHeader';
-import { friendlyMessage, signInEmail, signInProvider } from '../lib/api';
+import { Turnstile } from '../components/Turnstile';
+import { turnstileSiteKey } from '../lib/supabase';
+import { AuthCancelledError, friendlyMessage, signInEmail, signInProvider } from '../lib/api';
 import { useSession } from '../store/session';
+import { useMyBoards } from '../hooks/useBoards';
 
 /**
  * Restore an existing account (e.g. on a new phone). Signing in replaces the
  * anonymous session, so the boards saved under the account come back.
  */
 export default function SignInScreen() {
+  const user = useSession((s) => s.user);
   const init = useSession((s) => s.init);
+  const { boards } = useMyBoards();
   const [email, setEmail] = useState('');
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+
+  const captchaNeeded = Boolean(turnstileSiteKey) && !captchaToken;
 
   const finish = async () => {
     // The auth session changed underneath; reload the profile.
@@ -41,24 +50,42 @@ export default function SignInScreen() {
       await signInProvider(provider);
       await finish();
     } catch (e) {
-      setError(friendlyMessage(e));
+      if (!(e instanceof AuthCancelledError)) setError(friendlyMessage(e));
     } finally {
       setBusy(false);
     }
   };
 
   const withEmail = async () => {
-    if (!email.trim()) return;
+    if (!email.trim() || captchaNeeded) return;
     setBusy(true);
     setError(null);
     try {
-      await signInEmail(email.trim());
+      await signInEmail(email.trim(), captchaToken ?? undefined);
       setSent(true);
     } catch (e) {
-      setError(friendlyMessage(e));
+      if (!(e instanceof AuthCancelledError)) setError(friendlyMessage(e));
     } finally {
       setBusy(false);
     }
+  };
+
+  // Signing in abandons this phone's anonymous identity, so warn first if it
+  // already has boards (which signing in will NOT move).
+  const guard = (proceed: () => void) => {
+    if (user?.isAnonymous && boards.length > 0) {
+      Alert.alert(
+        'Boards on this phone will be lost',
+        'Boards you made here belong to this phone’s identity, and signing in won’t move them. Save this account instead to keep them.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Save account instead', onPress: () => router.push('/profile') },
+          { text: 'Sign in anyway', style: 'destructive', onPress: proceed },
+        ],
+      );
+      return;
+    }
+    proceed();
   };
 
   return (
@@ -66,15 +93,23 @@ export default function SignInScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScreenHeader title="Sign in" />
         <View style={styles.body}>
-          <Text style={styles.lead}>Welcome back. Sign in to bring your boards to this device.</Text>
+          <Text style={styles.lead}>Welcome back. Sign in to bring your account’s boards to this device.</Text>
 
           {Platform.OS === 'ios' ? (
-            <Pressable style={styles.linkBtn} onPress={() => withProvider('apple')} disabled={busy}>
+            <Pressable
+              style={styles.linkBtn}
+              onPress={() => guard(() => withProvider('apple'))}
+              disabled={busy}
+            >
               <MaterialCommunityIcons name="apple" size={20} color={colors.ink} />
               <Text style={styles.linkText}>Continue with Apple</Text>
             </Pressable>
           ) : null}
-          <Pressable style={styles.linkBtn} onPress={() => withProvider('google')} disabled={busy}>
+          <Pressable
+            style={styles.linkBtn}
+            onPress={() => guard(() => withProvider('google'))}
+            disabled={busy}
+          >
             <MaterialCommunityIcons name="google" size={20} color={colors.ink} />
             <Text style={styles.linkText}>Continue with Google</Text>
           </Pressable>
@@ -85,6 +120,15 @@ export default function SignInScreen() {
             <Text style={styles.sent}>Check your email for a sign-in link.</Text>
           ) : (
             <>
+              {captchaNeeded ? (
+                <View style={styles.captcha}>
+                  <Turnstile
+                    siteKey={turnstileSiteKey!}
+                    onToken={setCaptchaToken}
+                    onError={() => setCaptchaToken(null)}
+                  />
+                </View>
+              ) : null}
               <TextInput
                 style={styles.input}
                 value={email}
@@ -98,8 +142,8 @@ export default function SignInScreen() {
               <Button
                 label={busy ? 'Sending…' : 'Email me a link'}
                 variant="soft"
-                onPress={withEmail}
-                disabled={!email.trim() || busy}
+                onPress={() => guard(withEmail)}
+                disabled={!email.trim() || busy || captchaNeeded}
                 style={styles.emailBtn}
               />
             </>
@@ -107,7 +151,8 @@ export default function SignInScreen() {
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <Text style={styles.hint}>
-            Your boards stay on the same account — nothing moves.
+            Only an existing account can sign in here. Boards made on this phone stay with this
+            phone’s identity — use “Save your account” on the You screen to keep them.
           </Text>
         </View>
       </KeyboardAvoidingView>
@@ -145,6 +190,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginVertical: 10,
   },
+  captcha: { marginBottom: 10 },
   input: {
     height: 52,
     backgroundColor: colors.surface,

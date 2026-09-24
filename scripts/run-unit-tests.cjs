@@ -11,6 +11,7 @@ const out = fs.mkdtempSync(path.join(os.tmpdir(), 'notice-unit-'));
 try {
   execSync(
     'npx tsc src/utils/layout.ts src/utils/note.ts src/utils/id.ts src/utils/invite.ts ' +
+      'src/lib/sessionCrypto.ts ' +
       'src/types/index.ts src/theme/index.ts src/theme/colors.ts src/theme/fonts.ts ' +
       '--ignoreConfig --outDir ' + JSON.stringify(out) +
       ' --module commonjs --target es2019 --moduleResolution node --ignoreDeprecations 6.0 ' +
@@ -33,7 +34,9 @@ if (files.length === 0) {
 }
 const res = spawnSync(process.execPath, ['--test', ...files], {
   cwd: root,
-  env: { ...process.env, TEST_BUILD: out },
+  // NODE_PATH lets the compiled modules (e.g. sessionCrypto → aes-js) resolve
+  // dependencies from the repo's node_modules.
+  env: { ...process.env, TEST_BUILD: out, NODE_PATH: path.join(root, 'node_modules') },
   stdio: 'inherit',
 });
 fs.rmSync(out, { recursive: true, force: true });

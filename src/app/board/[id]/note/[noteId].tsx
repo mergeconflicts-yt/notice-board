@@ -8,6 +8,7 @@ import { NotePaper } from '../../../../components/NotePaper';
 import { AddNoteSheet, NoteDraft } from '../../../../components/AddNoteSheet';
 import { useBoard } from '../../../../hooks/useBoard';
 import { useSession } from '../../../../store/session';
+import { ListEntry } from '../../../../types';
 import { useToast } from '../../../../store/toast';
 import { editEntry, friendlyMessage, removeEntry, signedPhotoUrl } from '../../../../lib/api';
 import { keepUntilLabel } from '../../../../utils/note';
@@ -23,6 +24,9 @@ export default function ItemDetailScreen() {
   const me = useSession((s) => s.user);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Entries as they were when the editor opened — reconcile against these, not
+  // the live list (other members may have added rows since).
+  const [editSnapshot, setEditSnapshot] = useState<ListEntry[] | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const { width: screenW, height: screenH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -70,17 +74,20 @@ export default function ItemDetailScreen() {
         color: draft.color,
       });
       if (item.type === 'list') {
-        // Reconcile the checklist: add, edit and remove entries to match.
+        // Reconcile against the snapshot (not the live list): only rows the
+        // editor actually knew about are added/edited/removed.
+        const base = editSnapshot ?? itemEntries;
         const draftIds = new Set(draft.entries.map((r) => r.id));
         for (const row of draft.entries) {
-          const existing = itemEntries.find((e) => e.id === row.id);
+          const existing = base.find((e) => e.id === row.id);
           if (!existing) await addListEntry(item.id, row.text);
           else if (existing.text !== row.text) await editEntry(row.id, row.text);
         }
-        for (const entry of itemEntries) {
+        for (const entry of base) {
           if (!draftIds.has(entry.id)) await removeEntry(entry.id);
         }
       }
+      setEditSnapshot(null);
       setEditing(false);
     } catch (e) {
       useToast.getState().show(friendlyMessage(e));
@@ -145,7 +152,15 @@ export default function ItemDetailScreen() {
           {!item.pinned && item.type !== 'list' ? (
             <Action label="Keep longer" onPress={() => keepLonger(item)} />
           ) : null}
-          {isCreator ? <Action label="Edit" onPress={() => setEditing(true)} /> : null}
+          {isCreator ? (
+            <Action
+              label="Edit"
+              onPress={() => {
+                setEditSnapshot(itemEntries);
+                setEditing(true);
+              }}
+            />
+          ) : null}
           <Action label="Remove" destructive onPress={handleRemove} />
         </View>
       </View>
@@ -155,8 +170,11 @@ export default function ItemDetailScreen() {
         submitting={saving}
         submitLabel="Save"
         initial={item}
-        entries={itemEntries.map((e) => ({ id: e.id, text: e.text }))}
-        onClose={() => setEditing(false)}
+        entries={(editSnapshot ?? itemEntries).map((e) => ({ id: e.id, text: e.text }))}
+        onClose={() => {
+          setEditing(false);
+          setEditSnapshot(null);
+        }}
         onSubmit={handleEdit}
       />
     </Pressable>
