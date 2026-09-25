@@ -17,6 +17,7 @@ import { BoardSection } from '../../../components/BoardSection';
 import { PinnedStrip } from '../../../components/PinnedStrip';
 import { MemberDot } from '../../../components/MemberDot';
 import { AddNoteSheet, NoteDraft } from '../../../components/AddNoteSheet';
+import { BoardSwitcher } from '../../../components/BoardSwitcher';
 import { useBoard, randomId } from '../../../hooks/useBoard';
 import { useToast } from '../../../store/toast';
 import { friendlyMessage, keepLonger as apiKeepLonger, signedPhotoUrl, uploadPhoto } from '../../../lib/api';
@@ -64,6 +65,7 @@ export default function BoardScreen() {
     restoreItem,
   } = useBoard(boardId);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [entering, setEntering] = useState<Set<string>>(() => new Set());
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
@@ -358,9 +360,10 @@ export default function BoardScreen() {
       <View style={styles.header}>
         <Pressable
           hitSlop={8}
-          onPress={() => router.push(`/board/${boardId}/settings`)}
+          onPress={() => setSwitcherOpen(true)}
           style={styles.boardTitle}
-          accessibilityLabel="Board settings"
+          accessibilityRole="button"
+          accessibilityLabel="Switch boards"
         >
           <Text style={styles.boardName} numberOfLines={1}>{board.name}</Text>
           <MaterialCommunityIcons name="chevron-down" size={22} color={colors.ink} />
@@ -466,6 +469,11 @@ export default function BoardScreen() {
         submitting={submitting}
         onClose={handleSheetClose}
         onSubmit={handleAdd}
+      />
+      <BoardSwitcher
+        visible={switcherOpen}
+        currentBoardId={boardId}
+        onClose={() => setSwitcherOpen(false)}
       />
     </SafeAreaView>
   );

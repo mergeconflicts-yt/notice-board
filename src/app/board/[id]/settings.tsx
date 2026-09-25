@@ -7,7 +7,6 @@ import { boardColorKeys, boardColors, colors, fonts } from '../../../theme';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { Avatar } from '../../../components/Avatar';
 import { useBoard, fetchRemovedItems } from '../../../hooks/useBoard';
-import { useMyBoards } from '../../../hooks/useBoards';
 import { useSession } from '../../../store/session';
 import { useToast } from '../../../store/toast';
 import {
@@ -25,7 +24,6 @@ export default function BoardSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const boardId = id as string;
   const { board, members, reload } = useBoard(boardId);
-  const { boards } = useMyBoards();
   const user = useSession((s) => s.user);
   const [draftName, setDraftName] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
@@ -227,26 +225,6 @@ export default function BoardSettingsScreen() {
             )}
           </View>
         ) : null}
-
-        <Text style={styles.sectionLabel}>Your boards</Text>
-        <View style={styles.group}>
-          {boards.map((b, i) => (
-            <View key={b.id}>
-              <Pressable
-                style={styles.row}
-                onPress={() => (b.id !== boardId ? router.replace(`/board/${b.id}`) : undefined)}
-              >
-                <Text style={styles.rowLabel} numberOfLines={1}>{b.name}</Text>
-                {b.id === boardId ? <Text style={styles.rowValue}>Current</Text> : <Text style={styles.chevron}>›</Text>}
-              </Pressable>
-              {i < boards.length - 1 ? <View style={styles.divider} /> : null}
-            </View>
-          ))}
-          <View style={styles.divider} />
-          <Pressable style={styles.row} onPress={() => router.push('/create')}>
-            <Text style={styles.rowLabel}>＋ New board</Text>
-          </Pressable>
-        </View>
 
         <Text style={styles.sectionLabel}>Board access</Text>
         <View style={styles.group}>
