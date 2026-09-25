@@ -8,9 +8,8 @@ import { NotePaper } from '../../../../components/NotePaper';
 import { AddNoteSheet, NoteDraft } from '../../../../components/AddNoteSheet';
 import { useBoard } from '../../../../hooks/useBoard';
 import { useSession } from '../../../../store/session';
-import { ListEntry } from '../../../../types';
 import { useToast } from '../../../../store/toast';
-import { editEntry, friendlyMessage, removeEntry, signedPhotoUrl } from '../../../../lib/api';
+import { signedPhotoUrl } from '../../../../lib/api';
 import { keepUntilLabel } from '../../../../utils/note';
 
 const MAX_SCALE = 2.4;
@@ -19,14 +18,16 @@ const noop = () => {};
 export default function ItemDetailScreen() {
   const { id, noteId } = useLocalSearchParams<{ id: string; noteId: string }>();
   const boardId = id as string;
-  const { items, entries, members, toggleEntry, setDone, setPinned, keepLonger, removeItem, restoreItem, editItem, addListEntry } =
+  const { items, entries, members, loading, toggleEntry, setDone, setPinned, keepLonger, removeItem, restoreItem, editItem, editList } =
     useBoard(boardId);
   const me = useSession((s) => s.user);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  // Entries as they were when the editor opened — reconcile against these, not
-  // the live list (other members may have added rows since).
-  const [editSnapshot, setEditSnapshot] = useState<ListEntry[] | null>(null);
+  // Entries as they were when the editor opened — reconciled against these,
+  // not the live list (other members may have added rows since). Updated as a
+  // save progresses so a retry after a partial failure resumes rather than
+  // repeating work.
+  const [editSnapshot, setEditSnapshot] = useState<{ id: string; text: string }[] | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const { width: screenW, height: screenH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -36,14 +37,26 @@ export default function ItemDetailScreen() {
   const itemEntries = entries.filter((e) => e.itemId === noteId);
 
   useEffect(() => {
-    if (item?.photoPath) void signedPhotoUrl(item.photoPath).then(setPhotoUrl);
+    if (item?.photoPath) void signedPhotoUrl(item.photoPath).then(setPhotoUrl).catch(noop);
   }, [item?.photoPath]);
 
   if (!item) {
+    if (loading) {
+      return (
+        <View style={styles.container}>
+          <ActivityIndicator color={colors.accent} />
+        </View>
+      );
+    }
+    // Loaded but absent: expired, removed, or the link is stale.
     return (
-      <View style={styles.container}>
-        <ActivityIndicator color={colors.accent} />
-      </View>
+      <Pressable style={styles.container} onPress={() => router.back()}>
+        <Text style={styles.goneTitle}>This post is gone</Text>
+        <Text style={styles.goneSub}>It may have expired or been removed.</Text>
+        <View style={styles.goneBtn}>
+          <Text style={styles.goneBtnText}>Back to board</Text>
+        </View>
+      </Pressable>
     );
   }
 
@@ -64,33 +77,34 @@ export default function ItemDetailScreen() {
     if (!isCreator) return;
     setSaving(true);
     try {
-      // Send only the fields this post type owns; api.editItem merges the rest
-      // with the current item so nothing else is wiped.
-      await editItem(item, {
-        body: item.type === 'note' || item.type === 'photo' ? draft.body : undefined,
-        title: item.type === 'list' || item.type === 'date' ? draft.title : undefined,
-        eventAt: item.type === 'date' ? draft.eventAt : undefined,
-        place: item.type === 'date' ? draft.place : undefined,
-        color: draft.color,
-      });
       if (item.type === 'list') {
-        // Reconcile against the snapshot (not the live list): only rows the
-        // editor actually knew about are added/edited/removed.
+        // One atomic RPC: diff the draft against the snapshot and send only
+        // the adds/edits/removes, so a failure never leaves a half-applied list.
         const base = editSnapshot ?? itemEntries;
+        const baseText = new Map(base.map((e) => [e.id, e.text]));
         const draftIds = new Set(draft.entries.map((r) => r.id));
+        const adds: { id: string; text: string }[] = [];
+        const edits: { id: string; text: string }[] = [];
         for (const row of draft.entries) {
-          const existing = base.find((e) => e.id === row.id);
-          if (!existing) await addListEntry(item.id, row.text);
-          else if (existing.text !== row.text) await editEntry(row.id, row.text);
+          const previous = baseText.get(row.id);
+          if (previous === undefined) adds.push({ id: row.id, text: row.text });
+          else if (previous !== row.text) edits.push({ id: row.id, text: row.text });
         }
-        for (const entry of base) {
-          if (!draftIds.has(entry.id)) await removeEntry(entry.id);
-        }
+        const removes = base.filter((e) => !draftIds.has(e.id)).map((e) => e.id);
+        await editList(item, { title: draft.title, color: draft.color, body: draft.body, adds, edits, removes });
+      } else {
+        await editItem(item, {
+          body: item.type === 'note' || item.type === 'photo' ? draft.body : undefined,
+          title: item.type === 'date' ? draft.title : undefined,
+          eventAt: item.type === 'date' ? draft.eventAt : undefined,
+          place: item.type === 'date' ? draft.place : undefined,
+          color: draft.color,
+        });
       }
       setEditSnapshot(null);
       setEditing(false);
-    } catch (e) {
-      useToast.getState().show(friendlyMessage(e));
+    } catch {
+      // useBoard already showed the error; keep the sheet open to retry.
     } finally {
       setSaving(false);
     }
@@ -100,9 +114,8 @@ export default function ItemDetailScreen() {
     const snapshot = item;
     try {
       await removeItem(item);
-    } catch (e) {
-      // Stay on the screen and report the failure — don't claim it was removed.
-      useToast.getState().show(friendlyMessage(e));
+    } catch {
+      // Stay on the screen; useBoard already reported the failure.
       return;
     }
     router.back();
@@ -143,14 +156,14 @@ export default function ItemDetailScreen() {
 
         <View style={styles.buttonRow}>
           {canMarkDone ? (
-            <Action label={done ? 'Reopen' : 'Mark done'} onPress={() => setDone(item, !done)} />
+            <Action label={done ? 'Reopen' : 'Mark done'} onPress={() => setDone(item, !done).catch(noop)} />
           ) : null}
           <Action
             label={item.pinned ? 'Unpin' : 'Pin'}
-            onPress={() => setPinned(item, !item.pinned)}
+            onPress={() => setPinned(item, !item.pinned).catch(noop)}
           />
           {!item.pinned && item.type !== 'list' ? (
-            <Action label="Keep longer" onPress={() => keepLonger(item)} />
+            <Action label="Keep longer" onPress={() => keepLonger(item).catch(noop)} />
           ) : null}
           {isCreator ? (
             <Action
@@ -170,6 +183,7 @@ export default function ItemDetailScreen() {
         submitting={saving}
         submitLabel="Save"
         initial={item}
+        photoUrl={photoUrl}
         entries={(editSnapshot ?? itemEntries).map((e) => ({ id: e.id, text: e.text }))}
         onClose={() => {
           setEditing(false);
@@ -217,4 +231,14 @@ const styles = StyleSheet.create({
   },
   actionText: { fontFamily: fonts.ui.bold, fontSize: 14, color: colors.ink },
   actionDanger: { color: colors.danger },
+  goneTitle: { fontFamily: fonts.hand.bold, fontSize: 30, color: colors.ink },
+  goneSub: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.inkSoft, marginTop: 6 },
+  goneBtn: {
+    marginTop: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: colors.ink,
+  },
+  goneBtnText: { fontFamily: fonts.ui.bold, color: colors.background },
 });

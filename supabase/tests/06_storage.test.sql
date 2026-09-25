@@ -1,7 +1,7 @@
 -- Phase 3: private photo/avatar storage policies.
 -- Roles: O owner/uploader, S stranger, M co-member.
 begin;
-select plan(14);
+select plan(15);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000051', 'authenticated', 'authenticated'),
@@ -24,6 +24,9 @@ insert into storage.objects (bucket_id, name, owner) values
 
 -- Helper: malformed path denies instead of erroring.
 select is(public._path_board_id('not-a-uuid/x.jpg'), null, 'malformed path -> null');
+select is(
+  public._path_board_id('000000000000000000000000000000000000/x.jpg'),
+  null, '36-char non-uuid path -> null, not a cast error');
 select is(
   public._path_board_id('b0000000-0000-0000-0000-000000000051/x/y.jpg'),
   'b0000000-0000-0000-0000-000000000051'::uuid,

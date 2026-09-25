@@ -44,11 +44,14 @@ export function Turnstile({ siteKey, onToken, onError }: Props) {
   return (
     <View style={styles.wrap}>
       <WebView
-        originWhitelist={['*']}
-        // Turnstile validates the page's domain, so load it from the app's
-        // real origin rather than about:blank.
-        source={{ html, baseUrl: INVITE_BASE_URL || 'https://localhost' }}
+        // Only Cloudflare (the challenge script) and the app's real origin may
+        // load. In production the base URL is required — Turnstile validates the
+        // page domain, so there is no localhost fallback.
+        originWhitelist={INVITE_BASE_URL ? ['https://challenges.cloudflare.com', INVITE_BASE_URL] : ['https://challenges.cloudflare.com']}
+        source={{ html, baseUrl: INVITE_BASE_URL }}
         onMessage={handleMessage}
+        onError={() => onError?.('captcha failed to load')}
+        onHttpError={() => onError?.('captcha failed to load')}
         javaScriptEnabled
         style={styles.web}
       />

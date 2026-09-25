@@ -1,8 +1,9 @@
 # Database
 
 Postgres via Supabase. Schema is defined by ordered migrations in
-`supabase/migrations/` — never edit an applied migration; add a new one.
-Everything lives in `public`.
+`supabase/migrations/`. Migrations were edited in place while the project had
+no data (deviation #16); once a migration has been applied anywhere that
+matters, add a new one instead of editing it. Everything lives in `public`.
 
 Structure (docs/plan.md): **clients never write tables**. All mutations go
 through `SECURITY DEFINER` functions; reads use tables/views under RLS.
@@ -18,8 +19,9 @@ through `SECURITY DEFINER` functions; reads use tables/views under RLS.
 
 ### `profiles`
 `id uuid PK → auth.users ON DELETE CASCADE`, `display_name` (1–40 chars),
-`avatar_path`, `created_at`, `updated_at`. A row is inserted automatically by
-`on_auth_user_created` (default name `Someone`).
+`avatar_path` (`NULL`, else `<=200` chars and `<user_id>/<file>`), `created_at`,
+`updated_at`. A row is inserted automatically by `on_auth_user_created`
+(default name `Someone`).
 
 ### `boards`
 `id`, `name` (1–60), `color` (`sage|blue|clay|cream|charcoal`), `timezone`,
@@ -38,6 +40,7 @@ PK (`board_id`, `user_id`). `role`, `joined_at`. `board_id → boards CASCADE`,
 `created_by` / `updated_by` / `deleted_by`
 (all `→ profiles ON DELETE SET NULL`), `deleted_at`, `version`, timestamps.
 `unique (id, board_id)` is the target of `list_entries`' composite FK.
+`photo_path` (`NULL`, else `<=200` chars and `<board_id>/<item_id>/<file>`).
 Checks: date needs `event_at`, photo needs `photo_path`, note needs a body.
 
 ### `list_entries`
@@ -58,7 +61,8 @@ current window; the hourly job deletes windows older than 2 hours.
 
 ## Lifetime (`keep_until`)
 
-`public.default_keep_until(type, event_at, pinned, now)` is the single source:
+`public.default_keep_until(type, event_at, pinned, now, timezone)` is the
+single source (the board's IANA `timezone` makes the date boundary local):
 
 | Case | `keep_until` |
 |---|---|
@@ -87,6 +91,8 @@ and `rate_limits` have no grants at all.
 `public.is_member(board)` is `SECURITY DEFINER` and ignores soft-deleted
 boards, so policies never recurse. `visible_items` (`security_invoker`) is the
 board view: `deleted_at is null and (keep_until is null or keep_until > now())`.
+It is rebuilt in `..._item_position` so its expanded columns also carry
+`layout` (added after the view was first created).
 
 ## Storage
 
@@ -106,11 +112,24 @@ function guards `auth.uid()`, checks membership/role, stamps actor fields from
 `auth.uid()` (never parameters), and raises a stable code as the exception
 message. See `docs/api.md` for signatures.
 
-Internal (no grants): `hit_rate_limit`, `promote_longest_member`,
-`run_list_lifetime`, `expire_items`, `cleanup_rate_limits`, `run_edge_job`,
-`invite_key`, `pick_invite_code`, `normalise_invite_code`,
-`default_keep_until`. `is_member`/`_path_board_id` are granted to
-`authenticated` only (RLS/storage policies run as the caller).
+State-changing calls are idempotent no-ops when the target is already in the
+requested state (`set_pinned`, `set_done`, `set_entry_checked`, an `add_entry`
+retry), and board actions return `not_member` for missing, soft-deleted or
+foreign boards alike so an error cannot reveal that a board exists. Locks are
+taken board-first everywhere (then invite or member rows). Every mutating
+function charges a shared `item_write` rate limit (600/hour). `update_profile`
+coalesces `avatar_path` (a rename keeps it; `p_clear_avatar` removes it) and
+`run_list_lifetime` bumps `updated_at` (not `version`) so expiry changes reach
+delta reads.
+
+Internal (no client grants): `hit_rate_limit`, `promote_longest_member`,
+`run_list_lifetime`, `expire_items`, `cleanup_rate_limits`,
+`purge_stale_invites`, `run_edge_job`, `invite_key`, `pick_invite_code`,
+`normalise_invite_code`, `default_keep_until`. `is_member`/`_path_board_id` are
+granted to `authenticated` only (RLS/storage policies run as the caller).
+Service-role only (the Edge jobs): `expired_for_purge`, `photo_paths_in_use`,
+`purge_items`, `purge_boards`, `inactive_anonymous_user_ids`,
+`is_inactive_anonymous_user`, `job_failures`, `http_failures`.
 
 ## Triggers
 
@@ -122,13 +141,18 @@ Internal (no grants): `hit_rate_limit`, `promote_longest_member`,
 | Job | Schedule | Does |
 |---|---|---|
 | `expire-items` | every 15 min | `expire_items()` — soft-delete lapsed `keep_until` |
-| `cleanup-rate-limits` | hourly | `cleanup_rate_limits()` — drop stale `rl_*` sequences |
+| `cleanup-rate-limits` | hourly | `cleanup_rate_limits()` — drop `rate_limits` windows older than 2 h |
+| `cleanup-invites` | hourly | `purge_stale_invites()` — drop invites revoked/expired > 7 days |
 | `purge-nightly` | 03:00 | `run_edge_job('/purge')` — Edge Function purge |
 | `cleanup-users-nightly` | 03:30 | `run_edge_job('/cleanup-users')` — Edge Function cleanup-users |
 
-The Edge-Function jobs read the functions base URL and service-role key from
-Vault (`functions_url`, `service_role_key`) at run time; if absent the job is a
-no-op. Nothing sensitive lives in a session setting.
+The Edge-Function jobs read the functions base URL and a dedicated job secret
+from Vault (`functions_url`, `job_secret`) at run time and send the secret as a
+bearer token; the functions verify it (constant-time) against `JOB_SECRET`. If
+the secrets are absent the job raises a `WARNING` and does nothing. Check
+`public.job_failures()` / `public.http_failures()` for recent failures; nothing
+sensitive lives in a session setting. `net` is owned by `supabase_admin`, so
+its default grants can't be revoked by migrations (the API never exposes it).
 
 ## Migrations
 
@@ -143,3 +167,6 @@ no-op. Nothing sensitive lives in a session setting.
 8. `..._boards_realtime` — adds `boards` to the realtime publication.
 9. `..._lock_helpers` — revokes client EXECUTE on internal helpers, drops
    `_shares_board_with` (inlined into the avatars policy).
+10. `..._service_role` — grants the Edge jobs (service_role) their reads/RPCs.
+11. `..._service_cleanup` — service-role cleanup-user candidate/re-check RPCs
+    (activity includes token refreshes/sessions, not just `last_sign_in_at`).

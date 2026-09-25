@@ -48,7 +48,11 @@ $$;
 -- Profile
 -- ---------------------------------------------------------------------------
 
-create function public.update_profile(p_display_name text, p_avatar_path text default null)
+create function public.update_profile(
+  p_display_name text,
+  p_avatar_path text default null,
+  p_clear_avatar boolean default false
+)
 returns public.profiles
 language plpgsql
 security definer
@@ -62,13 +66,25 @@ begin
   if p_display_name is null or char_length(btrim(p_display_name)) not between 1 and 40 then
     raise exception 'invalid_input';
   end if;
-  -- An avatar path must live under the caller's own folder.
-  if p_avatar_path is not null and p_avatar_path not like auth.uid()::text || '/%' then
-    raise exception 'invalid_input';
+  -- An avatar path must live under the caller's own folder and be well formed.
+  if p_avatar_path is not null then
+    if p_clear_avatar then
+      raise exception 'invalid_input';
+    end if;
+    if char_length(p_avatar_path) > 200
+       or p_avatar_path !~ ('^' || auth.uid()::text || '/[^/]+$') then
+      raise exception 'invalid_input';
+    end if;
   end if;
+  -- p_avatar_path null means "keep the current avatar"; only p_clear_avatar
+  -- removes it. This stops a plain rename from wiping the avatar.
+  perform public.hit_rate_limit('item_write', 600, interval '1 hour');
   update public.profiles
   set display_name = btrim(p_display_name),
-      avatar_path = p_avatar_path
+      avatar_path = case
+        when p_clear_avatar then null
+        else coalesce(p_avatar_path, avatar_path)
+      end
   where id = auth.uid()
   returning * into v_row;
   if v_row.id is null then
@@ -101,7 +117,7 @@ begin
   if p_name is null or char_length(btrim(p_name)) not between 1 and 60 then
     raise exception 'invalid_input';
   end if;
-  if p_color not in ('sage', 'blue', 'clay', 'cream', 'charcoal') then
+  if p_color is null or p_color not in ('sage', 'blue', 'clay', 'cream', 'charcoal') then
     raise exception 'invalid_input';
   end if;
   -- Reject an unknown zone so date expiry can't silently fall back to UTC.
@@ -144,12 +160,13 @@ begin
   if p_name is null or char_length(btrim(p_name)) not between 1 and 60 then
     raise exception 'invalid_input';
   end if;
-  if p_color not in ('sage', 'blue', 'clay', 'cream', 'charcoal') then
+  if p_color is null or p_color not in ('sage', 'blue', 'clay', 'cream', 'charcoal') then
     raise exception 'invalid_input';
   end if;
   if exists (select 1 from public.boards where id = p_board_id and deleted_at is not null) then
     raise exception 'invalid_input';
   end if;
+  perform public.hit_rate_limit('item_write', 600, interval '1 hour');
   update public.boards
   set name = btrim(p_name),
       color = p_color,
@@ -169,12 +186,10 @@ begin
   if auth.uid() is null then
     raise exception 'not_authenticated';
   end if;
-  if not exists (select 1 from public.boards where id = p_board_id) then
-    raise exception 'not_found';
-  end if;
-  if exists (select 1 from public.boards where id = p_board_id and deleted_at is not null) then
-    return; -- idempotent
-  end if;
+  -- Lock first, then require ownership via raw membership (which survives the
+  -- soft delete). Missing/non-member both return not_member, so the error
+  -- never reveals that a board exists; a repeat delete by the owner is still
+  -- idempotent.
   perform 1 from public.boards where id = p_board_id for update;
   select role into v_role
   from public.board_members
@@ -184,6 +199,9 @@ begin
   end if;
   if v_role is distinct from 'owner' then
     raise exception 'not_owner';
+  end if;
+  if exists (select 1 from public.boards where id = p_board_id and deleted_at is not null) then
+    return; -- idempotent
   end if;
   update public.boards
   set deleted_at = now(),
@@ -233,8 +251,13 @@ begin
   if auth.uid() is null then
     raise exception 'not_authenticated';
   end if;
-  if not exists (select 1 from public.boards where id = p_board_id) then
-    raise exception 'not_found';
+  -- Lock first, then require a live board and live membership. A missing,
+  -- deleted or foreign board all yield not_member, so the error never reveals
+  -- that a board exists; the lock serialises concurrent leaves/promotions and
+  -- keeps the role read below from going stale.
+  perform 1 from public.boards where id = p_board_id for update;
+  if not exists (select 1 from public.boards where id = p_board_id and deleted_at is null) then
+    raise exception 'not_member';
   end if;
   select role into v_role
   from public.board_members
@@ -242,11 +265,9 @@ begin
   if v_role is null then
     raise exception 'not_member';
   end if;
-  -- Serialise concurrent membership changes on this board.
-  perform 1 from public.boards where id = p_board_id for update;
   delete from public.board_members
   where board_id = p_board_id and user_id = auth.uid();
-  select count(*) into v_remaining
+  select count(*)::integer into v_remaining
   from public.board_members
   where board_id = p_board_id;
   if v_remaining = 0 then
@@ -259,9 +280,9 @@ begin
     where board_id = p_board_id and revoked_at is null;
     return;
   end if;
-  if v_role = 'owner' then
-    perform public.promote_longest_member(p_board_id);
-  end if;
+  -- Unconditional: promotes the longest-standing member when the board would
+  -- otherwise be ownerless, and is a no-op when another owner remains.
+  perform public.promote_longest_member(p_board_id);
 end;
 $$;
 
@@ -273,15 +294,19 @@ set search_path = '' as $$
 declare
   v_caller_role public.member_role;
   v_target_role public.member_role;
+  v_remaining integer;
 begin
   if auth.uid() is null then
     raise exception 'not_authenticated';
   end if;
-  if not exists (select 1 from public.boards where id = p_board_id) then
-    raise exception 'not_found';
-  end if;
   if p_user_id = auth.uid() then
     raise exception 'invalid_input';
+  end if;
+  -- Lock the board before reading either role. A missing/deleted/foreign board
+  -- all return not_member, so the error never reveals that a board exists.
+  perform 1 from public.boards where id = p_board_id for update;
+  if not exists (select 1 from public.boards where id = p_board_id and deleted_at is null) then
+    raise exception 'not_member';
   end if;
   select role into v_caller_role
   from public.board_members
@@ -298,11 +323,23 @@ begin
   if v_target_role is null then
     raise exception 'not_found';
   end if;
-  perform 1 from public.boards where id = p_board_id for update;
+  perform public.hit_rate_limit('item_write', 600, interval '1 hour');
   delete from public.board_members
   where board_id = p_board_id and user_id = p_user_id;
-  -- The caller stays, so the board never empties here; just keep an owner.
-  perform public.promote_longest_member(p_board_id);
+  select count(*)::integer into v_remaining
+  from public.board_members
+  where board_id = p_board_id;
+  -- The caller normally stays, but if a concurrent removal emptied the board,
+  -- soft-delete it rather than leave a memberless live board behind.
+  if v_remaining = 0 then
+    update public.boards
+    set deleted_at = now(),
+        updated_at = now()
+    where id = p_board_id and deleted_at is null;
+  else
+    -- Keep an owner even if the removed target was the only one.
+    perform public.promote_longest_member(p_board_id);
+  end if;
   -- Revoke the active invite so a removed member can't rejoin with the old link.
   update public.invites
   set revoked_at = now()
@@ -346,8 +383,24 @@ begin
   if not public.is_member(p_board_id) then
     raise exception 'not_member';
   end if;
+  -- Reject NULLs explicitly: they would otherwise slip past the comparisons
+  -- and fail later as a raw not-null or check-constraint error.
+  if p_id is null or p_type is null or p_color is null then
+    raise exception 'invalid_input';
+  end if;
   select timezone into v_tz from public.boards where id = p_board_id;
   if p_type = 'date' and p_event_at is null then
+    raise exception 'invalid_input';
+  end if;
+  -- event_at is dates only and must be a real instant: 'infinity' would
+  -- otherwise mean "never expires". title is list/date, place is date.
+  if p_event_at is not null and (p_type <> 'date' or not isfinite(p_event_at)) then
+    raise exception 'invalid_input';
+  end if;
+  if p_title is not null and p_type not in ('list', 'date') then
+    raise exception 'invalid_input';
+  end if;
+  if p_place is not null and p_type <> 'date' then
     raise exception 'invalid_input';
   end if;
   -- A photo_path belongs to a photo only, and must live under this item's
@@ -366,6 +419,16 @@ begin
   end if;
   if p_type = 'note'
      and (p_body is null or char_length(btrim(p_body)) = 0) then
+    raise exception 'invalid_input';
+  end if;
+  -- Column check constraints cap raw lengths; catch them as invalid_input.
+  if p_body is not null and char_length(p_body) > 2000 then
+    raise exception 'invalid_input';
+  end if;
+  if p_title is not null and char_length(p_title) > 120 then
+    raise exception 'invalid_input';
+  end if;
+  if p_place is not null and char_length(p_place) > 120 then
     raise exception 'invalid_input';
   end if;
   if p_entries is not null then
@@ -400,7 +463,8 @@ begin
       end if;
       v_eid := v_e.value ->> 'id';
       v_etext := v_e.value ->> 'text';
-      if v_eid !~ '^[0-9a-fA-F-]{36}$' then
+      if v_eid is null
+         or v_eid !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
         raise exception 'invalid_input';
       end if;
       if v_etext is null or char_length(btrim(v_etext)) not between 1 and 200 then
@@ -466,8 +530,31 @@ begin
   if v_row.type = 'date' and p_event_at is null then
     raise exception 'invalid_input';
   end if;
+  -- Same field/type rules as post_item; 'infinity' would never expire.
+  if p_event_at is not null and (v_row.type <> 'date' or not isfinite(p_event_at)) then
+    raise exception 'invalid_input';
+  end if;
+  if p_title is not null and v_row.type not in ('list', 'date') then
+    raise exception 'invalid_input';
+  end if;
+  if p_place is not null and v_row.type <> 'date' then
+    raise exception 'invalid_input';
+  end if;
   if v_row.type = 'note'
      and (p_body is null or char_length(btrim(p_body)) = 0) then
+    raise exception 'invalid_input';
+  end if;
+  if p_color is null then
+    raise exception 'invalid_input';
+  end if;
+  -- Column check constraints cap raw lengths; catch them as invalid_input.
+  if p_body is not null and char_length(p_body) > 2000 then
+    raise exception 'invalid_input';
+  end if;
+  if p_title is not null and char_length(p_title) > 120 then
+    raise exception 'invalid_input';
+  end if;
+  if p_place is not null and char_length(p_place) > 120 then
     raise exception 'invalid_input';
   end if;
   select timezone into v_tz from public.boards where id = v_row.board_id;
@@ -476,18 +563,24 @@ begin
   -- longer", editing a ticked list doesn't stop it expiring, and a pinned/
   -- done item keeps its own rule.
   v_keep := v_row.keep_until;
-  if v_row.type = 'date' then
+  -- Recompute a date's expiry only when its event actually changed, so editing
+  -- the title of a date the member kept longer doesn't drop that extension.
+  -- Floor at now + 2 days (like restore) so a date moved into the past never
+  -- vanishes the instant it is saved.
+  if v_row.type = 'date' and p_event_at is distinct from v_row.event_at then
     -- Pinned wins over done (a pinned item never expires).
     if v_row.pinned then
       v_keep := null;
     elsif v_row.done_at is not null then
-      v_keep := v_row.done_at + interval '2 days';
+      v_keep := greatest(v_row.done_at + interval '2 days', now() + interval '2 days');
     else
-      v_keep := public.default_keep_until(
-        'date', coalesce(p_event_at, v_row.event_at), false, now(), v_tz
+      v_keep := greatest(
+        public.default_keep_until('date', p_event_at, false, now(), v_tz),
+        now() + interval '2 days'
       );
     end if;
   end if;
+  perform public.hit_rate_limit('item_write', 600, interval '1 hour');
   update public.items
   set body = p_body,
       title = p_title,
@@ -517,6 +610,9 @@ begin
   if auth.uid() is null then
     raise exception 'not_authenticated';
   end if;
+  if p_pinned is null then
+    raise exception 'invalid_input';
+  end if;
   select * into v_row from public.items where id = p_id for update;
   if v_row.id is null then
     raise exception 'not_found';
@@ -527,16 +623,26 @@ begin
   if v_row.deleted_at is not null then
     raise exception 'not_found';
   end if;
+  -- Idempotent: setting the state it already has is a no-op.
+  if v_row.pinned = p_pinned then
+    return;
+  end if;
+  perform public.hit_rate_limit('item_write', 600, interval '1 hour');
   update public.items
   set pinned = p_pinned,
       keep_until = case
         when p_pinned then null
-        -- Unpinning a done item keeps its done-based 2-day window.
-        when v_row.done_at is not null then v_row.done_at + interval '2 days'
+        -- Unpinning a done item keeps its done-based 2-day window, but never
+        -- one already in the past — floor it at now + 2 days.
+        when v_row.done_at is not null then
+          greatest(v_row.done_at + interval '2 days', now() + interval '2 days')
         when v_row.type = 'list' then null
-        else public.default_keep_until(
-          v_row.type, v_row.event_at, false, now(),
-          (select timezone from public.boards where id = v_row.board_id)
+        else greatest(
+          public.default_keep_until(
+            v_row.type, v_row.event_at, false, now(),
+            (select timezone from public.boards where id = v_row.board_id)
+          ),
+          now() + interval '2 days'
         )
       end,
       updated_by = auth.uid(),
@@ -561,6 +667,9 @@ begin
   if auth.uid() is null then
     raise exception 'not_authenticated';
   end if;
+  if p_done is null then
+    raise exception 'invalid_input';
+  end if;
   select * into v_row from public.items where id = p_id for update;
   if v_row.id is null then
     raise exception 'not_found';
@@ -575,6 +684,11 @@ begin
     raise exception 'invalid_input';
   end if;
   if p_done then
+    -- First done wins: re-marking is idempotent so done_at/done_by don't move.
+    if v_row.done_at is not null then
+      return;
+    end if;
+    perform public.hit_rate_limit('item_write', 600, interval '1 hour');
     update public.items
     set done_at = now(),
         done_by = auth.uid(),
@@ -585,13 +699,25 @@ begin
         version = v_row.version + 1
     where id = p_id and version = v_row.version;
   else
+    -- Already not done: nothing to undo.
+    if v_row.done_at is null then
+      return;
+    end if;
+    perform public.hit_rate_limit('item_write', 600, interval '1 hour');
     update public.items
     set done_at = null,
         done_by = null,
-        keep_until = public.default_keep_until(
-          v_row.type, v_row.event_at, v_row.pinned, now(),
-          (select timezone from public.boards where id = v_row.board_id)
-        ),
+        keep_until = case
+          when v_row.pinned then null
+          -- Floor at now + 2 days so reopening a past date doesn't vanish it.
+          else greatest(
+            public.default_keep_until(
+              v_row.type, v_row.event_at, false, now(),
+              (select timezone from public.boards where id = v_row.board_id)
+            ),
+            now() + interval '2 days'
+          )
+        end,
         updated_by = auth.uid(),
         updated_at = now(),
         version = v_row.version + 1
@@ -624,8 +750,17 @@ begin
   if v_row.pinned or v_row.type = 'list' then
     raise exception 'invalid_input';
   end if;
+  perform public.hit_rate_limit('item_write', 600, interval '1 hour');
   update public.items
-  set keep_until = greatest(v_row.keep_until, now()) + interval '7 days',
+  set keep_until = greatest(
+        v_row.keep_until,
+        -- +7 days, never past now + 30 days, and never shortening an item
+        -- whose date already lies beyond the cap.
+        least(
+          greatest(v_row.keep_until, now()) + interval '7 days',
+          now() + interval '30 days'
+        )
+      ),
       updated_by = auth.uid(),
       updated_at = now(),
       version = v_row.version + 1
@@ -654,6 +789,7 @@ begin
   if v_row.deleted_at is not null then
     return; -- idempotent
   end if;
+  perform public.hit_rate_limit('item_write', 600, interval '1 hour');
   update public.items
   set deleted_at = now(),
       deleted_by = auth.uid(),
@@ -688,6 +824,7 @@ begin
   if v_row.deleted_at < now() - interval '30 days' then
     raise exception 'invalid_input';
   end if;
+  perform public.hit_rate_limit('item_write', 600, interval '1 hour');
   update public.items
   set deleted_at = null,
       deleted_by = null,
@@ -752,7 +889,9 @@ begin
   end if;
   -- A pinned list stays forever, whatever its tick state.
   if v_pinned then
-    update public.items set keep_until = null where id = p_item_id;
+    update public.items
+    set keep_until = null, updated_at = now()
+    where id = p_item_id;
     return;
   end if;
   select
@@ -762,13 +901,17 @@ begin
         where item_id = p_item_id and checked_at is null
       )
     into v_all_checked;
+  -- Bump updated_at (but not version): the expiry change must reach delta
+  -- catch-up reads, which poll `updated_at > since`.
   if v_all_checked then
     update public.items
-    set keep_until = now() + interval '2 days'
+    set keep_until = now() + interval '2 days',
+        updated_at = now()
     where id = p_item_id;
   else
     update public.items
-    set keep_until = null
+    set keep_until = null,
+        updated_at = now()
     where id = p_item_id;
   end if;
 end;
@@ -801,6 +944,14 @@ begin
   end if;
   if p_text is null or char_length(btrim(p_text)) not between 1 and 200 then
     raise exception 'invalid_input';
+  end if;
+  -- A retry of the same id returns the stored row before the rate and cap
+  -- checks, so re-sending an already-added entry still succeeds on a full list.
+  select * into v_entry
+  from public.list_entries
+  where id = p_id and item_id = p_item_id;
+  if v_entry.id is not null then
+    return v_entry;
   end if;
   perform public.hit_rate_limit('add_entry', 300, interval '1 hour');
   if (select count(*) from public.list_entries where item_id = p_item_id) >= 500 then
@@ -840,6 +991,9 @@ begin
   if auth.uid() is null then
     raise exception 'not_authenticated';
   end if;
+  if p_checked is null then
+    raise exception 'invalid_input';
+  end if;
   select * into v_entry from public.list_entries where id = p_id;
   if v_entry.id is null then
     raise exception 'not_found';
@@ -855,15 +1009,17 @@ begin
     raise exception 'not_found';
   end if;
   select * into v_entry from public.list_entries where id = p_id for update;
+  -- Idempotent: a repeated tick/untick must not push the list lifetime again.
+  if (v_entry.checked_at is not null) = p_checked then
+    return;
+  end if;
+  perform public.hit_rate_limit('item_write', 600, interval '1 hour');
   if p_checked then
-    -- First tick wins: an already-checked entry keeps its original checker.
-    if v_entry.checked_at is null then
-      update public.list_entries
-      set checked_at = now(),
-          checked_by = auth.uid(),
-          updated_at = now()
-      where id = p_id;
-    end if;
+    update public.list_entries
+    set checked_at = now(),
+        checked_by = auth.uid(),
+        updated_at = now()
+    where id = p_id;
   else
     update public.list_entries
     set checked_at = null,
@@ -901,6 +1057,7 @@ begin
   if p_text is null or char_length(btrim(p_text)) not between 1 and 200 then
     raise exception 'invalid_input';
   end if;
+  perform public.hit_rate_limit('item_write', 600, interval '1 hour');
   update public.list_entries
   set text = btrim(p_text),
       updated_at = now()
@@ -915,6 +1072,7 @@ security definer
 set search_path = '' as $$
 declare
   v_entry public.list_entries%rowtype;
+  v_parent public.items%rowtype;
 begin
   if auth.uid() is null then
     raise exception 'not_authenticated';
@@ -926,11 +1084,161 @@ begin
   if not public.is_member(v_entry.board_id) then
     raise exception 'not_member';
   end if;
-  -- Serialise with ticks so the list lifetime is recomputed on fresh state.
-  perform 1 from public.items where id = v_entry.item_id for update;
+  -- Serialise with ticks, and refuse to touch an entry of a removed list.
+  select * into v_parent from public.items where id = v_entry.item_id for update;
+  if v_parent.id is null or v_parent.deleted_at is not null then
+    raise exception 'not_found';
+  end if;
   select * into v_entry from public.list_entries where id = p_id for update;
+  perform public.hit_rate_limit('item_write', 600, interval '1 hour');
   delete from public.list_entries where id = p_id;
   perform public.run_list_lifetime(v_entry.item_id);
+end;
+$$;
+
+-- Atomic list edit: the title/colour and all entry adds/edits/removes in one
+-- transaction, version-checked. The client's Save is therefore all-or-nothing
+-- (a partial failure can't leave duplicate or missing rows).
+create function public.edit_list(
+  p_item_id uuid,
+  p_expected_version integer,
+  p_title text,
+  p_color public.item_color,
+  p_body text default null,
+  p_adds jsonb default null,
+  p_edits jsonb default null,
+  p_removes uuid[] default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = '' as $$
+declare
+  v_row public.items%rowtype;
+  v_rows integer;
+  v_e record;
+  v_eid text;
+  v_etext text;
+  v_total integer;
+begin
+  if auth.uid() is null then
+    raise exception 'not_authenticated';
+  end if;
+  select * into v_row from public.items where id = p_item_id for update;
+  if v_row.id is null then
+    raise exception 'not_found';
+  end if;
+  if not public.is_member(v_row.board_id) then
+    raise exception 'not_member';
+  end if;
+  if v_row.created_by is distinct from auth.uid() then
+    raise exception 'not_author';
+  end if;
+  if v_row.deleted_at is not null then
+    raise exception 'not_found';
+  end if;
+  if v_row.type != 'list' then
+    raise exception 'invalid_input';
+  end if;
+  if v_row.version != p_expected_version then
+    raise exception 'version_conflict';
+  end if;
+  if p_title is not null and char_length(p_title) > 120 then
+    raise exception 'invalid_input';
+  end if;
+  if p_body is not null and char_length(p_body) > 2000 then
+    raise exception 'invalid_input';
+  end if;
+  if p_color is null then
+    raise exception 'invalid_input';
+  end if;
+  if p_adds is not null and jsonb_typeof(p_adds) != 'array' then
+    raise exception 'invalid_input';
+  end if;
+  if p_edits is not null and jsonb_typeof(p_edits) != 'array' then
+    raise exception 'invalid_input';
+  end if;
+  -- The resulting list must stay within the 500-entry cap.
+  select count(*)::integer into v_total
+  from public.list_entries where item_id = p_item_id;
+  v_total := v_total
+    + coalesce(jsonb_array_length(p_adds), 0)
+    - coalesce(array_length(p_removes, 1), 0);
+  if v_total > 500 then
+    raise exception 'invalid_input';
+  end if;
+  perform public.hit_rate_limit('item_write', 600, interval '1 hour');
+
+  if p_removes is not null then
+    delete from public.list_entries
+    where item_id = p_item_id and id = any (p_removes);
+  end if;
+
+  if p_edits is not null then
+    for v_e in select value from jsonb_array_elements(p_edits) loop
+      if jsonb_typeof(v_e.value) != 'object' then
+        raise exception 'invalid_input';
+      end if;
+      v_eid := v_e.value ->> 'id';
+      v_etext := v_e.value ->> 'text';
+      if v_eid is null
+         or v_eid !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+        raise exception 'invalid_input';
+      end if;
+      if v_etext is null or char_length(btrim(v_etext)) not between 1 and 200 then
+        raise exception 'invalid_input';
+      end if;
+      update public.list_entries
+      set text = btrim(v_etext), updated_at = now()
+      where id = v_eid::uuid and item_id = p_item_id;
+    end loop;
+  end if;
+
+  if p_adds is not null then
+    for v_e in select value from jsonb_array_elements(p_adds) loop
+      if jsonb_typeof(v_e.value) != 'object' then
+        raise exception 'invalid_input';
+      end if;
+      v_eid := v_e.value ->> 'id';
+      v_etext := v_e.value ->> 'text';
+      if v_eid is null
+         or v_eid !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+        raise exception 'invalid_input';
+      end if;
+      if v_etext is null or char_length(btrim(v_etext)) not between 1 and 200 then
+        raise exception 'invalid_input';
+      end if;
+      -- The id must not already belong to another item's entry.
+      if exists (
+        select 1 from public.list_entries
+        where id = v_eid::uuid and item_id <> p_item_id
+      ) then
+        raise exception 'invalid_input';
+      end if;
+      insert into public.list_entries (id, item_id, board_id, text, position, created_by)
+      values (
+        v_eid::uuid, p_item_id, v_row.board_id, btrim(v_etext),
+        (select coalesce(max(position), -1) + 1
+         from public.list_entries where item_id = p_item_id),
+        auth.uid()
+      )
+      on conflict (id) do nothing;
+    end loop;
+  end if;
+
+  update public.items
+  set title = p_title,
+      color = p_color,
+      body = p_body,
+      updated_by = auth.uid(),
+      updated_at = now(),
+      version = v_row.version + 1
+  where id = p_item_id and version = p_expected_version;
+  get diagnostics v_rows = row_count;
+  if v_rows = 0 then
+    raise exception 'version_conflict';
+  end if;
+  perform public.run_list_lifetime(p_item_id);
 end;
 $$;
 
@@ -940,8 +1248,8 @@ $$;
 -- ungranted: nested use only.
 -- ---------------------------------------------------------------------------
 
-revoke all on function public.update_profile(text, text) from public, anon;
-grant execute on function public.update_profile(text, text) to authenticated;
+revoke all on function public.update_profile(text, text, boolean) from public, anon;
+grant execute on function public.update_profile(text, text, boolean) to authenticated;
 
 revoke all on function public.create_board(text, text, text) from public, anon;
 grant execute on function public.create_board(text, text, text) to authenticated;
@@ -963,6 +1271,9 @@ grant execute on function public.post_item(uuid, uuid, item_type, item_color, te
 
 revoke all on function public.edit_item(uuid, integer, text, text, timestamptz, text, item_color) from public, anon;
 grant execute on function public.edit_item(uuid, integer, text, text, timestamptz, text, item_color) to authenticated;
+
+revoke all on function public.edit_list(uuid, integer, text, item_color, text, jsonb, jsonb, uuid[]) from public, anon;
+grant execute on function public.edit_list(uuid, integer, text, item_color, text, jsonb, jsonb, uuid[]) to authenticated;
 
 revoke all on function public.set_pinned(uuid, boolean) from public, anon;
 grant execute on function public.set_pinned(uuid, boolean) to authenticated;

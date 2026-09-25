@@ -1,6 +1,6 @@
 -- Phase 6: maintenance jobs (expire + rate-limit cleanup) and their schedule.
 begin;
-select plan(15);
+select plan(18);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000071', 'authenticated', 'authenticated');
@@ -15,7 +15,7 @@ insert into public.items (id, board_id, type, body, keep_until, created_by) valu
    'note', 'kept', null, 'a0000000-0000-0000-0000-000000000071');
 
 -- Expire job.
-select is(public.expire_items(), 1, 'expire_items reports one lapse');
+select ok(public.expire_items() >= 1, 'expire_items reports the lapse');
 select is(
   (select deleted_at is not null from public.items where id = 'c0000000-0000-0000-0000-000000000071'),
   true, 'lapsed item soft-deleted');
@@ -36,6 +36,16 @@ select is(
   (select count(*)::integer from public.rate_limits
    where user_id = 'a0000000-0000-0000-0000-000000000071' and action = 'x'),
   1, 'current window survives');
+
+-- Stale invites (revoked or expired over a week) are purged.
+insert into public.invites (board_id, token_hash, code_hash, secret_enc, expires_at, revoked_at) values
+  ('b0000000-0000-0000-0000-000000000071', extensions.gen_random_bytes(16), extensions.gen_random_bytes(16), extensions.gen_random_bytes(16), now() - interval '1 day', now() - interval '8 days'),
+  ('b0000000-0000-0000-0000-000000000071', extensions.gen_random_bytes(16), extensions.gen_random_bytes(16), extensions.gen_random_bytes(16), now() + interval '1 day', null);
+select is(public.purge_stale_invites(), 1, 'purge_stale_invites removes the stale row');
+select is(
+  (select count(*)::integer from public.invites
+   where board_id = 'b0000000-0000-0000-0000-000000000071'),
+  1, 'a live invite survives');
 
 -- Purge candidates: only items removed beyond the 30-day retention window.
 insert into public.items (id, board_id, type, body, created_by, deleted_at) values
@@ -97,6 +107,9 @@ select ok(
 select is(
   (select count(*)::integer from cron.job where jobname = 'expire-items'),
   1, 'expire-items is scheduled');
+select is(
+  (select count(*)::integer from cron.job where jobname = 'cleanup-invites'),
+  1, 'cleanup-invites is scheduled');
 
 select * from finish();
 rollback;

@@ -109,8 +109,18 @@ export function friendlyMessage(error: unknown): string {
   }
 }
 
-function raise(error: { message?: string } | null): never {
-  throw new ApiError(classify(error?.message), error?.message ?? 'unknown error');
+function raise(error: { message?: string; code?: string } | null): never {
+  const message = error?.message ?? 'unknown error';
+  // Raw table CHECK / length violations become invalid_input rather than a
+  // generic "something went wrong".
+  if (
+    error?.code === '23514' ||
+    error?.code === '22001' ||
+    /violates check constraint|value too long/i.test(message)
+  ) {
+    throw new ApiError('invalid_input', message);
+  }
+  throw new ApiError(classify(message), message);
 }
 
 // ---------------------------------------------------------------------------
@@ -304,12 +314,14 @@ export async function getRemovedItems(boardId: string): Promise<ItemWithAuthor[]
 
 export async function updateProfile(
   displayName: string,
-  avatarPath: string | null = null,
+  avatarPath?: string | null,
+  clearAvatar = false,
 ): Promise<User> {
   const { data, error } = await supabase.rpc('update_profile', {
     p_display_name: displayName,
-    p_avatar_path: avatarPath ?? undefined,
-  });
+    p_avatar_path: avatarPath ?? null,
+    p_clear_avatar: clearAvatar,
+  } as never);
   if (error) raise(error);
   return mapUser(data as unknown as ProfileRow);
 }
@@ -412,6 +424,32 @@ export async function editItem(current: ItemWithAuthor, patch: ItemEdit): Promis
     p_event_at: patch.eventAt !== undefined ? patch.eventAt : current.eventAt,
     p_place: patch.place !== undefined ? patch.place : current.place,
     p_color: patch.color ?? current.color,
+  } as never);
+  if (error) raise(error);
+}
+
+export type ListEditBatch = {
+  title?: string | null;
+  color?: ItemColor;
+  /** The list's notes body. */
+  body?: string | null;
+  adds?: { id: string; text: string }[];
+  edits?: { id: string; text: string }[];
+  removes?: string[];
+};
+
+/** Atomic list edit: title/body/colour and every entry change in one RPC, so a
+ *  partial failure can't duplicate or drop rows. */
+export async function editList(item: ItemWithAuthor, batch: ListEditBatch): Promise<void> {
+  const { error } = await supabase.rpc('edit_list', {
+    p_item_id: item.id,
+    p_expected_version: item.version,
+    p_title: batch.title !== undefined ? batch.title : item.title,
+    p_color: batch.color ?? item.color,
+    p_body: batch.body !== undefined ? batch.body : item.body,
+    p_adds: (batch.adds ?? []) as never,
+    p_edits: (batch.edits ?? []) as never,
+    p_removes: (batch.removes ?? []) as never,
   } as never);
   if (error) raise(error);
 }
@@ -529,36 +567,49 @@ export async function deleteAccount(): Promise<void> {
 
 type OAuthProvider = 'apple' | 'google';
 
+/** True while an in-app OAuth flow is exchanging a code. The `/auth` route
+ *  checks this so Android (where the redirect can also land in the app) doesn't
+ *  exchange the same PKCE code twice. */
+let authFlowActive = false;
+export function isAuthFlowActive(): boolean {
+  return authFlowActive;
+}
+
 /** Shared native OAuth flow for `linkIdentity` / `signInWithOAuth`. In RN the
  *  call returns the provider URL instead of redirecting, so we open it in an
  *  auth session and exchange the returned code. Throws `AuthCancelledError`
  *  when the user dismisses the browser; raises the provider error otherwise. */
 async function oauthFlow(mode: 'link' | 'signin', provider: OAuthProvider): Promise<void> {
-  const redirectTo = Linking.createURL('auth');
-  const options = { redirectTo, skipBrowserRedirect: true };
-  const { data, error } =
-    mode === 'link'
-      ? await supabase.auth.linkIdentity({ provider, options })
-      : await supabase.auth.signInWithOAuth({ provider, options });
-  if (error) raise(error);
-  if (!data?.url) return;
-  const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-  if (result.type !== 'success' || !result.url) throw new AuthCancelledError();
-  const url = new URL(result.url);
-  const providerError =
-    url.searchParams.get('error_description') || url.searchParams.get('error');
-  if (providerError) raise({ message: providerError });
-  const code = url.searchParams.get('code');
-  if (code) {
-    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-    if (exchangeError) raise(exchangeError);
+  authFlowActive = true;
+  try {
+    const redirectTo = Linking.createURL('auth');
+    const options = { redirectTo, skipBrowserRedirect: true };
+    const { data, error } =
+      mode === 'link'
+        ? await supabase.auth.linkIdentity({ provider, options })
+        : await supabase.auth.signInWithOAuth({ provider, options });
+    if (error) raise(error);
+    if (!data?.url) return;
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    if (result.type !== 'success' || !result.url) throw new AuthCancelledError();
+    const url = new URL(result.url);
+    const providerError =
+      url.searchParams.get('error_description') || url.searchParams.get('error');
+    if (providerError) raise({ message: providerError });
+    const code = url.searchParams.get('code');
+    if (code) {
+      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+      if (exchangeError) raise(exchangeError);
+    }
+    // Confirm the change actually took effect before reporting success.
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+    if (userError || !user) raise({ message: userError?.message ?? 'not_authenticated' });
+  } finally {
+    authFlowActive = false;
   }
-  // Confirm the change actually took effect before reporting success.
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-  if (userError || !user) raise({ message: userError?.message ?? 'not_authenticated' });
 }
 
 /** Add a sign-in method to the current (anonymous) account. */
@@ -572,8 +623,17 @@ export async function signInProvider(provider: OAuthProvider): Promise<void> {
 }
 
 export async function linkEmail(email: string): Promise<void> {
-  const { error } = await supabase.auth.updateUser({ email });
+  const { error } = await supabase.auth.updateUser(
+    { email },
+    { emailRedirectTo: Linking.createURL('auth') },
+  );
   if (error) raise(error);
+  // Confirm the change actually took effect before reporting success.
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError || !user) raise({ message: userError?.message ?? 'not_authenticated' });
 }
 
 /** Email magic-link sign-in to an existing account. Never creates an account

@@ -25,6 +25,8 @@ type Props = {
   onMove?: (item: ItemWithAuthor, left: number, top: number) => void;
   /** Reports the note's rendered height so the layout reserves enough room. */
   onMeasure?: (id: string, heightPx: number) => void;
+  /** Bumped by the board when a drop wasn't persisted, to snap the note back. */
+  resetKey?: number;
 };
 
 /** How long a note must be held before it can be picked up and dragged. */
@@ -55,6 +57,7 @@ export function BoardNote({
   onDragUpdate,
   onMove,
   onMeasure,
+  resetKey = 0,
 }: Props) {
   const [enter] = useState(() => new Animated.Value(animateIn ? 0 : 1));
   const [posX] = useState(() => new Animated.Value(left));
@@ -67,9 +70,9 @@ export function BoardNote({
   const startRef = useRef({ x: left, y: top });
 
   // Latest props for the (stable) gesture callbacks.
-  const handlers = useRef({ item, onPress, onMove, onDragStart, onDragUpdate });
+  const handlers = useRef({ item, onPress, onMove, onDragStart, onDragUpdate, left, top });
   useEffect(() => {
-    handlers.current = { item, onPress, onMove, onDragStart, onDragUpdate };
+    handlers.current = { item, onPress, onMove, onDragStart, onDragUpdate, left, top };
   });
 
   // Follow the layout unless the note is in hand (so a saved position settles
@@ -80,6 +83,16 @@ export function BoardNote({
     Animated.timing(posX, { toValue: left, duration: 220, useNativeDriver: false }).start();
     Animated.timing(posY, { toValue: top, duration: 220, useNativeDriver: false }).start();
   }, [left, top, posX, posY]);
+
+  // A drop that wasn't persisted (e.g. a failed delete) bumps resetKey so the
+  // note animates back to its stored spot instead of staying under the finger.
+  useEffect(() => {
+    if (resetKey === 0 || draggingRef.current) return;
+    posRef.current = { x: left, y: top };
+    Animated.timing(posX, { toValue: left, duration: 200, useNativeDriver: false }).start();
+    Animated.timing(posY, { toValue: top, duration: 200, useNativeDriver: false }).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to the bump
+  }, [resetKey]);
 
   useEffect(() => {
     if (!animateIn) return;
@@ -113,6 +126,22 @@ export function BoardNote({
         draggingRef.current = false;
         setDragging(false);
         Animated.spring(lift, { toValue: 0, friction: 7, tension: 90, useNativeDriver: false }).start();
+        const movedX = Math.abs(posRef.current.x - startRef.current.x);
+        const movedY = Math.abs(posRef.current.y - startRef.current.y);
+        if (movedX < 4 && movedY < 4) {
+          // A long-press without a real drag: don't persist a position.
+          Animated.timing(posX, {
+            toValue: handlers.current.left,
+            duration: 180,
+            useNativeDriver: false,
+          }).start();
+          Animated.timing(posY, {
+            toValue: handlers.current.top,
+            duration: 180,
+            useNativeDriver: false,
+          }).start();
+          return;
+        }
         handlers.current.onMove?.(handlers.current.item, posRef.current.x, posRef.current.y);
       });
 

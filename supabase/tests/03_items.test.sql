@@ -1,7 +1,7 @@
 -- Phase 1d: item RPCs — validation, authorship, versions, lifetimes.
 -- Roles: O owner/author, M member, S stranger.
 begin;
-select plan(67);
+select plan(111);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000021', 'authenticated', 'authenticated'),
@@ -84,6 +84,49 @@ select throws_ok(
   $$select public.post_item('c0000000-0000-0000-0000-000000000027', (select id from t_b),
     'note', 'butter', 'sneak', null, null, null, null, false, null)$$,
   'P0001', 'not_member', 'stranger cannot post');
+reset role;
+
+-- Null/oversize input raises invalid_input, never a raw Postgres error.
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000021', true);
+set role authenticated;
+select throws_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-000000000030', (select id from t_b),
+    null, 'butter', 'x', null, null, null, null, false, null)$$,
+  'P0001', 'invalid_input', 'null type rejected');
+select throws_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-000000000030', (select id from t_b),
+    'note', null, 'x', null, null, null, null, false, null)$$,
+  'P0001', 'invalid_input', 'null color rejected');
+select throws_ok(
+  $$select public.post_item(null, (select id from t_b),
+    'note', 'butter', 'x', null, null, null, null, false, null)$$,
+  'P0001', 'invalid_input', 'null item id rejected');
+select throws_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-000000000030', (select id from t_b),
+    'note', 'butter', repeat('x', 2001), null, null, null, null, false, null)$$,
+  'P0001', 'invalid_input', 'oversize body rejected');
+select throws_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-000000000030', (select id from t_b),
+    'note', 'butter', 'x', repeat('t', 121), null, null, null, false, null)$$,
+  'P0001', 'invalid_input', 'oversize title rejected');
+select throws_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-000000000031', (select id from t_b),
+    'list', 'paper', null, 'Bad', null, null, null, false, '[{"text":"no id"}]')$$,
+  'P0001', 'invalid_input', 'entry without an id rejected');
+select throws_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-000000000032', (select id from t_b),
+    'list', 'paper', null, 'Bad', null, null, null, false,
+    '[{"id":"000000000000000000000000000000000000","text":"x"}]')$$,
+  'P0001', 'invalid_input', 'malformed 36-char entry id rejected');
+select throws_ok(
+  $$select public.edit_item('c0000000-0000-0000-0000-000000000021', 1, 'x', null, null, null, null)$$,
+  'P0001', 'invalid_input', 'null color on edit rejected');
+select throws_ok(
+  $$select public.set_pinned('c0000000-0000-0000-0000-000000000021', null)$$,
+  'P0001', 'invalid_input', 'null pinned rejected');
+select throws_ok(
+  $$select public.set_done('c0000000-0000-0000-0000-000000000021', null)$$,
+  'P0001', 'invalid_input', 'null done rejected');
 reset role;
 
 -- edit_item authorship and versions, as O (author) and M (non-author).
@@ -288,6 +331,129 @@ select is(
   (select count(*)::integer from public.list_entries
    where item_id = 'c0000000-0000-0000-0000-000000000095'),
   1, 're-post does not attach entries to the existing item');
+
+-- ---------------------------------------------------------------------------
+-- Hardening: finite/per-type fields, stale unpin/undo floors, keep_longer
+-- cap, idempotent no-ops, and date edits that keep an extended lifetime.
+-- ---------------------------------------------------------------------------
+
+-- Non-finite or wrong-type fields are rejected as invalid_input.
+select throws_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-0000000000a6', (select id from t_b),
+    'date', 'sky', null, 'Far', 'infinity', null, null, false, null)$$,
+  'P0001', 'invalid_input', 'infinite event_at rejected');
+select throws_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-0000000000a7', (select id from t_b),
+    'note', 'butter', 'x', null, '2027-01-01T00:00:00Z', null, null, false, null)$$,
+  'P0001', 'invalid_input', 'a note cannot carry event_at');
+select throws_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-0000000000a8', (select id from t_b),
+    'note', 'butter', 'x', 'Title', null, null, null, false, null)$$,
+  'P0001', 'invalid_input', 'a note cannot carry a title');
+select throws_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-0000000000a9', (select id from t_b),
+    'note', 'butter', 'x', null, null, 'Park', null, false, null)$$,
+  'P0001', 'invalid_input', 'a note cannot carry a place');
+
+-- Unpinning an old done item floors its lifetime at now + 2 days.
+select lives_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-0000000000a1', (select id from t_b),
+    'note', 'butter', 'stale done', null, null, null, null, false, null)$$,
+  'post note for stale-unpin test');
+select lives_ok($$select public.set_pinned('c0000000-0000-0000-0000-0000000000a1', true)$$, 'pin it');
+select lives_ok($$select public.set_done('c0000000-0000-0000-0000-0000000000a1', true)$$, 'mark it done');
+reset role;
+update public.items
+set done_at = now() - interval '10 days'
+where id = 'c0000000-0000-0000-0000-0000000000a1';
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000021', true);
+set role authenticated;
+select lives_ok(
+  $$select public.set_pinned('c0000000-0000-0000-0000-0000000000a1', false)$$,
+  'unpin the stale done item');
+select ok(
+  (select keep_until > now() + interval '1 day 23 hours'
+      and keep_until < now() + interval '2 days 1 hour'
+   from public.items where id = 'c0000000-0000-0000-0000-0000000000a1'),
+  'unpinning floors the lifetime at now + 2 days');
+
+-- keep_longer cannot extend an item beyond 30 days from now.
+select lives_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-0000000000a2', (select id from t_b),
+    'note', 'butter', 'cap me', null, null, null, null, false, null)$$,
+  'post note for the cap test');
+select lives_ok($$select public.keep_longer('c0000000-0000-0000-0000-0000000000a2')$$, 'keep longer 1');
+select lives_ok($$select public.keep_longer('c0000000-0000-0000-0000-0000000000a2')$$, 'keep longer 2');
+select lives_ok($$select public.keep_longer('c0000000-0000-0000-0000-0000000000a2')$$, 'keep longer 3');
+select lives_ok($$select public.keep_longer('c0000000-0000-0000-0000-0000000000a2')$$, 'keep longer 4');
+select lives_ok($$select public.keep_longer('c0000000-0000-0000-0000-0000000000a2')$$, 'keep longer 5');
+select ok(
+  (select keep_until > now() + interval '29 days'
+      and keep_until < now() + interval '30 days 1 minute'
+   from public.items where id = 'c0000000-0000-0000-0000-0000000000a2'),
+  'keep_longer is capped at now + 30 days');
+select lives_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-0000000000aa', (select id from t_b),
+    'date', 'sky', null, 'Next year', '2027-06-01T10:00:00Z', null, null, false, null)$$,
+  'post a far-future date');
+select lives_ok($$select public.keep_longer('c0000000-0000-0000-0000-0000000000aa')$$, 'keep longer on a far date');
+select is(
+  (select keep_until from public.items where id = 'c0000000-0000-0000-0000-0000000000aa'),
+  '2027-06-02T00:00:00+00'::timestamptz, 'keep_longer never shortens a far-future date');
+
+-- Repeating a state change is a no-op.
+select lives_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-0000000000a3', (select id from t_b),
+    'note', 'butter', 'done once', null, null, null, null, false, null)$$,
+  'post note for done-idempotency');
+select lives_ok($$select public.set_done('c0000000-0000-0000-0000-0000000000a3', true)$$, 'mark done');
+select is(
+  (select version from public.items where id = 'c0000000-0000-0000-0000-0000000000a3'),
+  2, 'done bumps the version');
+select lives_ok($$select public.set_done('c0000000-0000-0000-0000-0000000000a3', true)$$, 're-mark done');
+select is(
+  (select version from public.items where id = 'c0000000-0000-0000-0000-0000000000a3'),
+  2, 're-marking done is a no-op');
+select lives_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-0000000000a4', (select id from t_b),
+    'note', 'butter', 'never changed', null, null, null, null, false, null)$$,
+  'post note for pin/undo idempotency');
+select lives_ok($$select public.set_pinned('c0000000-0000-0000-0000-0000000000a4', false)$$, 'unpin an unpinned note');
+select is(
+  (select version from public.items where id = 'c0000000-0000-0000-0000-0000000000a4'),
+  1, 'unpin on an unpinned note is a no-op');
+select lives_ok($$select public.set_done('c0000000-0000-0000-0000-0000000000a4', false)$$, 'undo a not-done note');
+select is(
+  (select version from public.items where id = 'c0000000-0000-0000-0000-0000000000a4'),
+  1, 'undo on a not-done note is a no-op');
+
+-- Editing a date only recomputes the lifetime when the event changes.
+select lives_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-0000000000a5', (select id from t_b),
+    'date', 'sky', null, 'Far Away', '2027-03-01T10:00:00Z', 'Park', null, false, null)$$,
+  'post date for the keep-longer edit test');
+reset role;
+update public.items
+set keep_until = now() + interval '20 days'
+where id = 'c0000000-0000-0000-0000-0000000000a5';
+create temp table t_date_keep as
+  select keep_until from public.items where id = 'c0000000-0000-0000-0000-0000000000a5';
+grant select on t_date_keep to authenticated;
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000021', true);
+set role authenticated;
+select lives_ok(
+  $$select public.edit_item('c0000000-0000-0000-0000-0000000000a5', 1, null, 'Far Away!', '2027-03-01T10:00:00Z', 'Park', 'sky')$$,
+  'edit the date title without changing the event');
+select is(
+  (select keep_until from public.items where id = 'c0000000-0000-0000-0000-0000000000a5'),
+  (select keep_until from t_date_keep),
+  'editing without a new event keeps the existing lifetime');
+select lives_ok(
+  $$select public.edit_item('c0000000-0000-0000-0000-0000000000a5', 2, null, 'Moved', '2027-04-01T10:00:00Z', 'Park', 'sky')$$,
+  'edit the date event');
+select is(
+  (select keep_until from public.items where id = 'c0000000-0000-0000-0000-0000000000a5'),
+  '2027-04-02T00:00:00+00'::timestamptz, 'a changed event recomputes the expiry');
 reset role;
 
 select * from finish();

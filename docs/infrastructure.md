@@ -57,11 +57,40 @@ the Vault/dashboard (`db push` does not run seeds).
 - `delete-account` — called by the app after `delete_account()`; removes the
   auth user via the admin API. `verify_jwt = true`.
 - `purge` — nightly (via pg_cron/pg_net); hard-deletes items removed >30 days
-  ago and sweeps orphan photo files. Service-role only.
+  ago, sweeps orphan photos, and removes avatar files that are no longer a
+  user's current avatar. `verify_jwt = false`; it checks a job secret itself.
 - `cleanup-users` — nightly; deletes idle anonymous users with no boards.
+  Candidate selection + re-check run in SQL (see below). Same job secret.
+
+Both scheduled functions authenticate the request themselves: pg_net sends
+`Authorization: Bearer <job secret>` (Vault secret `job_secret`), compared in
+constant time against `JOB_SECRET` (Edge Function secret), falling back to
+`SUPABASE_SERVICE_ROLE_KEY` only when `JOB_SECRET` is unset. The job secret may
+be a legacy service-role JWT **or** a new `sb_secret_…` key — whatever is put in
+Vault must be the same value the function expects in `JOB_SECRET`. The
+service-role key is still used inside the functions for the admin API.
 
 Test locally with `supabase functions serve --env-file supabase/.env.local`
 (needs `SUPABASE_SERVICE_ROLE_KEY`).
+
+### Job health
+
+Failures are visible without reading container logs:
+
+```sql
+-- cron runs that didn't succeed in the last day
+select * from public.job_failures();
+-- pg_net deliveries with a 4xx/5xx or error in the last day
+select * from public.http_failures();
+```
+
+Both are service-role only. `run_edge_job` also raises a `WARNING` (visible in
+Postgres logs) when `functions_url`/`job_secret` are missing, instead of
+silently doing nothing. The raw tables are `cron.job_run_details` and
+`net._http_response`. `net` is owned by `supabase_admin`, so its default
+anon/authenticated grants can't be revoked by migrations (the API already never
+routes to it — see `api.schemas`); revoke them as `supabase_admin` in the
+hosted SQL editor if you want them gone.
 
 ## Production (hosted Supabase)
 
@@ -77,11 +106,13 @@ Test locally with `supabase functions serve --env-file supabase/.env.local`
 5. Set the Vault secret `invite` (Dashboard → Vault, or SQL).
 6. Deploy Edge Functions: `supabase functions deploy purge cleanup-users
    delete-account`.
-7. Give the nightly jobs their endpoint + key via **Vault** (not a setting):
+7. Give the nightly jobs their endpoint + shared secret via **Vault** (not a
+   setting), and set the matching Edge Function secret `JOB_SECRET` (use a
+   random value; do not reuse the service-role key):
 
    ```sql
    select vault.create_secret('https://<ref>.functions.supabase.co', 'functions_url');
-   select vault.create_secret('<service role key>', 'service_role_key');
+   select vault.create_secret('<random job secret>', 'job_secret');
    ```
 
    The jobs are always scheduled; they become active once these secrets exist.
@@ -93,6 +124,24 @@ Test locally with `supabase functions serve --env-file supabase/.env.local`
 10. Before launch: turn on point-in-time recovery, review the security and
     performance advisors, and set anonymous-sign-in rate limits.
 
+### Hosted auth checklist (per project)
+
+`config.toml` only configures the local stack; set these in each hosted
+project's dashboard:
+
+- **SMTP** (`Auth → Email`): a real provider (host/port/user/pass + sender) so
+  magic-link and confirmation mail actually sends. Without it, email sign-in
+  silently fails in production.
+- **Site URL + Redirect URLs**: `site_url` = the web origin, and
+  `noticeboard://auth` (plus the web origin if used) in Redirect URLs, or
+  linking/sign-in can't complete.
+- **CAPTCHA** (`Auth → Settings`): Turnstile on with the secret, matching the
+  app's `EXPO_PUBLIC_TURNSTILE_SITE_KEY`.
+- **Email confirmations on** (`Auth → Email → Confirm email`). With manual
+  linking enabled and confirmations off, anyone could link an email they don't
+  control and claim it.
+- **Anonymous sign-ins on** and a per-IP rate limit (Auth → Rate Limits).
+
 ## Tests & CI
 
 - **Unit** (`node scripts/run-unit-tests.cjs`) — compiles the pure modules
@@ -101,10 +150,12 @@ Test locally with `supabase functions serve --env-file supabase/.env.local`
 - **DB** (`supabase test db`) — pgTAP suites in `supabase/tests/`:
   `01_tables_rls`, `02_boards`, `03_items`, `04_entries`, `05_invites`,
   `06_storage`, `07_accounts`, `08_jobs`, `09_position`, `10_privileges`,
-  `11_authz`, `12_expiry`.
+  `11_authz`, `12_expiry`, `13_service_role`.
+- **Edge Functions** — `deno check supabase/functions/*/index.ts` (in the
+  `check` job).
 - **CI** (`.github/workflows/ci.yml`): job `check` = `npm ci
-  --legacy-peer-deps` → `tsc --noEmit` → `expo lint` → unit tests; job
-  `database` = `supabase/setup-cli` → `supabase start` → `db reset` →
+  --legacy-peer-deps` → `tsc --noEmit` → `expo lint` → unit tests → deno check;
+  job `database` = `supabase/setup-cli` → `supabase start` → `db reset` →
   `test db` → `db lint`.
 - **Deploy** (`.github/workflows/deploy.yml`, manual `workflow_dispatch`):
   links a hosted project and runs `supabase db push`. Pick the environment

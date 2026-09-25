@@ -10,6 +10,20 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const base = appJson.expo as unknown as ExpoConfig;
   const inviteBase = process.env.EXPO_PUBLIC_INVITE_BASE_URL ?? '';
 
+  // A production build must know its public origin: universal links and the
+  // Turnstile page origin both depend on it, and a silent empty value would
+  // ship a broken invite/captcha flow.
+  const isProdBuild =
+    process.env.EAS_BUILD === 'true' && process.env.EAS_BUILD_PROFILE === 'production';
+  if (isProdBuild) {
+    if (!inviteBase) {
+      throw new Error('EXPO_PUBLIC_INVITE_BASE_URL is required for a production build.');
+    }
+    if (!/^https:\/\/[^/]+/i.test(inviteBase)) {
+      throw new Error('EXPO_PUBLIC_INVITE_BASE_URL must be an https:// URL.');
+    }
+  }
+
   let host = '';
   try {
     if (inviteBase) host = new URL(inviteBase).host;

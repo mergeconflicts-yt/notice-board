@@ -1,7 +1,7 @@
 -- Phase 1d: direct table access is closed; reads are member-scoped.
 -- Roles: O owner, M member, S stranger (all authenticated), plus anon.
 begin;
-select plan(23);
+select plan(27);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated'),
@@ -65,6 +65,9 @@ set role authenticated;
 select is((select count(*)::integer from public.boards), 1, 'member reads board');
 select is((select count(*)::integer from public.items), 1, 'member reads items');
 select is(
+  (select layout from public.visible_items where id = 'c0000000-0000-0000-0000-000000000001'),
+  null, 'view exposes the layout column');
+select is(
   (select count(*)::integer from public.profiles where id = 'a0000000-0000-0000-0000-000000000001'),
   1, 'member reads co-member profile');
 select throws_ok(
@@ -82,6 +85,22 @@ select throws_ok(
   $$update public.profiles set display_name = 'x' where id = 'a0000000-0000-0000-0000-000000000001'$$,
   '42501', 'permission denied for table profiles', 'owner cannot update profiles directly');
 reset role;
+
+-- Path constraints and supporting indexes exist.
+select throws_ok(
+  $$insert into public.items (id, board_id, type, body, photo_path) values
+    ('c0000000-0000-0000-0000-000000000098', 'b0000000-0000-0000-0000-000000000001',
+     'photo', 'x', 'not-a-uuid/path.jpg')$$,
+  '23514', null, 'malformed photo_path rejected by the table');
+select throws_ok(
+  $$update public.profiles set avatar_path = 'nope/x.jpg'
+    where id = 'a0000000-0000-0000-0000-000000000001'$$,
+  '23514', null, 'malformed avatar_path rejected by the table');
+select is(
+  (select count(*)::integer from pg_indexes
+   where schemaname = 'public'
+     and indexname in ('items_board_updated_idx', 'items_board_deleted_idx', 'invites_created_by_idx')),
+  3, 'delta/purge/lookup indexes exist');
 
 select * from finish();
 rollback;

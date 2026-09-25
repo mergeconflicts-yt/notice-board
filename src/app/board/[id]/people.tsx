@@ -36,12 +36,20 @@ export default function PeopleScreen() {
 
   const shareLink = async () => {
     if (!board || !invite) return;
-    await Share.share({ message: inviteMessage(board.name, invite.token) });
+    try {
+      await Share.share({ message: inviteMessage(board.name, invite.token) });
+    } catch {
+      // The sheet was dismissed or is unavailable — nothing to report.
+    }
   };
 
   const shareCode = async () => {
     if (!board || !invite) return;
-    await Share.share({ message: inviteCodeMessage(board.name, invite.code) });
+    try {
+      await Share.share({ message: inviteCodeMessage(board.name, invite.code) });
+    } catch {
+      // The sheet was dismissed or is unavailable — nothing to report.
+    }
   };
 
   const resetLink = async () => {

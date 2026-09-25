@@ -11,8 +11,33 @@ if (!url || !anonKey) {
   );
 }
 
+/**
+ * GoTrue only treats 500/501/502/503/504 (and a few Cloudflare codes) as
+ * temporary: any other status — including a 429 from a rate-limited token
+ * refresh — is treated as a permanent failure and the stored session is
+ * deleted. Present a 429 on the token endpoint as a 503 so the refresh is
+ * retried and the session is kept.
+ */
+const authFetch: typeof fetch = async (input, init) => {
+  const response = await fetch(input, init);
+  if (response.status !== 429) return response;
+  const url =
+    typeof input === 'string'
+      ? input
+      : input instanceof Request
+        ? input.url
+        : String(input);
+  if (!url.includes('/token')) return response;
+  return new Response(response.body, {
+    status: 503,
+    statusText: 'Service Unavailable',
+    headers: response.headers,
+  });
+};
+
 /** The single Supabase client for the whole app (docs/plan.md §8.1). */
 export const supabase = createClient<Database>(url, anonKey, {
+  global: { fetch: authFetch },
   auth: {
     storage: LargeSecureStore,
     autoRefreshToken: true,

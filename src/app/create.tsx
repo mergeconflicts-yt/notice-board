@@ -44,6 +44,7 @@ export default function CreateBoardScreen() {
             placeholderTextColor={colors.inkFaint}
             value={name}
             onChangeText={setName}
+            maxLength={60}
             autoFocus
           />
           <Text style={[styles.label, styles.colorLabel]}>Colour</Text>

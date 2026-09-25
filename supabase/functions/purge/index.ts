@@ -5,6 +5,7 @@
 //   3. sweeps orphan photo files older than 24h;
 //   4. deletes avatars belonging to accounts that no longer exist.
 import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2';
+import { authorized } from '../_shared/auth.ts';
 
 const PHOTOS = 'board-photos';
 const AVATARS = 'avatars';
@@ -62,13 +63,9 @@ async function requireCount(query: PromiseLike<{ count: number | null; error: un
 }
 
 Deno.serve(async (req: Request) => {
-  const auth = req.headers.get('Authorization') ?? '';
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  // Exact compare — an empty key must never let a caller through.
-  if (!serviceKey || auth !== `Bearer ${serviceKey}`) {
-    return new Response('forbidden', { status: 403 });
-  }
+  if (!authorized(req)) return new Response('forbidden', { status: 403 });
 
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, serviceKey);
 
   try {
@@ -110,20 +107,31 @@ Deno.serve(async (req: Request) => {
       .map((o) => o.path);
     const orphans = toRemove.length > 0 ? await removeObjects(admin, PHOTOS, toRemove) : 0;
 
-    // --- 4. Avatars of accounts that no longer exist ---------------------
+    // --- 4. Avatar files that are no longer a user's current avatar ------
+    // Removes avatars of deleted accounts AND stale/replaced files for living
+    // users. Avatars should be uploaded as <user_id>/avatar.jpg with upsert;
+    // any other object under a folder is unreferenced and can go.
     const avatarObjects = await listAll(admin, AVATARS);
     const folders = [...new Set(avatarObjects.map((o) => o.path.split('/')[0]).filter(Boolean))];
     let avatars = 0;
     for (const part of chunk(folders, CHUNK)) {
-      const { data: existing, error } = await admin.from('profiles').select('id').in('id', part);
+      const { data: existing, error } = await admin
+        .from('profiles')
+        .select('id, avatar_path')
+        .in('id', part);
       if (error) throw new Error(`profiles read failed: ${error.message}`);
-      const alive = new Set((existing ?? []).map((p) => p.id));
-      const gone = part.filter((id) => !alive.has(id));
-      if (gone.length === 0) continue;
-      const owned = avatarObjects
-        .filter((o) => gone.includes(o.path.split('/')[0]))
+      const current = new Map(
+        (existing ?? []).map((p) => [p.id, p.avatar_path as string | null]),
+      );
+      const stale = avatarObjects
+        .filter((o) => {
+          const uid = o.path.split('/')[0];
+          if (!part.includes(uid)) return false;
+          if (!current.has(uid)) return true; // account no longer exists
+          return o.path !== current.get(uid); // replaced / older file
+        })
         .map((o) => o.path);
-      if (owned.length > 0) avatars += await removeObjects(admin, AVATARS, owned);
+      if (stale.length > 0) avatars += await removeObjects(admin, AVATARS, stale);
     }
 
     return Response.json({ purged, boards: boardsDeleted ?? 0, orphans, avatars });

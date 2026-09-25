@@ -1,6 +1,6 @@
 -- Manual note positions: any member may move a note; the spot persists.
 begin;
-select plan(11);
+select plan(12);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000081', 'authenticated', 'authenticated'),
@@ -39,6 +39,9 @@ select is(
 select is(
   (select version from public.items where id = 'c0000000-0000-0000-0000-000000000081'),
   1, 'move does not bump the version');
+select is(
+  (select updated_by from public.items where id = 'c0000000-0000-0000-0000-000000000081'),
+  null, 'move does not stamp updated_by');
 
 -- Note the clamp: x follows the member who moved it.
 select is(

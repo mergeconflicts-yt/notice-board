@@ -23,6 +23,7 @@ revoke execute on function public.run_list_lifetime(uuid) from public, anon, aut
 revoke execute on function public.promote_longest_member(uuid) from public, anon, authenticated;
 revoke execute on function public.expire_items() from public, anon, authenticated;
 revoke execute on function public.cleanup_rate_limits() from public, anon, authenticated;
+revoke execute on function public.purge_stale_invites() from public, anon, authenticated;
 revoke execute on function public.run_edge_job(text) from public, anon, authenticated;
 revoke execute on function public.expired_for_purge(integer) from public, anon, authenticated;
 revoke execute on function public.photo_paths_in_use() from public, anon, authenticated;
@@ -45,7 +46,8 @@ create policy "avatars_shared_read" on storage.objects
     and (
       split_part(name, '/', 1) = auth.uid()::text
       or (
-        split_part(name, '/', 1) ~ '^[0-9a-fA-F-]{36}$'
+        split_part(name, '/', 1)
+          ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         and exists (
           select 1
           from public.board_members me

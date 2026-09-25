@@ -29,6 +29,9 @@ const TABS: { id: ComposerTab; label: string; icon: keyof typeof MaterialCommuni
   { id: 'date', label: 'Date', icon: 'calendar-month-outline' },
 ];
 
+/** Mirrors the server's per-list entry cap. */
+const MAX_ROWS = 500;
+
 export type NoteDraft = {
   type: ItemType;
   color: ItemColor;
@@ -64,6 +67,8 @@ type Props = {
   /** Present when editing; drives the initial tab and fields. */
   initial?: ItemWithAuthor | null;
   entries?: { id: string; text: string }[];
+  /** Signed URL of the existing photo when editing a photo post. */
+  photoUrl?: string | null;
   onClose: () => void;
   onSubmit: (draft: NoteDraft) => void;
 };
@@ -74,6 +79,7 @@ export function AddNoteSheet({
   submitLabel = 'Post',
   initial = null,
   entries = [],
+  photoUrl = null,
   onClose,
   onSubmit,
 }: Props) {
@@ -115,7 +121,7 @@ export function AddNoteSheet({
               : '',
         );
         setListTitle(initial.type === 'list' ? (initial.title ?? '') : '');
-        setListNotes('');
+        setListNotes(initial.type === 'list' ? (initial.body ?? '') : '');
         setRows(initial.type === 'list' ? entries.map((e) => ({ id: e.id, text: e.text })) : []);
         setPlace(initial.place ?? '');
         setEventAt(initial.eventAt ? new Date(initial.eventAt) : defaultEventAt());
@@ -149,9 +155,10 @@ export function AddNoteSheet({
   const filledRows = rows.filter((r) => r.text.trim().length > 0);
   const canPost = !submitting && (
     tab === 'note'
-      ? text.trim().length > 0 || editing
+      // A note edit must not save empty text.
+      ? text.trim().length > 0
       : tab === 'photo'
-        ? photoUri != null || editing
+        ? photoUri != null || (editing && initial?.photoPath != null)
         : tab === 'list'
           ? filledRows.length > 0
           : text.trim().length > 0
@@ -176,6 +183,7 @@ export function AddNoteSheet({
   const focusRow = (id: string) => rowInputRefs.current.get(id)?.focus();
 
   const addRowAndFocus = () => {
+    if (filledRows.length >= MAX_ROWS) return;
     const row = { id: randomId(), text: '' };
     pendingFocusRowId.current = row.id;
     setRows((prev) => [...prev, row]);
@@ -197,7 +205,7 @@ export function AddNoteSheet({
       const parsed = parseListItems(text);
       if (parsed.items.length > 0) {
         setListTitle(parsed.title ?? '');
-        setRows(parsed.items.map((it) => ({ id: randomId(), text: it.text })));
+        setRows(parsed.items.map((it) => ({ id: randomId(), text: it.text })).slice(0, MAX_ROWS));
       } else {
         setRows([{ id: randomId(), text: '' }, { id: randomId(), text: '' }, { id: randomId(), text: '' }]);
       }
@@ -214,7 +222,7 @@ export function AddNoteSheet({
         title: listTitle.trim(),
         eventAt: null,
         place: '',
-        entries: filledRows.map((r) => ({ id: r.id, text: r.text.trim() })),
+        entries: filledRows.slice(0, MAX_ROWS).map((r) => ({ id: r.id, text: r.text.trim() })),
         photoUri: null,
       });
       return;
@@ -314,6 +322,7 @@ export function AddNoteSheet({
                   multiline
                   autoFocus
                   textAlignVertical="top"
+                  maxLength={2000}
                   selectionColor={palette.ink}
                 />
               </View>
@@ -324,7 +333,7 @@ export function AddNoteSheet({
                 {photoUri || initial?.photoPath ? (
                   <View style={styles.previewWrap}>
                     <Image
-                      source={{ uri: photoUri ?? undefined }}
+                      source={{ uri: photoUri ?? photoUrl ?? undefined }}
                       style={styles.preview}
                       resizeMode="cover"
                     />
@@ -354,6 +363,7 @@ export function AddNoteSheet({
                   onChangeText={setText}
                   multiline
                   textAlignVertical="top"
+                  maxLength={2000}
                 />
               </View>
             ) : null}
@@ -374,6 +384,7 @@ export function AddNoteSheet({
                   placeholderTextColor={colors.inkFaint}
                   value={listTitle}
                   onChangeText={setListTitle}
+                  maxLength={120}
                   returnKeyType="next"
                   blurOnSubmit={false}
                   onSubmitEditing={() => {
@@ -391,6 +402,7 @@ export function AddNoteSheet({
                         placeholderTextColor={colors.inkFaint}
                         value={row.text}
                         onChangeText={(v) => updateRow(row.id, v)}
+                        maxLength={200}
                         onSubmitEditing={() => submitRow(index)}
                         returnKeyType="next"
                         blurOnSubmit={false}
@@ -418,6 +430,7 @@ export function AddNoteSheet({
                   placeholderTextColor={colors.inkFaint}
                   value={listNotes}
                   onChangeText={setListNotes}
+                  maxLength={2000}
                   multiline
                 />
               </View>
@@ -435,6 +448,7 @@ export function AddNoteSheet({
                     multiline
                     autoFocus
                     textAlignVertical="top"
+                    maxLength={120}
                     selectionColor={palette.ink}
                   />
                 </View>
@@ -484,6 +498,7 @@ export function AddNoteSheet({
                   placeholderTextColor={colors.inkFaint}
                   value={place}
                   onChangeText={setPlace}
+                  maxLength={120}
                 />
               </View>
             ) : null}

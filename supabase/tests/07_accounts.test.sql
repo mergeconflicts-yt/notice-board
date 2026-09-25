@@ -1,7 +1,7 @@
 -- Phase 5: account deletion keeps shared boards and posts.
 -- O deletes their account; M is a co-member of a shared board.
 begin;
-select plan(8);
+select plan(10);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000061', 'authenticated', 'authenticated'),
@@ -18,6 +18,20 @@ insert into public.board_members (board_id, user_id, role) values
 insert into public.items (id, board_id, type, body, created_by) values
   ('c0000000-0000-0000-0000-000000000061', 'b0000000-0000-0000-0000-000000000062',
    'note', 'O wrote this', 'a0000000-0000-0000-0000-000000000061');
+
+-- update_profile keeps the avatar unless the clear flag is set.
+update public.profiles
+set avatar_path = 'a0000000-0000-0000-0000-000000000061/a.jpg'
+where id = 'a0000000-0000-0000-0000-000000000061';
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000061', true);
+set role authenticated;
+select is(
+  (select avatar_path from public.update_profile('Renamed')),
+  'a0000000-0000-0000-0000-000000000061/a.jpg', 'rename keeps the avatar');
+select is(
+  (select avatar_path from public.update_profile('Renamed', null, true)),
+  null, 'explicit clear removes the avatar');
+reset role;
 
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000061', true);
 set role authenticated;

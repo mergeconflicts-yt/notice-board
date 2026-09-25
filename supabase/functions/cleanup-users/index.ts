@@ -1,52 +1,38 @@
 // Edge Function: cleanup-users (docs/plan.md §10). Service-role only.
-// Deletes anonymous users with no board memberships and no sign-in for 30 days.
+// Deletes anonymous users with no board memberships and no recent activity.
+//
+// Candidate selection runs in SQL (inactive_anonymous_user_ids), joining
+// auth.users against board_members so it scales and sees boards joined
+// mid-run; activity includes token refreshes, not just last_sign_in_at. Each
+// id is re-checked (is_inactive_anonymous_user) immediately before deletion.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { authorized } from '../_shared/auth.ts';
 
-const IDLE_DAYS = 30;
-const PER_PAGE = 200;
+const MAX_PER_RUN = 500;
 
 Deno.serve(async (req: Request) => {
-  const auth = req.headers.get('Authorization') ?? '';
+  if (!authorized(req)) return new Response('forbidden', { status: 403 });
+
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  // Exact compare — an empty key must never let a caller through.
-  if (!serviceKey || auth !== `Bearer ${serviceKey}`) {
-    return new Response('forbidden', { status: 403 });
-  }
-
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, serviceKey);
-  const idleCutoff = Date.now() - IDLE_DAYS * 864e5;
 
-  // Collect first, delete afterwards: deleting while paging shifts later users
-  // into pages already read, so they'd be skipped.
-  const candidates: string[] = [];
-  let page = 1;
-  for (;;) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: PER_PAGE });
-    if (error) return new Response(error.message, { status: 500 });
-    const users = data.users ?? [];
-    if (users.length === 0) break;
-    for (const user of users) {
-      const isAnon = (user as { is_anonymous?: boolean }).is_anonymous === true;
-      const lastSignIn = user.last_sign_in_at ? new Date(user.last_sign_in_at).getTime() : 0;
-      if (!isAnon || lastSignIn > idleCutoff) continue;
-      candidates.push(user.id);
-    }
-    if (users.length < PER_PAGE) break;
-    page += 1;
-  }
+  const { data: ids, error } = await admin.rpc('inactive_anonymous_user_ids', {
+    p_limit: MAX_PER_RUN,
+  });
+  if (error) return new Response(error.message, { status: 500 });
 
   let deleted = 0;
-  for (const id of candidates) {
-    const { count, error } = await admin
-      .from('board_members')
-      .select('user_id', { count: 'exact', head: true })
-      .eq('user_id', id);
-    // If we can't confirm the user has no boards, don't delete them.
-    if (error) continue;
-    if (count && count > 0) continue;
+  for (const id of ids ?? []) {
+    // Re-check in the database right before deleting: a board joined or a
+    // session refreshed since the candidate query must win.
+    const { data: stillIdle, error: checkError } = await admin.rpc(
+      'is_inactive_anonymous_user',
+      { p_id: id },
+    );
+    if (checkError || stillIdle !== true) continue;
     const { error: delError } = await admin.auth.admin.deleteUser(id);
     if (!delError) deleted += 1;
   }
 
-  return Response.json({ deleted });
+  return Response.json({ candidates: ids?.length ?? 0, deleted });
 });

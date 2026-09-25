@@ -551,6 +551,19 @@ export type Database = {
       delete_account: { Args: never; Returns: undefined }
       delete_board: { Args: { p_board_id: string }; Returns: undefined }
       edit_entry: { Args: { p_id: string; p_text: string }; Returns: undefined }
+      edit_list: {
+        Args: {
+          p_adds?: Json
+          p_body?: string
+          p_color: Database["public"]["Enums"]["item_color"]
+          p_edits?: Json
+          p_expected_version: number
+          p_item_id: string
+          p_removes?: string[]
+          p_title: string
+        }
+        Returns: undefined
+      }
       edit_item: {
         Args: {
           p_body: string
@@ -731,7 +744,7 @@ export type Database = {
         Returns: undefined
       }
       update_profile: {
-        Args: { p_avatar_path?: string; p_display_name: string }
+        Args: { p_avatar_path?: string; p_clear_avatar?: boolean; p_display_name: string }
         Returns: {
           avatar_path: string | null
           created_at: string

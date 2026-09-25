@@ -26,7 +26,11 @@ create type item_color as enum ('butter', 'blush', 'sage', 'sky', 'lavender', 'p
 create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   display_name text not null check (char_length(btrim(display_name)) between 1 and 40),
-  avatar_path text,
+  avatar_path text check (
+    avatar_path is null
+    or (char_length(avatar_path) <= 200
+        and avatar_path ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[^/]+$')
+  ),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -60,7 +64,11 @@ create table public.items (
   title text check (char_length(title) <= 120),
   event_at timestamptz,
   place text check (char_length(place) <= 120),
-  photo_path text,
+  photo_path text check (
+    photo_path is null
+    or (char_length(photo_path) <= 200
+        and photo_path ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[^/]+$')
+  ),
   pinned boolean not null default false,
   keep_until timestamptz,
   done_at timestamptz,
@@ -122,6 +130,11 @@ create table public.rate_limits (
 
 create index items_board_created_idx on public.items (board_id, created_at desc)
   where deleted_at is null;
+-- Delta catch-up reads (`updated_at > since`) and purge cascades.
+create index items_board_updated_idx on public.items (board_id, updated_at);
+-- list_removed_items (board + already deleted).
+create index items_board_deleted_idx on public.items (board_id, deleted_at)
+  where deleted_at is not null;
 create index items_keep_until_idx on public.items (keep_until)
   where deleted_at is null and keep_until is not null;
 create index items_deleted_at_idx on public.items (deleted_at)
@@ -130,6 +143,7 @@ create index list_entries_item_position_idx on public.list_entries (item_id, pos
 create index list_entries_board_idx on public.list_entries (board_id);
 create index board_members_user_idx on public.board_members (user_id);
 create index invites_board_idx on public.invites (board_id);
+create index invites_created_by_idx on public.invites (created_by);
 
 -- "Who did it" columns: indexed so account deletion (which nulls these on
 -- ON DELETE SET NULL) and audits don't scan the whole table.

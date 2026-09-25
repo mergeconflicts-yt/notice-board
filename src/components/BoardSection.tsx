@@ -18,6 +18,8 @@ type Props = {
   onDragUpdate?: (item: ItemWithAuthor, screenY: number) => void;
   /** Shown in place of the canvas when the section has no items. */
   emptyHint?: string;
+  /** Bumped when a drop wasn't persisted, to snap the note back. */
+  resetKey?: number;
 };
 
 /**
@@ -35,6 +37,7 @@ export function BoardSection({
   onDragStart,
   onDragUpdate,
   emptyHint,
+  resetKey,
 }: Props) {
   const [boardW, setBoardW] = useState(0);
   const [measured, setMeasured] = useState<Record<string, number>>({});
@@ -110,6 +113,7 @@ export function BoardSection({
                   onDragUpdate={onDragUpdate}
                   onMove={handleMove}
                   onMeasure={handleMeasure}
+                  resetKey={resetKey}
                 />
               );
             })

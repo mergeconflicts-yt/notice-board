@@ -34,8 +34,6 @@ export default function BoardSettingsScreen() {
   const name = draftName ?? board?.name ?? '';
   const myMembership = user ? members.find((m) => m.userId === user.id) : undefined;
   const isOwner = myMembership?.role === 'owner';
-  const owners = members.filter((m) => m.role === 'owner');
-  const isSoleOwner = isOwner && owners.length === 1 && owners[0]?.userId === user?.id;
   const memberCount = members.length;
 
   const pickColor = async (color: BoardColor) => {
@@ -159,6 +157,7 @@ export default function BoardSettingsScreen() {
               onChangeText={setDraftName}
               placeholder="Board name"
               placeholderTextColor={colors.inkFaint}
+              maxLength={60}
               autoFocus
             />
             <View style={styles.editorActions}>
@@ -251,14 +250,14 @@ export default function BoardSettingsScreen() {
 
         <Text style={styles.sectionLabel}>Board access</Text>
         <View style={styles.group}>
-          {!isSoleOwner ? (
+          {memberCount > 1 ? (
             <Pressable style={styles.row} onPress={confirmLeave}>
               <Text style={[styles.rowLabel, styles.dangerText]}>Leave board</Text>
             </Pressable>
           ) : null}
           {isOwner ? (
             <>
-              {!isSoleOwner ? <View style={styles.divider} /> : null}
+              {memberCount > 1 ? <View style={styles.divider} /> : null}
               <Pressable style={styles.row} onPress={confirmDelete}>
                 <Text style={[styles.rowLabel, styles.dangerText]}>Delete board</Text>
               </Pressable>

@@ -1,7 +1,7 @@
 -- Phase 1d: list entry RPCs — positions, ticks, edits, lifetime rule.
 -- Roles: O owner, M member, S stranger. Board B2 (O only) for cross-board.
 begin;
-select plan(37);
+select plan(52);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000031', 'authenticated', 'authenticated'),
@@ -115,6 +115,20 @@ select ok(
   (select keep_until > now() and keep_until < now() + interval '3 days'
    from public.items where id = 'c0000000-0000-0000-0000-000000000031'),
   'all checked sets 2-day keep');
+-- Re-ticking an already-ticked entry is a no-op: the lifetime must not move.
+reset role;
+create temp table t_entry_keep as
+  select keep_until from public.items where id = 'c0000000-0000-0000-0000-000000000031';
+grant select on t_entry_keep to authenticated;
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000032', true);
+set role authenticated;
+select lives_ok(
+  $$select public.set_entry_checked('d0000000-0000-0000-0000-000000000031', true)$$,
+  're-tick an already-ticked entry');
+select is(
+  (select keep_until from public.items where id = 'c0000000-0000-0000-0000-000000000031'),
+  (select keep_until from t_entry_keep),
+  're-tick does not move the list lifetime');
 select lives_ok(
   $$select public.set_entry_checked('d0000000-0000-0000-0000-000000000031', false)$$,
   'untick one entry');
@@ -138,6 +152,9 @@ select lives_ok(
 select throws_ok(
   $$select public.set_entry_checked('d0000000-0000-0000-0000-000000000031', true)$$,
   'P0001', 'not_found', 'cannot tick entries of a removed list');
+select throws_ok(
+  $$select public.remove_entry('d0000000-0000-0000-0000-000000000031')$$,
+  'P0001', 'not_found', 'cannot remove an entry of a removed list');
 reset role;
 
 -- Pinned lists never expire, and a new entry revives a fully-ticked list.
@@ -179,6 +196,91 @@ select throws_ok(
     (select jsonb_agg(jsonb_build_object('id', gen_random_uuid(), 'text', 'x'))
      from generate_series(1, 501)))$$,
   'P0001', 'invalid_input', 'too many entries in one list rejected');
+reset role;
+
+-- A lifetime change bumps updated_at so delta catch-up reads see it.
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000031', true);
+set role authenticated;
+select lives_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-0000000000b1', (select id from t_b),
+    'list', 'paper', null, 'Delta', null, null, null, false,
+    '[{"id":"d0000000-0000-0000-0000-0000000000b1","text":"x"}]')$$,
+  'post a list for the delta test');
+reset role;
+update public.items
+set updated_at = now() - interval '1 hour'
+where id = 'c0000000-0000-0000-0000-0000000000b1';
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000032', true);
+set role authenticated;
+select lives_ok(
+  $$select public.set_entry_checked('d0000000-0000-0000-0000-0000000000b1', true)$$,
+  'tick the only entry');
+reset role;
+select is(
+  (select updated_at > now() - interval '1 minute' from public.items
+   where id = 'c0000000-0000-0000-0000-0000000000b1'),
+  true, 'a lifetime change bumps updated_at');
+
+-- A retry of an existing entry still succeeds when the list is at the cap.
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000031', true);
+set role authenticated;
+select lives_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-000000000097', (select id from t_b),
+    'list', 'paper', null, 'Full', null, null, null, false, null)$$,
+  'post a list for the cap-retry test');
+reset role;
+insert into public.list_entries (id, item_id, board_id, text, position, created_by)
+select 'd0000000-0000-0000-0000-000000000097', 'c0000000-0000-0000-0000-000000000097',
+       (select id from t_b), 'first', 0, 'a0000000-0000-0000-0000-000000000031';
+insert into public.list_entries (id, item_id, board_id, text, position, created_by)
+select gen_random_uuid(), 'c0000000-0000-0000-0000-000000000097',
+       (select id from t_b), 'filler', g, 'a0000000-0000-0000-0000-000000000031'
+from generate_series(1, 499) g;
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000032', true);
+set role authenticated;
+select is(
+  (select text from public.add_entry('d0000000-0000-0000-0000-000000000097',
+    'c0000000-0000-0000-0000-000000000097', 'changed')),
+  'first', 'retry on a full list returns the stored entry');
+select throws_ok(
+  $$select public.add_entry('d0000000-0000-0000-0000-000000000098',
+    'c0000000-0000-0000-0000-000000000097', 'new')$$,
+  'P0001', 'invalid_input', 'a new entry on a full list is rejected');
+reset role;
+
+-- edit_list: title/colour and all entry changes in one version-checked call.
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000031', true);
+set role authenticated;
+select lives_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-0000000000c1', (select id from t_b),
+    'list', 'paper', null, 'Batch', null, null, null, false,
+    '[{"id":"d0000000-0000-0000-0000-0000000000c1","text":"keep"},
+      {"id":"d0000000-0000-0000-0000-0000000000c2","text":"edit"}]')$$,
+  'post a list for edit_list');
+select lives_ok(
+  $$select public.edit_list('c0000000-0000-0000-0000-0000000000c1', 1, 'Batch!', 'sky', 'list notes',
+    '[{"id":"d0000000-0000-0000-0000-0000000000c3","text":"added"}]',
+    '[{"id":"d0000000-0000-0000-0000-0000000000c2","text":"edited"}]',
+    array['d0000000-0000-0000-0000-0000000000c1']::uuid[])$$,
+  'edit_list applies all changes');
+select is(
+  (select string_agg(id || ':' || text, ',' order by text) from public.list_entries
+   where item_id = 'c0000000-0000-0000-0000-0000000000c1'),
+  'd0000000-0000-0000-0000-0000000000c3:added,d0000000-0000-0000-0000-0000000000c2:edited',
+  'entries match the batch');
+select is(
+  (select title || '/' || color::text || '/' || coalesce(body, '') || '/' || version::text
+   from public.items where id = 'c0000000-0000-0000-0000-0000000000c1'),
+  'Batch!/sky/list notes/2', 'title/colour/body updated and version bumped');
+select throws_ok(
+  $$select public.edit_list('c0000000-0000-0000-0000-0000000000c1', 1, 'Stale', 'sky', null, '[]', '[]', '{}')$$,
+  'P0001', 'version_conflict', 'stale edit_list rejected');
+reset role;
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000032', true);
+set role authenticated;
+select throws_ok(
+  $$select public.edit_list('c0000000-0000-0000-0000-0000000000c1', 2, 'Nope', 'sky', null, '[]', '[]', '{}')$$,
+  'P0001', 'not_author', 'non-author cannot edit_list');
 reset role;
 
 select * from finish();

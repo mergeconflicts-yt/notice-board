@@ -126,4 +126,99 @@ implemented slightly differently. Appended as work proceeds.
     without it a removed member could rejoin with the still-valid link. The
     optional `board_removals` allow/deny table was **not** added; revoking the
     invite is the whole fix here.
+22. **Concurrency, lock order and input validation hardening (review C1–C4).**
+    `leave_board`/`remove_member` now read roles only *after* `for update` on
+    the board and always call `promote_longest_member` (a no-op when an owner
+    remains); `remove_member` also soft-deletes an emptied board. Every
+    board→invite path (`accept_invite`, `get_invite_link`) now takes the board
+    lock first, so the previous invite→board order can no longer deadlock with
+    `delete_board`/`leave_board`/`delete_account`. NULL and oversize inputs
+    that used to surface as raw Postgres errors now raise `invalid_input`
+    (`post_item`/`edit_item` type/color/id/lengths, an entry with no `id`,
+    `create_board`/`rename_board` null color, `set_pinned`/`set_done` null
+    flag). The UUID guard is now a strict
+    `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`
+    (`~*`), so malformed paths are denied by the storage policies instead of
+    reaching the `::uuid` cast and raising.
+23. **Lifecycle, idempotency and view fixes (review C5–C13).** Unpinning an old
+    done item and undoing done floor `keep_until` at `now() + 2 days` (matching
+    `restore_item`) so a post can't vanish the moment it is changed;
+    `keep_longer` is capped at `now() + 30 days` without ever shortening a date
+    already beyond the cap. `post_item`/`edit_item` reject non-finite
+    `event_at` (`isfinite`) and enforce per-type fields (a note carries no
+    `event_at`/title/place). Repeated `set_pinned`/`set_done`/
+    `set_entry_checked` calls are no-ops, and an `add_entry` retry returns the
+    stored row before the rate/cap checks. `edit_item` recomputes a date's
+    lifetime only when `event_at` actually changes (so editing a title keeps a
+    "keep longer"); `remove_entry` refuses an entry of a removed list;
+    `set_item_position` no longer stamps `updated_by` (a move is not an edit).
+    The `visible_items` view is rebuilt in `..._item_position` to include
+    `layout`. Board actions treat missing/deleted/foreign boards as
+    `not_member` (no existence leak) while the owner's repeat `delete_board`
+    stays idempotent.
+24. **Backend hardening round 2 (review C14–C21).** `run_list_lifetime` bumps
+    `updated_at` so list expiry reaches delta catch-up. `update_profile`
+    coalesces `avatar_path` (a rename no longer wipes it; `p_clear_avatar` is
+    the explicit clear) and the app drops its pass-the-avatar workaround.
+    `avatar_path`/`photo_path` gain `<=200`-char, strict-prefix check
+    constraints. Every mutating RPC charges a shared `item_write` bucket
+    (600/h). Added `invites(created_by)`, `items(board_id, updated_at)` and
+    `items(board_id, deleted_at)` indexes. `delete_account` locks boards and
+    reads memberships in one `for update of b` query. `count(*)` is cast to
+    `int` for the lint gate. An hourly `cleanup-invites` job purges invites
+    revoked or expired more than a week ago.
+25. **Auth session hardening (review R1–R3).** The Supabase client wraps fetch
+    so a 429 from `/token` is presented as a 503, which GoTrue retries instead
+    of deleting the stored session. `signOut`/`deleteAccount` clear the
+    identity marker only after success and always reset the intentional
+    sign-out flag, so a failure can't drop the marker or ignore the next real
+    sign-out. List edits reuse each new row's client id (`add_entry` is
+    idempotent) and update the editor snapshot as steps succeed, so a retry
+    after a partial failure resumes instead of duplicating or failing.
+26. **Session/board UX hardening (review D1–D9).** The Turnstile WebView no
+    longer calls `init()` on failure (which remounted the challenge into an
+    infinite loop): it reports the error, retries the challenge with growing
+    backoff, handles `onError`/`onHttpError`, restricts `originWhitelist` to
+    Cloudflare + the configured base URL, and refuses to fall back to
+    `https://localhost` (a missing `EXPO_PUBLIC_INVITE_BASE_URL` is surfaced as
+    a config error). The offline retry backoff now actually grows — `init()`
+    stops resetting it; only success or an explicit manual Retry does — and
+    `init()` is single-flight so overlapping starts can't create two anonymous
+    users. A module-level OAuth-flow flag makes `/auth` skip the PKCE exchange
+    it didn't initiate, and `/auth` shows an error with a Home button. Email
+    linking passes `emailRedirectTo` and re-reads the user. A failed board load
+    shows an error + Retry instead of "This board is gone". A just-posted item
+    is attributed to its author immediately (no "Former member" flash).
+    Unhandled rejections (`.then` without `.catch`, `Share.share`, item action
+    buttons) are guarded, and only one layer toasts (useBoard).
+27. **Ops & Edge-Function hardening (review E1–E9).** `run_edge_job` uses a
+    dedicated Vault secret `job_secret` (not the service-role key, which pg_net
+    would queue in `net.http_request_queue`) and raises a `WARNING` when
+    `functions_url`/`job_secret` are missing; `job_failures()`/`http_failures()`
+    surface recent cron/pg_net errors. The Edge functions verify the bearer
+    token in constant time. `cleanup-users` selects and re-checks candidates in
+    SQL (`inactive_anonymous_user_ids`/`is_inactive_anonymous_user`), counting
+    token refreshes and sessions as activity so active anonymous users aren't
+    deleted; it caps at 500/run. `purge` also removes avatar files that are no
+    longer a living user's current avatar. `config.toml` declares
+    `verify_jwt = false` for `purge`/`cleanup-users` (they self-authorise), and
+    the docs list the hosted auth checklist (SMTP, redirect URLs, captcha,
+    email confirmations). `net` is owned by `supabase_admin`, so its
+    anon/authenticated grants can't be revoked by a migration; the API never
+    exposes it (documented).
+28. **Remaining F review notes.** Several F items are deliberately documented
+    rather than changed: **F2** Realtime `DELETE` events on `items`/
+    `list_entries`/`boards` aren't RLS-filtered by Supabase and carry only
+    primary keys; per-board channel topics limit exposure but full mitigation
+    needs Realtime Authorization (private channels), deferred. **F3** photo
+    uploads still accept a client-declared MIME/file until the 24h sweep;
+    signed-upload RPCs are the intended follow-up. **F6** a foreground/delta
+    reload can re-merge over an in-flight optimistic row; the delta lookback
+    reconciles it on the next tick. **F1** anonymous-sign-in farming is bounded
+    by the per-IP auth rate limit plus Turnstile in production (no app-level
+    per-IP store). **F12** the date picker and date display use the device zone
+    while expiry uses the board zone — aligning display to the board zone is a
+    follow-up. **F19** the deep link is `noticeboard://j/<token>` (route
+    `/j/[token]`), matching the web `/j/<token>` path rather than the plan's
+    `join` wording.
 

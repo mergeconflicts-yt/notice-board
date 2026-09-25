@@ -109,8 +109,31 @@ begin
 end;
 $$;
 
--- POST to an Edge Function with the service-role key from Vault. No-op when
--- the secrets are not configured. Not callable by client roles.
+-- Drop invite rows that have been revoked or expired for over a week. They are
+-- never needed again (get_invite_link rotates expired links), so keep the
+-- table from growing forever.
+create function public.purge_stale_invites()
+returns integer
+language plpgsql
+security definer
+set search_path = '' as $$
+declare
+  v_deleted integer;
+begin
+  delete from public.invites
+  where (revoked_at is not null and revoked_at < now() - interval '7 days')
+     or (expires_at < now() - interval '7 days');
+  get diagnostics v_deleted = row_count;
+  return v_deleted;
+end;
+$$;
+
+-- POST to an Edge Function with a dedicated job secret from Vault. No-op (with
+-- a warning) when the secrets are not configured. Not callable by client roles.
+--
+-- `job_secret` is deliberately separate from the service-role key: pg_net keeps
+-- queued request headers (including the bearer token) in `net.http_request_queue`
+-- until delivery, so a leaked/over-scoped service key there would be far worse.
 create function public.run_edge_job(p_path text)
 returns void
 language plpgsql
@@ -121,8 +144,9 @@ declare
   v_key text;
 begin
   select decrypted_secret into v_url from vault.decrypted_secrets where name = 'functions_url';
-  select decrypted_secret into v_key from vault.decrypted_secrets where name = 'service_role_key';
+  select decrypted_secret into v_key from vault.decrypted_secrets where name = 'job_secret';
   if v_url is null or v_key is null then
+    raise warning 'run_edge_job(%): Vault secrets "functions_url" and "job_secret" are required; skipping', p_path;
     return;
   end if;
   perform net.http_post(
@@ -136,6 +160,47 @@ begin
   );
 end;
 $$;
+
+-- pg_net's `net` schema is owned by supabase_admin, and migrations run as
+-- `postgres`, so its grants to anon/authenticated cannot be revoked here (a
+-- REVOKE is a no-op with a warning). Exposure is instead contained by
+-- `api.schemas = ["public", "graphql_public"]` + `auto_expose_new_tables =
+-- false`: PostgREST never routes to `net`. The secrets it carries are also
+-- isolated — run_edge_job uses a dedicated `job_secret`, not the service key.
+-- If desired, revoke `net` EXECUTE/USAGE as supabase_admin in the hosted
+-- project's SQL editor.
+
+-- Diagnostics: surface job failures instead of letting them vanish into
+-- cron/net internals. Service-role only (they reveal internal endpoints).
+create function public.job_failures(p_since_hours integer default 24)
+returns table (jobname text, status text, return_message text, start_time timestamptz)
+language sql
+security definer
+set search_path = '' as $$
+  select j.jobname, d.status, d.return_message, d.start_time
+  from cron.job_run_details d
+  join cron.job j on j.jobid = d.jobid
+  where d.status <> 'succeeded'
+    and d.start_time > now() - make_interval(hours => p_since_hours)
+  order by d.start_time desc;
+$$;
+
+create function public.http_failures(p_since_hours integer default 24)
+returns table (id bigint, status_code integer, error_msg text, created timestamptz)
+language sql
+security definer
+set search_path = '' as $$
+  select r.id, r.status_code, r.error_msg, r.created
+  from net._http_response r
+  where (r.status_code is null or r.status_code >= 400 or r.error_msg is not null)
+    and r.created > now() - make_interval(hours => p_since_hours)
+  order by r.created desc;
+$$;
+
+revoke all on function public.job_failures(integer) from public, anon, authenticated;
+revoke all on function public.http_failures(integer) from public, anon, authenticated;
+grant execute on function public.job_failures(integer) to service_role;
+grant execute on function public.http_failures(integer) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- Schedules (idempotent). Unscheduling a missing job raises, so guard it.
@@ -154,6 +219,12 @@ begin
   exception when others then null;
   end;
   perform cron.schedule('cleanup-rate-limits', '0 * * * *', 'select public.cleanup_rate_limits()');
+
+  begin
+    perform cron.unschedule('cleanup-invites');
+  exception when others then null;
+  end;
+  perform cron.schedule('cleanup-invites', '20 * * * *', 'select public.purge_stale_invites()');
 
   begin
     perform cron.unschedule('purge-nightly');

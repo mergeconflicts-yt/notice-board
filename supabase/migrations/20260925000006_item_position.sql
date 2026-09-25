@@ -14,6 +14,18 @@ alter table public.items
   add constraint items_layout_shape_check
   check (layout is null or jsonb_typeof(layout) = 'object');
 
+-- visible_items was created before `layout` existed, so its expanded SELECT *
+-- never carried the column. Rebuild it so the view and the table agree, and
+-- re-assert its grants (no client writes, authenticated reads only).
+drop view if exists public.visible_items;
+create view public.visible_items with (security_invoker = true) as
+  select *
+  from public.items
+  where deleted_at is null
+    and (keep_until is null or keep_until > now());
+revoke all on public.visible_items from public, anon, authenticated;
+grant select on public.visible_items to authenticated;
+
 -- Move an item by hand (any member). Passing NULL x/y clears it back to the
 -- automatic layout.
 create function public.set_item_position(p_id uuid, p_x double precision, p_y double precision)
@@ -55,12 +67,12 @@ begin
   end if;
 
   perform public.hit_rate_limit('set_item_position', 600, interval '1 hour');
-  -- Position is presentation metadata: bump updated_at but NOT version, so a
-  -- member dragging a note never invalidates the author's in-flight edit.
+  -- Position is presentation metadata: bump updated_at but NOT version (so a
+  -- member dragging a note never invalidates the author's in-flight edit) and
+  -- NOT updated_by (moving a note is not editing it).
   if p_x is null or p_y is null then
     update public.items
     set layout = null,
-        updated_by = auth.uid(),
         updated_at = now()
     where id = p_id;
     return;
@@ -73,7 +85,6 @@ begin
         'y', least(greatest(0::double precision, p_y), 20000::double precision),
         'manual', true
       ),
-      updated_by = auth.uid(),
       updated_at = now()
   where id = p_id;
 end;

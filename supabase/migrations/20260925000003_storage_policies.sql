@@ -15,7 +15,8 @@ language sql
 immutable
 set search_path = '' as $$
   select case
-    when split_part(p_path, '/', 1) ~ '^[0-9a-fA-F-]{36}$'
+    when split_part(p_path, '/', 1)
+      ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
     then split_part(p_path, '/', 1)::uuid
     else null
   end;
@@ -69,7 +70,8 @@ create policy "avatars_shared_read" on storage.objects
     and (
       split_part(name, '/', 1) = auth.uid()::text
       or (
-        split_part(name, '/', 1) ~ '^[0-9a-fA-F-]{36}$'
+        split_part(name, '/', 1)
+          ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         and public._shares_board_with(split_part(name, '/', 1)::uuid)
       )
     )

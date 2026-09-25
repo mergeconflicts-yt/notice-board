@@ -40,6 +40,7 @@ export default function BoardScreen() {
     entries,
     loading,
     error,
+    reload,
     createItem,
     moveItem,
     removeItem,
@@ -51,9 +52,16 @@ export default function BoardScreen() {
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [dragActive, setDragActive] = useState(false);
   const [overDelete, setOverDelete] = useState(false);
+  // Bumped when a dropped note's delete fails, so it snaps back to its spot.
+  const [dragReset, setDragReset] = useState(0);
   const seenIdsRef = useRef<Set<string>>(new Set());
   const firstLoadRef = useRef(true);
   const overDeleteRef = useRef(false);
+  // A failed post keeps its client id + uploaded path, so retrying reuses them
+  // instead of creating a second item (post_item is idempotent on p_id).
+  const pendingDraftRef = useRef<{ id: string; photoPath: string | null; photoUri: string | null } | null>(
+    null,
+  );
 
   const openItem = (item: ItemWithAuthor) => router.push(`/board/${boardId}/note/${item.id}`);
 
@@ -188,7 +196,8 @@ export default function BoardScreen() {
             onPress: () => restoreItem(item).catch(() => {}),
           }),
         )
-        .catch((e) => useToast.getState().show(friendlyMessage(e)));
+        // useBoard already surfaced the failure; snap the note back.
+        .catch(() => setDragReset((n) => n + 1));
       return;
     }
     moveItem(item, x, y).catch(() => {});
@@ -196,12 +205,21 @@ export default function BoardScreen() {
 
   const handleAdd = async (draft: NoteDraft) => {
     setSubmitting(true);
-    try {
-      const itemId = randomId();
-      let photoPath: string | null = null;
-      if (draft.type === 'photo' && draft.photoUri) {
+    const pending = pendingDraftRef.current;
+    const itemId = pending?.id ?? randomId();
+    let photoPath = pending?.photoPath ?? null;
+    if (draft.type === 'photo' && draft.photoUri && (!photoPath || pending?.photoUri !== draft.photoUri)) {
+      try {
         photoPath = await uploadPhoto(boardId, itemId, draft.photoUri);
+      } catch (e) {
+        // The upload isn't routed through useBoard, so surface its error here.
+        useToast.getState().show(friendlyMessage(e));
+        setSubmitting(false);
+        return;
       }
+    }
+    pendingDraftRef.current = { id: itemId, photoPath, photoUri: draft.photoUri };
+    try {
       await createItem({
         id: itemId,
         boardId,
@@ -214,9 +232,11 @@ export default function BoardScreen() {
         photoPath,
         entries: draft.type === 'list' ? draft.entries : undefined,
       });
+      pendingDraftRef.current = null;
       setSheetOpen(false);
-    } catch (e) {
-      useToast.getState().show(friendlyMessage(e));
+    } catch {
+      // createItem already surfaced the error via useBoard; keep the pending
+      // id/path so a retry doesn't duplicate the post or re-upload.
     } finally {
       setSubmitting(false);
     }
@@ -233,6 +253,24 @@ export default function BoardScreen() {
   }
 
   if (!board) {
+    if (error) {
+      // A failed load is not a missing board — offer a retry instead of
+      // claiming the board is gone.
+      return (
+        <SafeAreaView style={styles.safe}>
+          <View style={styles.center}>
+            <Text style={styles.missingTitle}>Can’t open this board</Text>
+            <Text style={styles.missingSub}>{error}</Text>
+            <Pressable onPress={() => void reload()} style={styles.missingBtn}>
+              <Text style={styles.missingBtnText}>Retry</Text>
+            </Pressable>
+            <Pressable onPress={() => router.replace('/')} style={styles.missingBack}>
+              <Text style={styles.missingBackText}>Back to start</Text>
+            </Pressable>
+          </View>
+        </SafeAreaView>
+      );
+    }
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
@@ -320,6 +358,7 @@ export default function BoardScreen() {
               onMove={handleDrop}
               onDragStart={handleDragStart}
               onDragUpdate={handleDragUpdate}
+              resetKey={dragReset}
               emptyHint="Everything else lives here."
             />
           </View>
@@ -508,4 +547,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.ink,
   },
   missingBtnText: { fontFamily: fonts.ui.bold, color: colors.background },
+  missingBack: { marginTop: 12, paddingVertical: 8 },
+  missingBackText: { fontFamily: fonts.ui.semibold, fontSize: 14, color: colors.inkSoft },
 });

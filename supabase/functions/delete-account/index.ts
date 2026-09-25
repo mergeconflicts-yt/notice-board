@@ -1,9 +1,9 @@
 // Edge Function: delete-account (docs/plan.md §5, §10).
 //
-// Called by the app AFTER the delete_account() RPC has tidied board state.
-// Postgres cannot safely delete auth.users, so this uses the admin API with
-// the service-role key. The caller's JWT identifies the user; a user can only
-// delete themselves.
+// The app calls this with the user's JWT; the function runs delete_account()
+// as that user (board cleanup) and then removes the auth user via the admin
+// API. A user can only delete themselves. It is retryable: delete_account() is
+// safe to run again, so a failure after cleanup can simply be retried.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 Deno.serve(async (req: Request) => {
@@ -26,10 +26,11 @@ Deno.serve(async (req: Request) => {
   }
 
   // Tidy board state first (as the user), so this can't orphan boards even if
-  // the function is invoked directly rather than after the app's RPC call.
+  // the function is invoked directly. Safe to repeat.
   const { error: cleanupError } = await anon.rpc('delete_account');
   if (cleanupError) {
-    return new Response(cleanupError.message, { status: 500 });
+    console.error('delete-account cleanup failed:', cleanupError.message);
+    return new Response('could not delete account', { status: 500 });
   }
 
   const admin = createClient(
@@ -38,8 +39,11 @@ Deno.serve(async (req: Request) => {
   );
   const { error } = await admin.auth.admin.deleteUser(user.id);
   if (error) {
-    return new Response(error.message, { status: 500 });
+    // Cleanup already ran; a retry will just attempt the user delete again.
+    console.error('delete-account admin delete failed:', error.message);
+    return new Response('could not delete account', { status: 500 });
   }
 
   return new Response(null, { status: 204 });
 });
+

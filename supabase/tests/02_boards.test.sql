@@ -1,7 +1,7 @@
 -- Phase 1d: board RPCs — roles, validation, ownership transfer, cleanup.
 -- Roles: O owner, M member, S stranger, R rate-limit probe.
 begin;
-select plan(47);
+select plan(52);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000011', 'authenticated', 'authenticated'),
@@ -21,6 +21,7 @@ select is(
   'owner', 'creator is owner');
 select throws_ok($$select public.create_board('   ', 'blue')$$, 'P0001', 'invalid_input', 'blank name rejected');
 select throws_ok($$select public.create_board('x', 'neon')$$, 'P0001', 'invalid_input', 'bad color rejected');
+select throws_ok($$select public.create_board('x', null)$$, 'P0001', 'invalid_input', 'null color rejected');
 reset role;
 create temp table t_b1 as
   select id from public.boards where name = 'Club' and created_by = 'a0000000-0000-0000-0000-000000000011' limit 1;
@@ -55,6 +56,9 @@ select throws_ok(
   $$select public.rename_board((select id from t_b1), 'x', 'neon')$$,
   'P0001', 'invalid_input', 'rename with bad color');
 select throws_ok(
+  $$select public.rename_board((select id from t_b1), 'x', null)$$,
+  'P0001', 'invalid_input', 'rename with null color');
+select throws_ok(
   $$select public.rename_board('b0000000-0000-0000-0000-000000000099', 'Ghost', 'clay')$$,
   'P0001', 'not_found', 'rename of missing board');
 reset role;
@@ -87,7 +91,7 @@ select throws_ok(
   'P0001', 'not_member', 'non-member cannot delete');
 select throws_ok(
   $$select public.delete_board('b0000000-0000-0000-0000-000000000099')$$,
-  'P0001', 'not_found', 'delete of missing board');
+  'P0001', 'not_member', 'delete of missing board is not_member (no existence leak)');
 reset role;
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000011', true);
 set role authenticated;
@@ -110,6 +114,15 @@ set role authenticated;
 select lives_ok(
   $$select public.delete_board((select id from t_b1))$$,
   'delete is idempotent');
+select throws_ok(
+  $$select public.leave_board((select id from t_b1))$$,
+  'P0001', 'not_member', 'cannot leave a soft-deleted board');
+select throws_ok(
+  $$select public.remove_member((select id from t_b1), 'a0000000-0000-0000-0000-000000000012')$$,
+  'P0001', 'not_member', 'cannot remove a member of a soft-deleted board');
+select throws_ok(
+  $$select public.reset_invite_link((select id from t_b1))$$,
+  'P0001', 'not_member', 'cannot reset an invite on a soft-deleted board');
 reset role;
 
 -- leave_board promotion on B3 (O owner, M member; O leaves).

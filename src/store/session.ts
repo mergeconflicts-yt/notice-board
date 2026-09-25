@@ -15,7 +15,7 @@ type SessionState = {
   status: SessionStatus;
   user: User | null;
   error: string | null;
-  init: (captchaToken?: string) => Promise<void>;
+  init: (captchaToken?: string, manual?: boolean) => Promise<void>;
   setDisplayName: (displayName: string) => Promise<void>;
   signOut: () => Promise<void>;
   /** Abandon a lost identity and start a fresh anonymous account. */
@@ -35,10 +35,20 @@ let retryDelay = 2000;
 // True while the app itself is signing out, so the auth listener doesn't treat
 // it as a lost session.
 let intentionalSignOut = false;
+// Single-flight: overlapping init() calls share one bootstrap, so two starts
+// can't each create an anonymous user.
+let inFlightInit: Promise<void> | null = null;
 
+/** Cancel a pending retry. Deliberately does NOT reset the backoff — init()
+ *  runs on every retry, and resetting here made the delay stay at 2s forever. */
 function clearRetry() {
   if (retryTimer) clearTimeout(retryTimer);
   retryTimer = null;
+}
+
+/** Full reset — only on a successful init or an explicit manual Retry. */
+function resetRetry() {
+  clearRetry();
   retryDelay = 2000;
 }
 
@@ -106,6 +116,82 @@ async function loadProfile(id: string): Promise<User | null> {
   };
 }
 
+async function runInit(
+  captchaToken: string | undefined,
+  manual: boolean,
+  set: (partial: Partial<SessionState>) => void,
+): Promise<void> {
+  if (manual) resetRetry();
+  else clearRetry();
+  set({ status: 'loading', error: null });
+  try {
+    // Capture BEFORE getUser(): a failed refresh makes Supabase delete the
+    // stored session, so checking afterwards would find nothing.
+    const stored = await hasStoredSession();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      const marker = await readMarker();
+      if (stored || marker) {
+        if (stored && isRetryable(userError)) {
+          set({ status: 'offline', error: 'Can\'t reach the board. Check your connection.' });
+          scheduleRetry();
+          return;
+        }
+        // Identity existed but can't be restored: offer sign-in / start fresh
+        // rather than silently creating a new user.
+        set({
+          status: 'signedout',
+          error: 'Sign in to restore your boards.',
+        });
+        return;
+      }
+      // Genuine first launch.
+      if (turnstileSiteKey && !captchaToken) {
+        set({ status: 'needsCaptcha', error: null });
+        return;
+      }
+      const { error } = await supabase.auth.signInAnonymously({
+        options: captchaToken ? { captchaToken } : undefined,
+      });
+      if (error) throw error;
+    }
+
+    const {
+      data: { user: current },
+    } = await supabase.auth.getUser();
+    if (!current) throw new Error('not_authenticated');
+    await writeMarker(current.id);
+    const profile = await loadProfile(current.id);
+    const isAnonymous = (current as { is_anonymous?: boolean }).is_anonymous === true;
+    // A successful bootstrap restores the default retry cadence.
+    resetRetry();
+    set({
+      user: {
+        ...(profile ?? {
+          id: current.id,
+          displayName: 'Someone',
+          avatarPath: null,
+          createdAt: current.created_at ?? new Date().toISOString(),
+        }),
+        isAnonymous,
+      },
+      status: 'ready',
+      error: null,
+    });
+  } catch (e) {
+    if (isRetryable(e)) {
+      set({ status: 'offline', error: 'Can\'t reach the board. Check your connection.' });
+      scheduleRetry();
+    } else {
+      set({ status: 'offline', error: friendlyMessage(e) });
+    }
+  }
+}
+
 /**
  * Session bootstrap (docs/plan.md §8.3): reuse a stored session, sign in
  * anonymously only when this device has never held one, and never replace a
@@ -116,88 +202,39 @@ export const useSession = create<SessionState>((set) => ({
   user: null,
   error: null,
 
-  init: async (captchaToken) => {
-    clearRetry();
-    set({ status: 'loading', error: null });
-    try {
-      // Capture BEFORE getUser(): a failed refresh makes Supabase delete the
-      // stored session, so checking afterwards would find nothing.
-      const stored = await hasStoredSession();
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        const marker = await readMarker();
-        if (stored || marker) {
-          if (stored && isRetryable(userError)) {
-            set({ status: 'offline', error: 'Can\'t reach the board. Check your connection.' });
-            scheduleRetry();
-            return;
-          }
-          // Identity existed but can't be restored: offer sign-in / start fresh
-          // rather than silently creating a new user.
-          set({
-            status: 'signedout',
-            error: 'Sign in to restore your boards.',
-          });
-          return;
-        }
-        // Genuine first launch.
-        if (turnstileSiteKey && !captchaToken) {
-          set({ status: 'needsCaptcha', error: null });
-          return;
-        }
-        const { error } = await supabase.auth.signInAnonymously({
-          options: captchaToken ? { captchaToken } : undefined,
-        });
-        if (error) throw error;
-      }
-
-      const {
-        data: { user: current },
-      } = await supabase.auth.getUser();
-      if (!current) throw new Error('not_authenticated');
-      await writeMarker(current.id);
-      const profile = await loadProfile(current.id);
-      const isAnonymous = (current as { is_anonymous?: boolean }).is_anonymous === true;
-      set({
-        user: {
-          ...(profile ?? {
-            id: current.id,
-            displayName: 'Someone',
-            avatarPath: null,
-            createdAt: current.created_at ?? new Date().toISOString(),
-          }),
-          isAnonymous,
-        },
-        status: 'ready',
-        error: null,
-      });
-    } catch (e) {
-      if (isRetryable(e)) {
-        set({ status: 'offline', error: 'Can\'t reach the board. Check your connection.' });
-        scheduleRetry();
-      } else {
-        set({ status: 'offline', error: friendlyMessage(e) });
-      }
-    }
+  init: (captchaToken, manual = false) => {
+    // Single-flight: a second start reuses the in-progress bootstrap instead
+    // of racing it (which could create two anonymous users).
+    if (inFlightInit) return inFlightInit;
+    inFlightInit = runInit(captchaToken, manual, set).finally(() => {
+      inFlightInit = null;
+    });
+    return inFlightInit;
   },
 
   setDisplayName: async (displayName) => {
-    // Keep the existing avatar; renaming must not clear it.
+    // update_profile coalesces avatar_path, so renaming never clears it.
     const current = useSession.getState().user;
-    const user = await updateProfile(displayName, current?.avatarPath ?? null);
+    const user = await updateProfile(displayName);
     set({ user: { ...user, isAnonymous: current?.isAnonymous ?? false } });
   },
 
   signOut: async () => {
-    clearRetry();
+    resetRetry();
     intentionalSignOut = true;
-    await clearMarker();
-    await supabase.auth.signOut();
-    set({ user: null, status: 'loading', error: null });
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      // Only drop the marker once the sign-out actually succeeded: a failed
+      // sign-out must leave the stored identity for the next launch to offer
+      // (rather than silently mint a new user).
+      await clearMarker();
+      set({ user: null, status: 'loading', error: null });
+    } finally {
+      // Always clear the flag — if it stayed set, the next real sign-out would
+      // be mistaken for a lost session and ignored.
+      intentionalSignOut = false;
+    }
   },
 
   startFresh: async () => {
@@ -208,8 +245,13 @@ export const useSession = create<SessionState>((set) => ({
 
   deleteAccount: async () => {
     intentionalSignOut = true;
-    await clearMarker();
-    await apiDeleteAccount();
+    try {
+      await apiDeleteAccount();
+      // The account is gone: clear the marker so init() starts a fresh identity.
+      await clearMarker();
+    } finally {
+      intentionalSignOut = false;
+    }
   },
 }));
 

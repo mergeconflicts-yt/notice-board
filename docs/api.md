@@ -25,6 +25,13 @@ Invalid invites are deliberately **silent**: `preview_invite` returns zero
 rows and `accept_invite` returns `NULL` (so the attempt still counts toward
 the brute-force cap). See `docs/backend-plan-questions.md` #6.
 
+Board-scoped actions (`delete_board`, `leave_board`, `remove_member`,
+`reset_invite_link`) return `not_member` for a missing, soft-deleted or
+foreign board alike, so the error never reveals that a board exists.
+
+Every mutating function shares one `item_write` rate limit (600/hour) on top
+of any per-action bucket (`post_item`, `add_entry`, invites).
+
 ## Reads (direct, RLS-scoped)
 
 | What | Query |
@@ -44,7 +51,7 @@ the brute-force cap). See `docs/backend-plan-questions.md` #6.
 ### Profile / account
 | Function | Access | Notes |
 |---|---|---|
-| `update_profile(p_display_name, p_avatar_path?)` | any user | own row |
+| `update_profile(p_display_name, p_avatar_path?, p_clear_avatar?)` | any user | own row; avatar is kept unless `p_clear_avatar` |
 | `delete_account()` | any user | tidies boards; auth user removed by Edge Function |
 
 ### Boards
@@ -67,12 +74,12 @@ the brute-force cap). See `docs/backend-plan-questions.md` #6.
 ### Items
 | Function | Access | Notes |
 |---|---|---|
-| `post_item(p_id, p_board_id, p_type, p_color, p_body, p_title, p_event_at, p_place, p_photo_path, p_pinned, p_entries)` → item | member | idempotent on `p_id`; validates photo path `<board_id>/<item_id>/…`; rate limit 300/h |
-| `edit_item(p_id, p_expected_version, p_body, p_title, p_event_at, p_place, p_color)` | author | `version_conflict` on stale version |
-| `set_pinned(p_id, p_pinned)` | member | pinned = `keep_until NULL` |
-| `set_done(p_id, p_done)` | member | notes/dates only |
-| `keep_longer(p_id)` | member | +7 days; not pinned/lists |
-| `set_item_position(p_id, p_x, p_y)` | member | hand-place a note (`items.layout`); NULL clears to auto; does **not** bump `version` |
+| `post_item(p_id, p_board_id, p_type, p_color, p_body, p_title, p_event_at, p_place, p_photo_path, p_pinned, p_entries)` → item | member | idempotent on `p_id`; validates photo path `<board_id>/<item_id>/…` and that fields match the type (finite `event_at`, dates only); title list/date, place date; rate limit 300/h |
+| `edit_item(p_id, p_expected_version, p_body, p_title, p_event_at, p_place, p_color)` | author | `version_conflict` on stale version; same type rules; a date's lifetime is recomputed only when `event_at` changes |
+| `set_pinned(p_id, p_pinned)` | member | pinned = `keep_until NULL`; no-op if already in that state |
+| `set_done(p_id, p_done)` | member | notes/dates only; first done wins; no-op if already in that state |
+| `keep_longer(p_id)` | member | +7 days, capped at 30 days from now; not pinned/lists |
+| `set_item_position(p_id, p_x, p_y)` | member | hand-place a note (`items.layout`); NULL clears to auto; does **not** bump `version` or stamp `updated_by` |
 | `remove_item(p_id)` / `restore_item(p_id)` | member | soft delete; restore within 30 days |
 | `list_removed_items(p_board_id)` | member | last 30 days |
 

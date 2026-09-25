@@ -2,11 +2,18 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+
+# A new commit supersedes an in-progress run for the same ref.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -36,6 +43,7 @@ jobs:
 
   database:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -45,7 +53,9 @@ jobs:
           version: 2.117.0
 
       - name: Start local stack
-        run: supabase start
+        # The pgTAP/lint job only needs the database, auth and storage schemas;
+        # skip the UI/proxy/edge containers to start faster.
+        run: supabase start -x studio,imgproxy,mailpit,edge-runtime,analytics,vector
 
       - name: Apply migrations
         run: supabase db reset

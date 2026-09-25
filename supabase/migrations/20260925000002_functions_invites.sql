@@ -79,6 +79,9 @@ begin
     end if;
     raise exception 'not_member';
   end if;
+  -- Lock the board before the invite row, matching delete_board/leave_board's
+  -- board -> invite order so a concurrent soft-delete can't deadlock.
+  perform 1 from public.boards where id = p_board_id for update;
   perform public.hit_rate_limit('invite_link', 30, interval '1 hour');
   select * into v_inv
   from public.invites
@@ -159,8 +162,11 @@ begin
   if auth.uid() is null then
     raise exception 'not_authenticated';
   end if;
-  if not exists (select 1 from public.boards where id = p_board_id) then
-    raise exception 'not_found';
+  -- Lock the board first (same order as delete_board/get_invite_link). A
+  -- missing/deleted/foreign board all return not_member: no existence leak.
+  perform 1 from public.boards where id = p_board_id for update;
+  if not exists (select 1 from public.boards where id = p_board_id and deleted_at is null) then
+    raise exception 'not_member';
   end if;
   select role into v_role
   from public.board_members
@@ -232,17 +238,27 @@ set search_path = '' as $$
 declare
   v_norm text := public.normalise_invite_code(p_token_or_code);
   v_inv public.invites%rowtype;
+  v_board_id uuid;
 begin
   if auth.uid() is null then
     raise exception 'not_authenticated';
+  end if;
+  -- Find the board without locking, then take the board lock before the invite
+  -- lock. This matches delete_board/leave_board (board -> invite) and avoids
+  -- the invite -> board deadlock the old order had.
+  select board_id into v_board_id
+  from public.invites
+  where token_hash = extensions.digest(coalesce(p_token_or_code, ''), 'sha256')
+     or code_hash = extensions.digest(v_norm, 'sha256');
+  if v_board_id is not null then
+    perform 1 from public.boards where id = v_board_id for update;
   end if;
   select * into v_inv
   from public.invites
   where token_hash = extensions.digest(coalesce(p_token_or_code, ''), 'sha256')
      or code_hash = extensions.digest(v_norm, 'sha256')
   for update;
-  -- Serialise with leaves/promotions on this board, then check liveness.
-  perform 1 from public.boards where id = v_inv.board_id for update;
+  -- Check liveness now that the board is locked.
   -- Only failed lookups count toward invite_try (see preview_invite). A valid
   -- accept costs nothing; a wrong/expired/revoked code or a deleted board does.
   if v_inv.id is null

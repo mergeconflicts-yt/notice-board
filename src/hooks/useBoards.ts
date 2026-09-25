@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { friendlyMessage, getMyBoards } from '../lib/api';
 import { useSession } from '../store/session';
 import { Board } from '../types';
@@ -48,6 +49,14 @@ export function useMyBoards() {
     setLoading(true);
     return load();
   }, [load]);
+
+  // A rename/leave/delete elsewhere (or on another device) must show up when
+  // the list regains focus — it is not on Realtime.
+  useFocusEffect(
+    useCallback(() => {
+      if (status === 'ready' && userId) void load();
+    }, [status, userId, load]),
+  );
 
   return { boards, loading, error, reload };
 }

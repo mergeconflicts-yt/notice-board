@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, usePathname } from 'expo-router';
@@ -5,6 +6,8 @@ import { colors, fonts } from '../theme';
 import { Button } from './Button';
 import { Turnstile } from './Turnstile';
 import { turnstileSiteKey } from '../lib/supabase';
+import { INVITE_BASE_URL } from '../lib/inviteLinks';
+import { friendlyMessage } from '../lib/api';
 import { useSession } from '../store/session';
 
 /**
@@ -21,6 +24,47 @@ export function SessionGate() {
   const signOut = useSession((s) => s.signOut);
   const startFresh = useSession((s) => s.startFresh);
   const pathname = usePathname();
+
+  // Captcha failures must NOT call init() again: that remounts the challenge,
+  // which fails again, forever. Keep the error here and retry the challenge
+  // (with growing backoff) instead.
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+  const [captchaNonce, setCaptchaNonce] = useState(0);
+  const captchaDelay = useRef(1000);
+  const captchaTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearCaptchaTimer = useCallback(() => {
+    if (captchaTimer.current) clearTimeout(captchaTimer.current);
+    captchaTimer.current = null;
+  }, []);
+  useEffect(() => clearCaptchaTimer, [clearCaptchaTimer]);
+
+  const handleCaptchaToken = useCallback(
+    (token: string) => {
+      clearCaptchaTimer();
+      captchaDelay.current = 1000;
+      setCaptchaError(null);
+      void init(token);
+    },
+    [clearCaptchaTimer, init],
+  );
+
+  const handleCaptchaError = useCallback((message: string) => {
+    setCaptchaError(message);
+    if (captchaTimer.current) return;
+    captchaTimer.current = setTimeout(() => {
+      captchaTimer.current = null;
+      setCaptchaError(null);
+      setCaptchaNonce((n) => n + 1);
+    }, captchaDelay.current);
+    captchaDelay.current = Math.min(captchaDelay.current * 2, 30000);
+  }, []);
+
+  const retryCaptcha = useCallback(() => {
+    clearCaptchaTimer();
+    captchaDelay.current = 1000;
+    setCaptchaError(null);
+    setCaptchaNonce((n) => n + 1);
+  }, [clearCaptchaTimer]);
 
   // The overlay must not cover the screens that resolve it.
   const exempt = pathname === '/sign-in' || pathname === '/auth';
@@ -40,7 +84,13 @@ export function SessionGate() {
         {
           text: 'Sign out',
           style: 'destructive',
-          onPress: () => void signOut().then(() => init()),
+          onPress: () => {
+            void signOut()
+              .then(() => init())
+              .catch((e) =>
+                useSession.setState({ status: 'offline', error: friendlyMessage(e) }),
+              );
+          },
         },
       ],
     );
@@ -58,15 +108,32 @@ export function SessionGate() {
   };
 
   if (status === 'needsCaptcha' && turnstileSiteKey) {
+    if (!INVITE_BASE_URL) {
+      return (
+        <SafeAreaView style={[styles.overlay, styles.center]}>
+          <Text style={styles.title}>One quick check</Text>
+          <Text style={styles.sub}>
+            This build is missing EXPO_PUBLIC_INVITE_BASE_URL, so the human check can’t load.
+          </Text>
+        </SafeAreaView>
+      );
+    }
     return (
       <SafeAreaView style={[styles.overlay, styles.center]}>
         <Text style={styles.title}>One quick check</Text>
-        <Text style={styles.sub}>Confirm you’re human to continue.</Text>
-        <Turnstile
-          siteKey={turnstileSiteKey}
-          onToken={(token) => void init(token)}
-          onError={() => void init()}
-        />
+        <Text style={styles.sub}>
+          {captchaError ? 'Couldn’t load the check.' : 'Confirm you’re human to continue.'}
+        </Text>
+        {captchaError ? (
+          <Button label="Retry" onPress={retryCaptcha} style={styles.btn} />
+        ) : (
+          <Turnstile
+            key={captchaNonce}
+            siteKey={turnstileSiteKey}
+            onToken={handleCaptchaToken}
+            onError={handleCaptchaError}
+          />
+        )}
       </SafeAreaView>
     );
   }
@@ -89,7 +156,7 @@ export function SessionGate() {
       <SafeAreaView style={[styles.overlay, styles.center]}>
         <Text style={styles.title}>Can’t reach the board</Text>
         <Text style={styles.sub}>{error ?? 'Check your connection and try again.'}</Text>
-        <Button label="Retry" onPress={() => void init()} style={styles.btn} />
+        <Button label="Retry" onPress={() => void init(undefined, true)} style={styles.btn} />
         <Button label="Sign in" variant="soft" onPress={() => router.push('/sign-in')} style={styles.btn} />
         <Button label="Sign out" variant="soft" onPress={confirmSignOut} style={styles.btn} />
       </SafeAreaView>

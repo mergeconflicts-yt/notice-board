@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { AppState } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import * as Crypto from 'expo-crypto';
+import { createStore, useStore } from 'zustand';
 import { supabase } from '../lib/supabase';
 import {
   addEntry as apiAddEntry,
   ApiError,
   editItem as apiEditItem,
+  editList as apiEditList,
   friendlyMessage,
   getBoard,
   getBoardContent,
@@ -15,6 +17,7 @@ import {
   getMembers,
   getRemovedItems,
   ItemEdit,
+  ListEditBatch,
   NewItem,
   postItem as apiPostItem,
   keepLonger as apiKeepLonger,
@@ -103,432 +106,29 @@ function advanceCursor(prev: string | null, items: ItemWithAuthor[], entries: Li
 }
 
 /** The delta `since` value: the cursor shifted back by the lookback window. */
-function deltaSince(cursor: string | null): string | undefined {
-  if (!cursor) return undefined;
+function deltaSince(cursor: string): string {
   return new Date(new Date(cursor).getTime() - DELTA_LOOKBACK_MS).toISOString();
 }
 
-/** Live board state: board, people, posts and checklist rows. */
-export function useBoard(boardId: string) {
-  const [board, setBoard] = useState<Board | null>(null);
-  const [members, setMembers] = useState<BoardMember[]>([]);
-  const [items, setItems] = useState<ItemWithAuthor[]>([]);
-  const [entries, setEntries] = useState<ListEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const status = useSession((s) => s.status);
-  const lastSeenRef = useRef<string | null>(null);
-  const membersRef = useRef<BoardMember[]>([]);
-  const itemsRef = useRef<ItemWithAuthor[]>([]);
-  useEffect(() => {
-    membersRef.current = members;
-  }, [members]);
-  useEffect(() => {
-    itemsRef.current = items;
-  }, [items]);
-
-  /** Resolve an item's author from the loaded members (realtime rows have no
-   *  profile embed, so without this the author shows as unknown). */
-  const withAuthor = useCallback((item: ItemWithAuthor, previous?: ItemWithAuthor) => {
-    if (item.author) return item;
-    const author =
-      previous?.author ??
-      membersRef.current.find((m) => m.userId === item.createdBy)?.user ??
-      null;
-    return { ...item, author };
-  }, []);
-
-  const load = useCallback(async () => {
-    try {
-      const [nextBoard, nextMembers, content] = await Promise.all([
-        getBoard(boardId),
-        getMembers(boardId),
-        getBoardContent(boardId),
-      ]);
-      setBoard(nextBoard);
-      setMembers(nextMembers);
-      setItems(content.items);
-      setEntries(content.entries);
-      lastSeenRef.current = advanceCursor(lastSeenRef.current, content.items, content.entries);
-      setError(null);
-    } catch (e) {
-      setError(friendlyMessage(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [boardId]);
-
-  // Initial load. Written inline (not via `load()`) so React's lint rule sees
-  // the setState calls only inside the async continuation, not synchronously
-  // in the effect body.
-  useEffect(() => {
-    // Don't query before there is a session — the gate only hides the screen,
-    // the route still mounts, and a pre-session read just errors under RLS.
-    if (status !== 'ready') return;
-    let alive = true;
-    void (async () => {
-      try {
-        const [nextBoard, nextMembers, content] = await Promise.all([
-          getBoard(boardId),
-          getMembers(boardId),
-          getBoardContent(boardId),
-        ]);
-        if (!alive) return;
-        setBoard(nextBoard);
-        setMembers(nextMembers);
-        setItems(content.items);
-        setEntries(content.entries);
-        lastSeenRef.current = advanceCursor(lastSeenRef.current, content.items, content.entries);
-        setError(null);
-      } catch (e) {
-        if (alive) setError(friendlyMessage(e));
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [boardId, status]);
-
-  const reload = useCallback(() => {
-    setLoading(true);
-    return load();
-  }, [load]);
-
-  // Safety net: refresh the board row whenever a board screen regains focus
-  // (covers a missed realtime event or a change made on another device).
-  useFocusEffect(
-    useCallback(() => {
-      if (status !== 'ready') return;
-      let alive = true;
-      void getBoard(boardId).then((next) => {
-        if (alive) setBoard(next);
-      });
-      return () => {
-        alive = false;
-      };
-    }, [boardId, status]),
-  );
-
-  // Realtime: one channel per open board. Rows are applied in place; a
-  // reconnect (SUBSCRIBED after a drop) triggers a delta read instead of a
-  // full refetch.
-  useEffect(() => {
-    // Subscribe only once signed in — otherwise realtime auth fails and the
-    // channel never recovers.
-    if (status !== 'ready') return;
-    // A unique topic per subscription: `channel(topic)` returns an existing
-    // (already-subscribed) channel, and adding callbacks after subscribe()
-    // throws. Remounts / fast-refresh must not collide.
-    const topic = `board:${boardId}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 8)}`;
-    const channel = supabase
-      .channel(topic)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'items', filter: `board_id=eq.${boardId}` },
-        (payload) => {
-          if (payload.eventType === 'DELETE') {
-            const id = (payload.old as { id?: string }).id;
-            if (id) setItems((prev) => prev.filter((i) => i.id !== id));
-            return;
-          }
-          const row = payload.new as Record<string, unknown>;
-          const mapped = mapRealtimeItem(row);
-          const expired =
-            mapped.deletedAt !== null ||
-            (mapped.keepUntil !== null && new Date(mapped.keepUntil) <= new Date());
-          setItems((prev) => {
-            const without = prev.filter((i) => i.id !== mapped.id);
-            if (expired) return without;
-            return [...without, withAuthor(mapped, prev.find((i) => i.id === mapped.id))];
-          });
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'boards', filter: `id=eq.${boardId}` },
-        (payload) => {
-          if (payload.eventType === 'DELETE') {
-            setBoard(null);
-            return;
-          }
-          const row = payload.new as { deleted_at?: string | null };
-          if (row.deleted_at) {
-            setBoard(null);
-            return;
-          }
-          // The row is raw; refetch to map it (and pick up name/colour).
-          void getBoard(boardId).then((next) => {
-            if (next) setBoard(next);
-          });
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'list_entries', filter: `board_id=eq.${boardId}` },
-        (payload) => {
-          if (payload.eventType === 'DELETE') {
-            const id = (payload.old as { id?: string }).id;
-            if (id) setEntries((prev) => prev.filter((e) => e.id !== id));
-            return;
-          }
-          const mapped = mapRealtimeEntry(payload.new as Record<string, unknown>);
-          setEntries((prev) => [...prev.filter((e) => e.id !== mapped.id), mapped]);
-        },
-      )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED' && lastSeenRef.current) {
-          // Catch up on items changed since the cursor — including deletions,
-          // which the live filter would hide — and take the full (small) entry
-          // list so hard-deleted rows disappear.
-          const since = deltaSince(lastSeenRef.current)!;
-          void Promise.all([getItemsSince(boardId, since), getEntries(boardId)])
-            .then(([deltaItems, allEntries]) => {
-              setItems((prev) => mergeDeltaItems(prev, deltaItems, withAuthor));
-              setEntries(allEntries);
-              lastSeenRef.current = advanceCursor(
-                lastSeenRef.current,
-                deltaItems,
-                allEntries,
-              );
-            })
-            .catch(() => {});
-        }
-      });
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [boardId, status, withAuthor]);
-
-  // Returning to the foreground refetches everything, catching up on posts,
-  // members and deletions missed while backgrounded.
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (next) => {
-      if (next === 'active') void load();
-    });
-    return () => sub.remove();
-  }, [load]);
-
-  const toast = useToast.getState();
-
-  const onError = useCallback(
-    (e: unknown) => {
-      if (e instanceof ApiError && e.code === 'version_conflict') {
-        toast.show(friendlyMessage(e));
-        void load();
-        return;
-      }
-      toast.show(friendlyMessage(e));
-    },
-    [load, toast],
-  );
-
-  const createItem = useCallback(
-    async (input: NewItem) => {
-      const temp: ItemWithAuthor = {
-        id: input.id,
-        boardId: input.boardId,
-        type: input.type,
-        color: input.color,
-        body: input.body ?? null,
-        title: input.title ?? null,
-        eventAt: input.eventAt ?? null,
-        place: input.place ?? null,
-        photoPath: input.photoPath ?? null,
-        layout: null,
-        pinned: input.pinned ?? false,
-        keepUntil: null,
-        doneAt: null,
-        doneBy: null,
-        createdBy: null,
-        updatedBy: null,
-        deletedAt: null,
-        deletedBy: null,
-        version: 1,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        author: null,
-      };
-      setItems((prev) => [...prev, temp]);
-      try {
-        const saved = await apiPostItem(input);
-        setItems((prev) => prev.map((i) => (i.id === input.id ? { ...saved, author: saved.author ?? temp.author } : i)));
-        // Entries for a fresh list arrive via realtime; nothing else to do.
-      } catch (e) {
-        setItems((prev) => prev.filter((i) => i.id !== input.id));
-        onError(e);
-        throw e;
-      }
-    },
-    [onError],
-  );
-
-  const patchItem = useCallback(
-    async (id: string, patch: Partial<ItemWithAuthor>, run: () => Promise<void>) => {
-      // Roll back only this item (not the whole array), so a failure can't
-      // clobber unrelated concurrent changes.
-      const previous = itemsRef.current.find((i) => i.id === id);
-      setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
-      try {
-        await run();
-      } catch (e) {
-        if (previous) setItems((prev) => prev.map((i) => (i.id === id ? previous : i)));
-        onError(e);
-        throw e;
-      }
-    },
-    [onError],
-  );
-
-  const editItem = useCallback(
-    async (item: ItemWithAuthor, patch: ItemEdit) =>
-      patchItem(
-        item.id,
-        {
-          body: patch.body !== undefined ? patch.body : item.body,
-          title: patch.title !== undefined ? patch.title : item.title,
-          eventAt: patch.eventAt !== undefined ? patch.eventAt : item.eventAt,
-          place: patch.place !== undefined ? patch.place : item.place,
-          color: patch.color ?? item.color,
-        },
-        () => apiEditItem(item, patch),
-      ),
-    [patchItem],
-  );
-
-  const setPinned = useCallback(
-    (item: ItemWithAuthor, pinned: boolean) =>
-      patchItem(item.id, { pinned, keepUntil: pinned ? null : item.keepUntil }, () =>
-        apiSetPinned(item.id, pinned),
-      ),
-    [patchItem],
-  );
-
-  const setDone = useCallback(
-    (item: ItemWithAuthor, done: boolean) =>
-      patchItem(item.id, { doneAt: done ? new Date().toISOString() : null }, () =>
-        apiSetDone(item.id, done),
-      ),
-    [patchItem],
-  );
-
-  const keepLonger = useCallback(
-    (item: ItemWithAuthor) => patchItem(item.id, {}, () => apiKeepLonger(item.id)),
-    [patchItem],
-  );
-
-  const moveItem = useCallback(
-    (item: ItemWithAuthor, x: number, y: number) =>
-      patchItem(item.id, { layout: { x, y, manual: true } }, () =>
-        apiSetItemPosition(item.id, x, y),
-      ),
-    [patchItem],
-  );
-
-  const removeItem = useCallback(
-    (item: ItemWithAuthor) =>
-      patchItem(item.id, {}, () => apiRemoveItem(item.id)).then(() => {
-        setItems((prev) => prev.filter((i) => i.id !== item.id));
-      }),
-    [patchItem],
-  );
-
-  const restoreItem = useCallback(
-    async (item: ItemWithAuthor) => {
-      // Put it straight back on the board, then persist (undo path).
-      setItems((prev) => (prev.some((i) => i.id === item.id) ? prev : [...prev, item]));
-      try {
-        await apiRestoreItem(item.id);
-      } catch (e) {
-        setItems((prev) => prev.filter((i) => i.id !== item.id));
-        onError(e);
-        throw e;
-      }
-    },
-    [onError],
-  );
-
-  const toggleEntry = useCallback(
-    (entry: ListEntry) => {
-      const next = entry.checkedAt === null;
-      const previous = entry;
-      setEntries((prev) =>
-        prev.map((e) =>
-          e.id === entry.id
-            ? { ...e, checkedAt: next ? new Date().toISOString() : null }
-            : e,
-        ),
-      );
-      apiSetEntryChecked(entry.id, next).catch((e) => {
-        // Restore just this row.
-        setEntries((prev) => prev.map((cur) => (cur.id === entry.id ? previous : cur)));
-        onError(e);
-      });
-    },
-    [onError],
-  );
-
-  const addListEntry = useCallback(
-    async (itemId: string, text: string) => {
-      const id = randomId();
-      const position = entries.filter((e) => e.itemId === itemId).length;
-      const temp: ListEntry = {
-        id,
-        itemId,
-        boardId,
-        text,
-        position,
-        checkedAt: null,
-        checkedBy: null,
-        createdBy: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      setEntries((prev) => [...prev, temp]);
-      try {
-        const saved = await apiAddEntry(id, itemId, text);
-        setEntries((prev) => prev.map((e) => (e.id === id ? saved : e)));
-      } catch (e) {
-        setEntries((prev) => prev.filter((e) => e.id !== id));
-        onError(e);
-        throw e;
-      }
-    },
-    [boardId, entries, onError],
-  );
-
-  return {
-    board,
-    members,
-    items,
-    entries,
-    loading,
-    error,
-    reload,
-    createItem,
-    editItem,
-    setPinned,
-    setDone,
-    keepLonger,
-    moveItem,
-    removeItem,
-    restoreItem,
-    toggleEntry,
-    addListEntry,
-  };
-}
-
-export async function fetchRemovedItems(boardId: string): Promise<ItemWithAuthor[]> {
-  return getRemovedItems(boardId);
+/** Resolve an item's author from the loaded members (realtime rows have no
+ *  profile embed). Re-run whenever members change so an unknown `createdBy`
+ *  becomes an author once that member is known. */
+function resolveAuthor(
+  item: ItemWithAuthor,
+  members: BoardMember[],
+  previous?: ItemWithAuthor,
+): ItemWithAuthor {
+  if (item.author) return item;
+  const author =
+    previous?.author ?? members.find((m) => m.userId === item.createdBy)?.user ?? null;
+  return { ...item, author };
 }
 
 /** Apply a delta: upsert changed items, drop deleted/expired ones. */
 function mergeDeltaItems(
   prev: ItemWithAuthor[],
   delta: ItemWithAuthor[],
-  resolve: (item: ItemWithAuthor, previous?: ItemWithAuthor) => ItemWithAuthor,
+  members: BoardMember[],
 ): ItemWithAuthor[] {
   const byId = new Map(prev.map((i) => [i.id, i]));
   for (const item of delta) {
@@ -536,7 +136,440 @@ function mergeDeltaItems(
       item.deletedAt !== null ||
       (item.keepUntil !== null && new Date(item.keepUntil) <= new Date());
     if (expired) byId.delete(item.id);
-    else byId.set(item.id, resolve(item, byId.get(item.id)));
+    else byId.set(item.id, resolveAuthor(item, members, byId.get(item.id)));
   }
   return [...byId.values()];
+}
+
+/** Public shape returned by `useBoard` (a slice of the per-board store). */
+export type BoardStore = {
+  board: Board | null;
+  members: BoardMember[];
+  items: ItemWithAuthor[];
+  entries: ListEntry[];
+  loading: boolean;
+  error: string | null;
+  reload: () => Promise<void>;
+  refreshMeta: () => Promise<void>;
+  createItem: (input: NewItem) => Promise<void>;
+  editItem: (item: ItemWithAuthor, patch: ItemEdit) => Promise<void>;
+  editList: (item: ItemWithAuthor, batch: ListEditBatch) => Promise<void>;
+  setPinned: (item: ItemWithAuthor, pinned: boolean) => Promise<void>;
+  setDone: (item: ItemWithAuthor, done: boolean) => Promise<void>;
+  keepLonger: (item: ItemWithAuthor) => Promise<void>;
+  moveItem: (item: ItemWithAuthor, x: number, y: number) => Promise<void>;
+  removeItem: (item: ItemWithAuthor) => Promise<void>;
+  restoreItem: (item: ItemWithAuthor) => Promise<void>;
+  toggleEntry: (entry: ListEntry) => void;
+  addListEntry: (itemId: string, text: string, id?: string) => Promise<void>;
+};
+
+/** Internal store shape (adds the delta catch-up used by the channel). */
+type BoardStoreInternal = BoardStore & { catchUp: () => void; expireLocal: () => void };
+export type BoardStoreApi = ReturnType<typeof createBoardStore>;
+
+function createBoardStore(boardId: string) {
+  // Cursor for delta catch-up. `loaded` distinguishes "never loaded" (and an
+  // empty board, whose cursor is '') from a real cursor.
+  let lastSeen: string | null = null;
+  let loaded = false;
+
+  return createStore<BoardStoreInternal>((set, get) => {
+    const onError = (e: unknown) => {
+      const toast = useToast.getState();
+      if (e instanceof ApiError && e.code === 'version_conflict') {
+        toast.show(friendlyMessage(e));
+        void get().reload();
+        return;
+      }
+      toast.show(friendlyMessage(e));
+    };
+
+    const patchItem = async (
+      id: string,
+      patch: Partial<ItemWithAuthor>,
+      run: () => Promise<void>,
+    ) => {
+      // Roll back only this item (not the whole array), so a failure can't
+      // clobber unrelated concurrent changes.
+      const previous = get().items.find((i) => i.id === id);
+      set((s) => ({ items: s.items.map((i) => (i.id === id ? { ...i, ...patch } : i)) }));
+      try {
+        await run();
+      } catch (e) {
+        if (previous) {
+          set((s) => ({ items: s.items.map((i) => (i.id === id ? previous : i)) }));
+        }
+        onError(e);
+        throw e;
+      }
+    };
+
+    return {
+      board: null,
+      members: [],
+      items: [],
+      entries: [],
+      loading: true,
+      error: null,
+
+      reload: async () => {
+        try {
+          const [nextBoard, nextMembers, content] = await Promise.all([
+            getBoard(boardId),
+            getMembers(boardId),
+            getBoardContent(boardId),
+          ]);
+          set({
+            board: nextBoard,
+            members: nextMembers,
+            items: content.items,
+            entries: content.entries,
+            error: null,
+          });
+          lastSeen = advanceCursor(lastSeen, content.items, content.entries);
+          loaded = true;
+        } catch (e) {
+          set({ error: friendlyMessage(e) });
+        } finally {
+          set({ loading: false });
+        }
+      },
+
+      /** Re-read the board row and members (board_members isn't on Realtime),
+       *  and re-resolve any item whose author is now known. */
+      refreshMeta: async () => {
+        try {
+          const [nextBoard, nextMembers] = await Promise.all([
+            getBoard(boardId),
+            getMembers(boardId),
+          ]);
+          set((s) => ({
+            board: nextBoard,
+            members: nextMembers,
+            items: s.items.map((i) => resolveAuthor(i, nextMembers)),
+          }));
+        } catch {
+          // Keep the current view; the next focus/reload will retry.
+        }
+      },
+
+      catchUp: () => {
+        // Before the first load there is nothing to diff against; the initial
+        // reload covers it.
+        if (!loaded) return;
+        // An empty board has no timestamp to diff from — full reload.
+        if (!lastSeen) {
+          void get().reload();
+          return;
+        }
+        const since = deltaSince(lastSeen);
+        void Promise.all([getItemsSince(boardId, since), getEntries(boardId)])
+          .then(([deltaItems, allEntries]) => {
+            const state = get();
+            set({
+              items: mergeDeltaItems(state.items, deltaItems, state.members),
+              entries: allEntries,
+            });
+            lastSeen = advanceCursor(lastSeen, deltaItems, allEntries);
+          })
+          .catch(() => {});
+      },
+
+      // A post whose keep_until lapses while the board is open must disappear
+      // without waiting for a reload.
+      expireLocal: () =>
+        set((s) => {
+          const now = Date.now();
+          const next = s.items.filter(
+            (i) => !(i.keepUntil && new Date(i.keepUntil).getTime() <= now),
+          );
+          return next.length === s.items.length ? s : { items: next };
+        }),
+
+      createItem: async (input) => {
+        const me = useSession.getState().user;
+        const temp: ItemWithAuthor = {
+          id: input.id,
+          boardId: input.boardId,
+          type: input.type,
+          color: input.color,
+          body: input.body ?? null,
+          title: input.title ?? null,
+          eventAt: input.eventAt ?? null,
+          place: input.place ?? null,
+          photoPath: input.photoPath ?? null,
+          layout: null,
+          pinned: input.pinned ?? false,
+          keepUntil: null,
+          doneAt: null,
+          doneBy: null,
+          // Attribute it to me immediately so my own new post never flashes as
+          // "Former member" while the round-trip settles.
+          createdBy: me?.id ?? null,
+          updatedBy: null,
+          deletedAt: null,
+          deletedBy: null,
+          version: 1,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          author: me ?? null,
+        };
+        set((s) => ({ items: [...s.items, temp] }));
+        try {
+          const saved = await apiPostItem(input);
+          const merged = resolveAuthor(saved, get().members, temp);
+          set((s) => ({ items: s.items.map((i) => (i.id === input.id ? merged : i)) }));
+          // Entries for a fresh list arrive via realtime; nothing else to do.
+        } catch (e) {
+          set((s) => ({ items: s.items.filter((i) => i.id !== input.id) }));
+          onError(e);
+          throw e;
+        }
+      },
+
+      editItem: (item, patch) =>
+        patchItem(
+          item.id,
+          {
+            body: patch.body !== undefined ? patch.body : item.body,
+            title: patch.title !== undefined ? patch.title : item.title,
+            eventAt: patch.eventAt !== undefined ? patch.eventAt : item.eventAt,
+            place: patch.place !== undefined ? patch.place : item.place,
+            color: patch.color ?? item.color,
+          },
+          () => apiEditItem(item, patch),
+        ),
+
+      editList: async (item, batch) => {
+        // One atomic RPC for the title/colour AND all entry changes; on success
+        // re-read so the local entry set exactly matches the server.
+        try {
+          await apiEditList(item, batch);
+          await get().reload();
+        } catch (e) {
+          onError(e);
+          throw e;
+        }
+      },
+
+      setPinned: (item, pinned) =>
+        patchItem(item.id, { pinned, keepUntil: pinned ? null : item.keepUntil }, () =>
+          apiSetPinned(item.id, pinned),
+        ),
+
+      setDone: (item, done) =>
+        patchItem(item.id, { doneAt: done ? new Date().toISOString() : null }, () =>
+          apiSetDone(item.id, done),
+        ),
+
+      keepLonger: (item) => patchItem(item.id, {}, () => apiKeepLonger(item.id)),
+
+      moveItem: (item, x, y) =>
+        patchItem(item.id, { layout: { x, y, manual: true } }, () =>
+          apiSetItemPosition(item.id, x, y),
+        ),
+
+      removeItem: (item) =>
+        patchItem(item.id, {}, () => apiRemoveItem(item.id)).then(() => {
+          set((s) => ({ items: s.items.filter((i) => i.id !== item.id) }));
+        }),
+
+      restoreItem: async (item) => {
+        // Put it straight back on the board, then persist (undo path).
+        set((s) =>
+          s.items.some((i) => i.id === item.id) ? s : { items: [...s.items, item] },
+        );
+        try {
+          await apiRestoreItem(item.id);
+        } catch (e) {
+          set((s) => ({ items: s.items.filter((i) => i.id !== item.id) }));
+          onError(e);
+          throw e;
+        }
+      },
+
+      toggleEntry: (entry) => {
+        const next = entry.checkedAt === null;
+        const previous = entry;
+        set((s) => ({
+          entries: s.entries.map((e) =>
+            e.id === entry.id ? { ...e, checkedAt: next ? new Date().toISOString() : null } : e,
+          ),
+        }));
+        apiSetEntryChecked(entry.id, next).catch((e) => {
+          set((s) => ({ entries: s.entries.map((cur) => (cur.id === entry.id ? previous : cur)) }));
+          onError(e);
+        });
+      },
+
+      addListEntry: async (itemId, text, id = randomId()) => {
+        const position = get().entries.filter((e) => e.itemId === itemId).length;
+        const temp: ListEntry = {
+          id,
+          itemId,
+          boardId,
+          text,
+          position,
+          checkedAt: null,
+          checkedBy: null,
+          createdBy: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        set((s) => ({ entries: [...s.entries, temp] }));
+        try {
+          // The caller may supply the client id so a retry after a partial
+          // failure maps to the same row (add_entry is idempotent on p_id).
+          const saved = await apiAddEntry(id, itemId, text);
+          set((s) => ({ entries: s.entries.map((e) => (e.id === id ? saved : e)) }));
+        } catch (e) {
+          set((s) => ({ entries: s.entries.filter((e) => e.id !== id) }));
+          onError(e);
+          throw e;
+        }
+      },
+    };
+  });
+}
+
+/** Start the realtime channel + foreground refresh for a board. Returns a
+ *  disposer; called when the first screen for the board mounts and torn down
+ *  when the last one unmounts. */
+function startBoard(store: BoardStoreApi, boardId: string): () => void {
+  void store.getState().reload();
+
+  const topic = `board:${boardId}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 8)}`;
+  const channel = supabase
+    .channel(topic)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'items', filter: `board_id=eq.${boardId}` },
+      (payload) => {
+        if (payload.eventType === 'DELETE') {
+          const id = (payload.old as { id?: string }).id;
+          if (id) store.setState((s) => ({ items: s.items.filter((i) => i.id !== id) }));
+          return;
+        }
+        const mapped = mapRealtimeItem(payload.new as Record<string, unknown>);
+        const expired =
+          mapped.deletedAt !== null ||
+          (mapped.keepUntil !== null && new Date(mapped.keepUntil) <= new Date());
+        store.setState((s) => {
+          const previous = s.items.find((i) => i.id === mapped.id);
+          const without = s.items.filter((i) => i.id !== mapped.id);
+          if (expired) return { items: without };
+          return { items: [...without, resolveAuthor(mapped, s.members, previous)] };
+        });
+      },
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'boards', filter: `id=eq.${boardId}` },
+      (payload) => {
+        if (payload.eventType === 'DELETE') {
+          store.setState({ board: null });
+          return;
+        }
+        const row = payload.new as { deleted_at?: string | null };
+        if (row.deleted_at) {
+          store.setState({ board: null });
+          return;
+        }
+        // The row is raw; refetch to map it (and pick up name/colour).
+        void getBoard(boardId)
+          .then((next) => {
+            if (next) store.setState({ board: next });
+          })
+          .catch(() => {});
+      },
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'list_entries', filter: `board_id=eq.${boardId}` },
+      (payload) => {
+        if (payload.eventType === 'DELETE') {
+          const id = (payload.old as { id?: string }).id;
+          if (id) store.setState((s) => ({ entries: s.entries.filter((e) => e.id !== id) }));
+          return;
+        }
+        const mapped = mapRealtimeEntry(payload.new as Record<string, unknown>);
+        store.setState((s) => ({
+          entries: [...s.entries.filter((e) => e.id !== mapped.id), mapped],
+        }));
+      },
+    )
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') store.getState().catchUp();
+    });
+
+  const appSub = AppState.addEventListener('change', (next) => {
+    if (next === 'active') void store.getState().reload();
+  });
+
+  // Drop locally-expired posts while the board stays open.
+  const expireTimer = setInterval(() => store.getState().expireLocal(), 30000);
+
+  return () => {
+    void supabase.removeChannel(channel);
+    appSub.remove();
+    clearInterval(expireTimer);
+  };
+}
+
+type RegistryEntry = { store: BoardStoreApi; refs: number; stop: (() => void) | null };
+const registry = new Map<string, RegistryEntry>();
+
+function storeFor(boardId: string): BoardStoreApi {
+  let entry = registry.get(boardId);
+  if (!entry) {
+    entry = { store: createBoardStore(boardId), refs: 0, stop: null };
+    registry.set(boardId, entry);
+  }
+  return entry.store;
+}
+
+/** Register one mounted screen for a board. The first registration starts the
+ *  channel/load; the returned disposer tears it down when the last unmounts.
+ *  Mutates the module-level registry (not a hook value). */
+function acquire(boardId: string): () => void {
+  let entry = registry.get(boardId);
+  if (!entry) {
+    entry = { store: createBoardStore(boardId), refs: 0, stop: null };
+    registry.set(boardId, entry);
+  }
+  const current = entry;
+  current.refs += 1;
+  if (current.refs === 1 && !current.stop) current.stop = startBoard(current.store, boardId);
+  return () => {
+    current.refs -= 1;
+    if (current.refs === 0 && current.stop) {
+      current.stop();
+      current.stop = null;
+    }
+  };
+}
+
+/** Shared, per-board hook: every screen for a board uses the same store (and
+ *  therefore the same channel/load), so changes propagate everywhere and undo
+ *  never runs through an unmounted hook. */
+export function useBoard(boardId: string): BoardStore {
+  const store = useMemo(() => storeFor(boardId), [boardId]);
+  const state = useStore(store);
+
+  useEffect(() => acquire(boardId), [boardId]);
+
+  // Focus refresh keeps the member list current (board_members is not on
+  // Realtime) and re-resolves authors for members who arrived late.
+  useFocusEffect(
+    useCallback(() => {
+      void store.getState().refreshMeta();
+    }, [store]),
+  );
+
+  return state;
+}
+
+export async function fetchRemovedItems(boardId: string): Promise<ItemWithAuthor[]> {
+  return getRemovedItems(boardId);
 }
