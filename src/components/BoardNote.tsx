@@ -23,6 +23,9 @@ type Props = {
   onDragUpdate?: (item: ItemWithAuthor, screenY: number) => void;
   /** Called on drop with the note's new top-left corner, in canvas pixels. */
   onMove?: (item: ItemWithAuthor, left: number, top: number) => void;
+  /** A drag ended without a real move (e.g. a long-press in place), so the
+   *  board can hide the delete zone. `onMove` is not called on this path. */
+  onDragEnd?: (item: ItemWithAuthor) => void;
   /** Reports the note's rendered height so the layout reserves enough room. */
   onMeasure?: (id: string, heightPx: number) => void;
   /** Bumped by the board when a drop wasn't persisted, to snap the note back. */
@@ -56,6 +59,7 @@ export function BoardNote({
   onDragStart,
   onDragUpdate,
   onMove,
+  onDragEnd,
   onMeasure,
   resetKey = 0,
 }: Props) {
@@ -70,9 +74,9 @@ export function BoardNote({
   const startRef = useRef({ x: left, y: top });
 
   // Latest props for the (stable) gesture callbacks.
-  const handlers = useRef({ item, onPress, onMove, onDragStart, onDragUpdate, left, top });
+  const handlers = useRef({ item, onPress, onMove, onDragEnd, onDragStart, onDragUpdate, left, top });
   useEffect(() => {
-    handlers.current = { item, onPress, onMove, onDragStart, onDragUpdate, left, top };
+    handlers.current = { item, onPress, onMove, onDragEnd, onDragStart, onDragUpdate, left, top };
   });
 
   // Follow the layout unless the note is in hand (so a saved position settles
@@ -129,7 +133,8 @@ export function BoardNote({
         const movedX = Math.abs(posRef.current.x - startRef.current.x);
         const movedY = Math.abs(posRef.current.y - startRef.current.y);
         if (movedX < 4 && movedY < 4) {
-          // A long-press without a real drag: don't persist a position.
+          // A long-press without a real drag: don't persist a position, but
+          // still tell the board the drag ended so it hides the delete zone.
           Animated.timing(posX, {
             toValue: handlers.current.left,
             duration: 180,
@@ -140,6 +145,7 @@ export function BoardNote({
             duration: 180,
             useNativeDriver: false,
           }).start();
+          handlers.current.onDragEnd?.(handlers.current.item);
           return;
         }
         handlers.current.onMove?.(handlers.current.item, posRef.current.x, posRef.current.y);

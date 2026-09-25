@@ -42,7 +42,14 @@ export type NoteDraft = {
   entries: { id: string; text: string }[];
   /** A freshly picked local image, or null. */
   photoUri: string | null;
+  /** Pin at creation ("Keep at top"). */
+  pinned: boolean;
+  /** Extra keep_longer applications after posting (each +7 days). */
+  keepExtra: number;
 };
+
+/** Keep-duration stops: 0 = standard lifetime, then +7/+14/+21 days. */
+const KEEP_STOPS = 4;
 
 type ListRow = { id: string; text: string };
 
@@ -89,10 +96,10 @@ export function AddNoteSheet({
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [color, setColor] = useState<ItemColor>('butter');
   const [listTitle, setListTitle] = useState('');
-  const [listNotes, setListNotes] = useState('');
   const [rows, setRows] = useState<ListRow[]>([]);
   const [eventAt, setEventAt] = useState<Date>(() => defaultEventAt());
-  const [place, setPlace] = useState('');
+  const [pinned, setPinned] = useState(false);
+  const [keepExtra, setKeepExtra] = useState(0);
   const [openPicker, setOpenPicker] = useState<'date' | 'time' | null>(null);
   const [picking, setPicking] = useState(false);
   const [wasOpen, setWasOpen] = useState(false);
@@ -121,24 +128,24 @@ export function AddNoteSheet({
               : '',
         );
         setListTitle(initial.type === 'list' ? (initial.title ?? '') : '');
-        setListNotes(initial.type === 'list' ? (initial.body ?? '') : '');
         setRows(initial.type === 'list' ? entries.map((e) => ({ id: e.id, text: e.text })) : []);
-        setPlace(initial.place ?? '');
         setEventAt(initial.eventAt ? new Date(initial.eventAt) : defaultEventAt());
       } else {
         setTab('note');
         setColor(colorForItem(randomId()));
         setText('');
         setListTitle('');
-        setListNotes('');
         setRows([]);
-        setPlace('');
         setEventAt(defaultEventAt());
       }
       setPhotoUri(null);
       setOpenPicker(null);
+      setPinned(false);
+      setKeepExtra(0);
     }
   }
+
+  const cycleKeep = () => setKeepExtra((e) => (e + 1) % KEEP_STOPS);
 
   // Focus a freshly added row once it has mounted, and keep it in view.
   useEffect(() => {
@@ -218,12 +225,14 @@ export function AddNoteSheet({
       onSubmit({
         type: 'list',
         color,
-        body: listNotes.trim(),
+        body: '',
         title: listTitle.trim(),
         eventAt: null,
         place: '',
         entries: filledRows.slice(0, MAX_ROWS).map((r) => ({ id: r.id, text: r.text.trim() })),
         photoUri: null,
+        pinned,
+        keepExtra: 0,
       });
       return;
     }
@@ -234,9 +243,11 @@ export function AddNoteSheet({
         body: '',
         title: text.trim(),
         eventAt: eventAt.toISOString(),
-        place: place.trim(),
+        place: '',
         entries: [],
         photoUri: null,
+        pinned,
+        keepExtra,
       });
       return;
     }
@@ -250,6 +261,8 @@ export function AddNoteSheet({
         place: '',
         entries: [],
         photoUri,
+        pinned,
+        keepExtra,
       });
       return;
     }
@@ -262,6 +275,8 @@ export function AddNoteSheet({
       place: '',
       entries: [],
       photoUri: null,
+      pinned,
+      keepExtra,
     });
   };
 
@@ -279,10 +294,11 @@ export function AddNoteSheet({
         <Pressable style={styles.scrim} onPress={onClose} />
         <View style={styles.sheet}>
           <View style={styles.header}>
-            <Text style={styles.title}>{editing ? 'Edit' : 'Add to board'}</Text>
-            <Pressable hitSlop={12} onPress={onClose} style={styles.closeBtn}>
-              <MaterialCommunityIcons name="close" size={24} color={colors.inkSoft} />
+            <Pressable hitSlop={12} onPress={onClose} style={styles.cancelBtn}>
+              <Text style={styles.cancelText}>Cancel</Text>
             </Pressable>
+            <Text style={styles.title}>{editing ? 'Edit' : 'Add to board'}</Text>
+            <View style={styles.headerSpacer} />
           </View>
 
           {!editing ? (
@@ -297,8 +313,8 @@ export function AddNoteSheet({
                   >
                     <MaterialCommunityIcons
                       name={t.icon}
-                      size={26}
-                      color={active ? colors.ink : colors.inkFaint}
+                      size={20}
+                      color={active ? colors.background : colors.ink}
                     />
                     <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{t.label}</Text>
                   </Pressable>
@@ -427,15 +443,6 @@ export function AddNoteSheet({
                 <Pressable onPress={addRowAndFocus} style={styles.addRow}>
                   <Text style={styles.addRowText}>＋ Add item</Text>
                 </Pressable>
-                <TextInput
-                  style={[styles.input, styles.captionInput]}
-                  placeholder="Notes (optional)..."
-                  placeholderTextColor={colors.inkFaint}
-                  value={listNotes}
-                  onChangeText={setListNotes}
-                  maxLength={2000}
-                  multiline
-                />
               </View>
             ) : null}
 
@@ -495,28 +502,64 @@ export function AddNoteSheet({
                     }}
                   />
                 ) : null}
-                <TextInput
-                  style={[styles.input, styles.captionInput]}
-                  placeholder="Place (optional)..."
-                  placeholderTextColor={colors.inkFaint}
-                  value={place}
-                  onChangeText={setPlace}
-                  maxLength={120}
-                />
               </View>
             ) : null}
           </ScrollView>
 
           <ColorDots color={color} onPick={setColor} />
 
-          <View style={styles.actions}>
-            <Pressable onPress={onClose} style={styles.cancelBtn}>
-              <Text style={styles.cancelText}>Cancel</Text>
-            </Pressable>
-            <Pressable onPress={submit} disabled={!canPost} style={[styles.postBtn, !canPost && styles.postDisabled]}>
-              <Text style={styles.postText}>{submitLabel}</Text>
-            </Pressable>
-          </View>
+          <View style={styles.footerDivider} />
+
+          {!editing ? (
+            <View style={styles.createRow}>
+              {tab !== 'list' ? (
+                <Pressable
+                  onPress={cycleKeep}
+                  disabled={pinned}
+                  hitSlop={8}
+                  style={styles.keepBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel="Keep for longer"
+                >
+                  <MaterialCommunityIcons
+                    name="clock-outline"
+                    size={20}
+                    color={pinned ? colors.inkFaint : colors.ink}
+                  />
+                  <Text style={[styles.keepText, pinned && styles.keepTextDisabled]}>
+                    Keep{keepExtra > 0 ? ` +${keepExtra * 7}d` : ''}
+                  </Text>
+                </Pressable>
+              ) : null}
+              <Pressable
+                onPress={() => setPinned((p) => !p)}
+                hitSlop={8}
+                style={styles.keepBtn}
+                accessibilityRole="button"
+                accessibilityState={{ selected: pinned }}
+              >
+                <MaterialCommunityIcons
+                  name={pinned ? 'pin' : 'pin-outline'}
+                  size={20}
+                  color={pinned ? colors.accentDeep : colors.ink}
+                />
+                <Text style={styles.keepText}>Keep at top</Text>
+              </Pressable>
+              <View style={styles.createSpacer} />
+              <Pressable onPress={submit} disabled={!canPost} style={[styles.postBtn, !canPost && styles.postDisabled]}>
+                <Text style={styles.postText}>Post</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.actions}>
+              <Pressable onPress={onClose} style={styles.cancelBtn}>
+                <Text style={styles.cancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable onPress={submit} disabled={!canPost} style={[styles.postBtn, !canPost && styles.postDisabled]}>
+                <Text style={styles.postText}>{submitLabel}</Text>
+              </Pressable>
+            </View>
+          )}
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -566,22 +609,40 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 14,
   },
-  title: { fontFamily: fonts.ui.extraBold, fontSize: 24, color: colors.ink },
-  closeBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  tabs: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  tab: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 18, gap: 4 },
-  tabActive: { backgroundColor: colors.selected },
-  tabLabel: { fontFamily: fonts.ui.semibold, fontSize: 13, color: colors.inkFaint },
-  tabLabelActive: { color: colors.ink },
+  cancelBtn: { minWidth: 64 },
+  cancelText: { fontFamily: fonts.ui.regular, fontSize: 17, color: colors.ink },
+  title: {
+    flex: 1,
+    textAlign: 'center',
+    fontFamily: fonts.ui.extraBold,
+    fontSize: 20,
+    color: colors.ink,
+  },
+  headerSpacer: { width: 64 },
+  tabs: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 11,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  tabActive: { backgroundColor: colors.ink, borderColor: colors.ink },
+  tabLabel: { fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.ink },
+  tabLabelActive: { color: colors.background },
   // Takes the space left by the header/tabs/dots/actions inside the
   // maxHeight-capped sheet and scrolls, so no field can end up underneath the
   // colour row or keyboard.
-  scroll: { flex: 1 },
+  scroll: { flexGrow: 0, flexShrink: 1 },
   scrollContent: { paddingBottom: 4 },
-  sticky: { borderRadius: 8, padding: 16, minHeight: 170 },
+  sticky: { borderRadius: 8, padding: 16, minHeight: 300 },
   stickyInput: {
     minHeight: 110,
     fontFamily: fonts.hand.regular,
@@ -592,8 +653,13 @@ const styles = StyleSheet.create({
   dateSticky: { minHeight: 130 },
   dateInput: { minHeight: 64, fontSize: 24 },
   dots: { flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 12 },
-  dot: { width: 28, height: 28, borderRadius: 14, borderWidth: 1 },
+  dot: { width: 26, height: 26, borderRadius: 13, borderWidth: 1 },
   dotSelected: { borderColor: colors.ink, borderWidth: 2 },
+  footerDivider: {
+    height: 1,
+    backgroundColor: colors.divider,
+    marginTop: 10,
+  },
   previewWrap: { borderRadius: 14, overflow: 'hidden', position: 'relative' },
   preview: { width: '100%', aspectRatio: 16 / 9 },
   remove: {
@@ -700,10 +766,13 @@ const styles = StyleSheet.create({
   },
   dtTriggerActive: { borderColor: colors.accentDeep, backgroundColor: colors.accentWash },
   dtTriggerText: { fontFamily: fonts.ui.bold, fontSize: 15, color: colors.ink },
-  actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
-  cancelBtn: { paddingVertical: 10, paddingRight: 16 },
-  cancelText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.inkSoft },
-  postBtn: { backgroundColor: colors.ink, borderRadius: 999, paddingHorizontal: 26, paddingVertical: 12 },
-  postDisabled: { opacity: 0.5 },
+  actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
+  createRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 10 },
+  keepBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  keepText: { fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.ink },
+  keepTextDisabled: { color: colors.inkFaint },
+  createSpacer: { flex: 1 },
+  postBtn: { backgroundColor: colors.ink, borderRadius: 999, paddingHorizontal: 22, paddingVertical: 9 },
+  postDisabled: { backgroundColor: colors.inkFaint },
   postText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.background },
 });

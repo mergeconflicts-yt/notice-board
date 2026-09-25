@@ -71,6 +71,39 @@ export function formatEventTime(iso: string): string {
   return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
+/** Relative posted time for card attribution: "20 min", "1 h", "Yesterday". */
+export function timeAgo(iso: string | null): string | null {
+  if (!iso) return null;
+  const ms = Date.now() - new Date(iso).getTime();
+  if (Number.isNaN(ms)) return null;
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return 'Just now';
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h} h`;
+  if (h < 48) return 'Yesterday';
+  return `${Math.floor(h / 24)} days`;
+}
+
+/** Calendar-block parts + relative day word for a date ticket. */
+export function ticketDay(iso: string): { dow: string; day: string; mon: string; label: string } {
+  const d = new Date(iso);
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((startOfDay(d) - startOfDay(new Date())) / 86400000);
+  const label =
+    diff === 0
+      ? 'TODAY'
+      : diff === 1
+        ? 'TOMORROW'
+        : d.toLocaleDateString(undefined, { weekday: 'long' }).toUpperCase();
+  return {
+    dow: d.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase(),
+    day: String(d.getDate()),
+    mon: d.toLocaleDateString(undefined, { month: 'short' }).toUpperCase(),
+    label,
+  };
+}
+
 /** "Leaves the board Thu 1 Oct" style copy, straight from the server's keep_until. */
 export function keepUntilLabel(keepUntil: string | null): string | null {
   if (!keepUntil) return null;

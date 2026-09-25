@@ -3,6 +3,7 @@ export {
   boardColorKeys,
   colors,
   fastenerColors,
+  memberColors,
   noteColors,
   noteColorKeys,
 } from './colors';

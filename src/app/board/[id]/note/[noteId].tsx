@@ -91,13 +91,15 @@ export default function ItemDetailScreen() {
           else if (previous !== row.text) edits.push({ id: row.id, text: row.text });
         }
         const removes = base.filter((e) => !draftIds.has(e.id)).map((e) => e.id);
-        await editList(item, { title: draft.title, color: draft.color, body: draft.body, adds, edits, removes });
+        // The composer has no notes field: leave any existing body untouched.
+        await editList(item, { title: draft.title, color: draft.color, adds, edits, removes });
       } else {
         await editItem(item, {
           body: item.type === 'note' || item.type === 'photo' ? draft.body : undefined,
           title: item.type === 'date' ? draft.title : undefined,
           eventAt: item.type === 'date' ? draft.eventAt : undefined,
-          place: item.type === 'date' ? draft.place : undefined,
+          // The composer has no place field: leave any existing place untouched.
+          place: undefined,
           color: draft.color,
         });
       }

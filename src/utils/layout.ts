@@ -64,8 +64,15 @@ export function estimateItemHeight(item: Dims, wFrac: number): number {
       return 44 + (item.title ? 30 : 0) + 30 * 3;
     case 'date':
       return 40 + 28 * lines(item.title, 3) + 54;
-    default:
+    default: {
+      // Short one-liners render big (hero treatment) — estimate accordingly so
+      // the first paint doesn't overlap before measured heights arrive.
+      const trimmed = (item.body ?? '').trim();
+      if (trimmed.length > 0 && trimmed.length <= 20 && !trimmed.includes('\n')) {
+        return 60 + 40 * lines(item.body, 6);
+      }
       return 34 + 24 * lines(item.body, 6);
+    }
   }
 }
 

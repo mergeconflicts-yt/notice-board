@@ -2,11 +2,12 @@ import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { ItemWithAuthor, ListEntry } from '../types';
 import { colors, noteColors, fonts } from '../theme';
 import { FastenerView, fastenerForItem } from './Pin';
+import { MemberDot } from './MemberDot';
 import {
   PaperVariant,
-  formatEventDate,
   formatEventTime,
-  keepUntilLabel,
+  ticketDay,
+  timeAgo,
   paperVariantFor,
 } from '../utils/note';
 
@@ -48,16 +49,20 @@ export function NotePaper({
   const variant = paperVariantFor(item.type);
   const palette = noteColors[item.color];
   const done = Boolean(item.doneAt);
-  const expiry = keepUntilLabel(item.keepUntil);
+  const age = timeAgo(item.createdAt);
 
   const isPhoto = variant === 'photo';
   const isList = variant === 'list';
   const cardBg = item.color === 'paper' ? colors.paper : palette.bg;
   const borderColor = item.color === 'paper' ? colors.paperEdge : palette.edge;
 
-  const bodyFontSize = large ? 26 : item.type === 'note' ? 20 : 18;
+  const bodyTrimmed = item.type === 'note' ? (item.body ?? '').trim() : '';
+  // A short one-liner note gets the big hero treatment.
+  const heroNote = bodyTrimmed.length > 0 && bodyTrimmed.length <= 20 && !bodyTrimmed.includes('\n');
+  const bodyFontSize = large ? 26 : heroNote ? 32 : item.type === 'note' ? 20 : 18;
 
-  const authorName = item.author?.displayName ?? (item.createdBy ? null : 'Former member');
+  const rawName = item.author?.displayName?.trim();
+  const authorName = rawName ? rawName : item.createdBy ? null : 'Former member';
 
   return (
     <View
@@ -111,39 +116,7 @@ export function NotePaper({
             onToggleEntry={onToggleEntry}
           />
         ) : variant === 'appointment' ? (
-          <View>
-            <Text
-              numberOfLines={large ? undefined : TITLE_LINES}
-              style={[
-                styles.text,
-                styles.ticketText,
-                {
-                  color: palette.ink,
-                  fontSize: bodyFontSize,
-                  lineHeight: bodyFontSize * 1.2,
-                  textDecorationLine: done ? 'line-through' : 'none',
-                  opacity: done ? 0.55 : 1,
-                },
-              ]}
-            >
-              {item.title ?? ''}
-            </Text>
-            {item.eventAt ? (
-              <View style={styles.apptEvent}>
-                <Text style={[styles.apptEventDate, { color: palette.ink }]}>
-                  {formatEventDate(item.eventAt)}
-                </Text>
-                <Text style={[styles.apptEventTime, { color: palette.ink }]}>
-                  {formatEventTime(item.eventAt)}
-                </Text>
-              </View>
-            ) : null}
-            {item.place ? (
-              <Text style={[styles.place, { color: palette.ink }]} numberOfLines={2}>
-                📍 {item.place}
-              </Text>
-            ) : null}
-          </View>
+          <TicketBody item={item} palette={palette} done={done} large={large} />
         ) : isPhoto ? (
           item.body?.trim() ? (
             <Text
@@ -158,10 +131,11 @@ export function NotePaper({
             numberOfLines={large ? undefined : 6}
             style={[
               styles.text,
+              heroNote && { fontFamily: fonts.hand.bold },
               {
                 color: palette.ink,
                 fontSize: bodyFontSize,
-                lineHeight: bodyFontSize * 1.25,
+                lineHeight: bodyFontSize * 1.2,
                 textDecorationLine: done ? 'line-through' : 'none',
                 opacity: done ? 0.55 : 1,
               },
@@ -172,23 +146,84 @@ export function NotePaper({
         )}
       </View>
 
-      {authorName || expiry ? (
+      {authorName || age ? (
         <View style={styles.attribution}>
           {authorName ? (
-            <Text
-              numberOfLines={1}
-              style={[styles.signature, { color: palette.ink, fontSize: large ? 24 : 20 }]}
-            >
-              - {authorName}
-            </Text>
+            <>
+              <MemberDot
+                seed={item.createdBy ?? authorName}
+                name={authorName}
+                size={large ? 26 : 22}
+              />
+              <Text
+                numberOfLines={1}
+                style={[styles.signature, { color: palette.ink, fontSize: large ? 20 : 16 }]}
+              >
+                {authorName}
+              </Text>
+            </>
           ) : null}
-          {expiry ? (
-            <Text style={[styles.expiryInline, { color: palette.ink }]}>
-              {authorName ? '· ' : ''}⏳ {expiry}
+          {age ? (
+            <Text style={[styles.age, { color: palette.ink }]}>
+              {authorName ? `· ${age}` : age}
             </Text>
           ) : null}
         </View>
       ) : null}
+    </View>
+  );
+}
+
+function TicketBody({
+  item,
+  palette,
+  done,
+  large,
+}: {
+  item: ItemWithAuthor;
+  palette: { bg: string; ink: string; edge: string; shadow: string };
+  done: boolean;
+  large: boolean;
+}) {
+  const parts = item.eventAt ? ticketDay(item.eventAt) : null;
+  return (
+    <View style={styles.ticketRow}>
+      {parts ? (
+        <View style={styles.calBlock}>
+          <Text style={styles.calDow}>{parts.dow}</Text>
+          <Text style={[styles.calDay, { color: palette.ink }]}>{parts.day}</Text>
+          <Text style={[styles.calMon, { color: palette.ink }]}>{parts.mon}</Text>
+        </View>
+      ) : null}
+      <View style={styles.ticketMain}>
+        {parts ? <Text style={styles.dayLabel}>{parts.label}</Text> : null}
+        <Text
+          numberOfLines={large ? undefined : TITLE_LINES}
+          style={[
+            styles.text,
+            styles.ticketText,
+            {
+              color: palette.ink,
+              fontSize: large ? 26 : 20,
+              lineHeight: large ? 30 : 24,
+              textDecorationLine: done ? 'line-through' : 'none',
+              opacity: done ? 0.55 : 1,
+            },
+          ]}
+        >
+          {item.title ?? ''}
+        </Text>
+        {item.eventAt ? (
+          <Text style={[styles.ticketTime, { color: palette.ink }]}>
+            {formatEventTime(item.eventAt)}
+          </Text>
+        ) : null}
+        {item.place ? (
+          <Text style={[styles.place, { color: palette.ink }]} numberOfLines={2}>
+            {item.place}
+          </Text>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -301,9 +336,20 @@ const styles = StyleSheet.create({
   text: { fontFamily: fonts.hand.semibold },
   photoCaption: { textAlign: 'center' },
   ticketText: { fontFamily: fonts.hand.bold },
-  apptEvent: { marginTop: 6, gap: 1 },
-  apptEventDate: { fontFamily: fonts.hand.regular, fontSize: 20, lineHeight: 24 },
-  apptEventTime: { fontFamily: fonts.hand.bold, fontSize: 22, lineHeight: 26 },
+  ticketRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  calBlock: { alignItems: 'center', minWidth: 44, paddingTop: 2 },
+  calDow: { fontFamily: fonts.ui.bold, fontSize: 12, letterSpacing: 0.5, color: colors.danger },
+  calDay: { fontFamily: fonts.hand.bold, fontSize: 30, lineHeight: 32 },
+  calMon: { fontFamily: fonts.ui.semibold, fontSize: 12, opacity: 0.7 },
+  ticketMain: { flex: 1 },
+  dayLabel: {
+    fontFamily: fonts.ui.bold,
+    fontSize: 13,
+    letterSpacing: 0.5,
+    color: colors.danger,
+    marginBottom: 2,
+  },
+  ticketTime: { fontFamily: fonts.hand.bold, fontSize: 19, lineHeight: 23, marginTop: 2 },
   place: { fontFamily: fonts.ui.semibold, fontSize: 14, marginTop: 6, opacity: 0.85 },
   listTitle: {
     fontFamily: fonts.hand.regular,
@@ -335,11 +381,12 @@ const styles = StyleSheet.create({
   listText: { flex: 1, fontFamily: fonts.hand.regular, fontSize: 22, lineHeight: 24 },
   listMore: { fontFamily: fonts.ui.semibold, fontSize: 12, opacity: 0.6, marginTop: 8 },
   attribution: {
-    flexDirection: 'column',
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
     marginTop: 12,
-    gap: 2,
+    gap: 6,
   },
-  signature: { fontFamily: fonts.hand.semibold, opacity: 0.85, textAlign: 'right' },
-  expiryInline: { fontFamily: fonts.ui.semibold, fontSize: 12, opacity: 0.65 },
+  signature: { flexShrink: 1, fontFamily: fonts.hand.semibold, opacity: 0.85 },
+  age: { fontFamily: fonts.ui.semibold, fontSize: 12, opacity: 0.65 },
 });

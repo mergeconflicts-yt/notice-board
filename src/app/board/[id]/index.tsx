@@ -14,11 +14,11 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { colors, boardColors, fonts } from '../../../theme';
 import { BoardSection } from '../../../components/BoardSection';
 import { PinnedStrip } from '../../../components/PinnedStrip';
-import { Avatar } from '../../../components/Avatar';
+import { MemberDot } from '../../../components/MemberDot';
 import { AddNoteSheet, NoteDraft } from '../../../components/AddNoteSheet';
 import { useBoard, randomId } from '../../../hooks/useBoard';
 import { useToast } from '../../../store/toast';
-import { friendlyMessage, signedPhotoUrl, uploadPhoto } from '../../../lib/api';
+import { friendlyMessage, keepLonger as apiKeepLonger, signedPhotoUrl, uploadPhoto } from '../../../lib/api';
 import { ItemWithAuthor } from '../../../types';
 
 /** Share of the board height reserved for the pinned-forever strip. */
@@ -39,6 +39,8 @@ function draftKey(draft: NoteDraft): string {
     p: draft.place,
     u: draft.photoUri,
     entries: draft.entries,
+    pinned: draft.pinned,
+    keepExtra: draft.keepExtra,
   });
 }
 
@@ -190,6 +192,14 @@ export default function BoardScreen() {
     setDragActive(true);
   };
 
+  // A drag ended without a real move (long-press in place): nothing to
+  // persist, just hide the delete zone again.
+  const handleDragEnd = () => {
+    overDeleteRef.current = false;
+    setOverDelete(false);
+    setDragActive(false);
+  };
+
   // The finger counts as "over delete" once it reaches the bottom zone.
   const handleDragUpdate = (_item: ItemWithAuthor, screenY: number) => {
     const over = screenY >= windowH - insets.bottom - DELETE_ZONE_HEIGHT;
@@ -256,8 +266,22 @@ export default function BoardScreen() {
         eventAt: draft.eventAt,
         place: draft.place || null,
         photoPath,
+        pinned: draft.pinned,
         entries: draft.type === 'list' ? draft.entries : undefined,
       });
+      // Extra keep time the composer asked for: one keep_longer call per +7d.
+      // Pinned and list posts are excluded — the server keeps pinned items
+      // forever and rejects keep_longer for lists.
+      if (draft.keepExtra > 0 && !draft.pinned && draft.type !== 'list') {
+        for (let i = 0; i < draft.keepExtra; i++) {
+          try {
+            await apiKeepLonger(itemId);
+          } catch (e) {
+            useToast.getState().show(friendlyMessage(e));
+            break;
+          }
+        }
+      }
       pendingDraftRef.current = null;
       setSheetOpen(false);
     } catch {
@@ -324,35 +348,32 @@ export default function BoardScreen() {
       <View style={styles.header}>
         <Pressable
           hitSlop={8}
-          onPress={() => router.push(`/board/${boardId}/people`)}
-          style={styles.peopleBtn}
+          onPress={() => router.push(`/board/${boardId}/settings`)}
+          style={styles.boardTitle}
+          accessibilityLabel="Board settings"
         >
-          {members.slice(0, 3).map((m, i) => (
-            <View key={m.userId} style={[styles.avatarStack, { zIndex: 10 - i, marginLeft: i === 0 ? 0 : -8 }]}>
-              <Avatar name={m.user.displayName} size={26} />
-            </View>
-          ))}
-          {members.length > 3 ? (
-            <View style={[styles.avatarStack, styles.moreStack, { marginLeft: -8 }]}>
-              <Text style={styles.moreText}>+{members.length - 3}</Text>
-            </View>
-          ) : null}
-        </Pressable>
-
-        <Pressable onPress={() => router.push(`/board/${boardId}/settings`)} style={styles.boardTitle}>
           <Text style={styles.boardName} numberOfLines={1}>{board.name}</Text>
-          <Text style={styles.boardSubtitle}>Shared board</Text>
+          <MaterialCommunityIcons name="chevron-down" size={22} color={colors.ink} />
         </Pressable>
 
         <Pressable
           hitSlop={8}
-          onPress={() => router.push(`/board/${boardId}/settings`)}
-          style={styles.settingsBtn}
-          accessibilityLabel="Board settings"
+          onPress={() => router.push(`/board/${boardId}/people`)}
+          style={styles.peopleBtn}
         >
-          <Text style={styles.settingsGlyph}>⚙︎</Text>
+          {members.slice(0, 4).map((m, i) => (
+            <View key={m.userId} style={{ zIndex: 10 - i, marginLeft: i === 0 ? 0 : -8 }}>
+              <MemberDot seed={m.userId} name={m.user.displayName} size={30} />
+            </View>
+          ))}
+          {members.length > 4 ? (
+            <View style={[styles.moreStack, { marginLeft: -8 }]}>
+              <Text style={styles.moreText}>+{members.length - 4}</Text>
+            </View>
+          ) : null}
         </Pressable>
       </View>
+      <Text style={styles.tagline}>📌 Always here</Text>
 
       {error ? <Text style={styles.banner}>{error}</Text> : null}
 
@@ -368,9 +389,6 @@ export default function BoardScreen() {
       ) : (
         <View style={styles.sections}>
           <View style={styles.pinnedSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>📌 Pinned forever</Text>
-            </View>
             <PinnedStrip
               items={pinnedItems}
               entries={entries}
@@ -378,8 +396,6 @@ export default function BoardScreen() {
               onOpen={openItem}
             />
           </View>
-
-          <View style={styles.sectionDivider} />
 
           <View style={styles.restSection}>
             <BoardSection
@@ -391,6 +407,7 @@ export default function BoardScreen() {
               onMove={handleDrop}
               onDragStart={handleDragStart}
               onDragUpdate={handleDragUpdate}
+              onDragEnd={handleDragEnd}
               resetKey={dragReset}
               emptyHint="Everything else lives here."
             />
@@ -422,14 +439,15 @@ export default function BoardScreen() {
         <Pressable
           onPress={() => setSheetOpen(true)}
           accessibilityRole="button"
-          accessibilityLabel="Add note"
+          accessibilityLabel="Add to board"
           style={({ pressed }) => [
-            styles.fab,
-            { bottom: insets.bottom + 24 },
-            pressed && styles.fabPressed,
+            styles.composerBtn,
+            { bottom: insets.bottom + 20 },
+            pressed && styles.composerPressed,
           ]}
         >
-          <Text style={styles.fabGlyph}>+</Text>
+          <Text style={styles.composerGlyph}>+</Text>
+          <Text style={styles.composerText}>Add to board</Text>
         </Pressable>
       ) : null}
 
@@ -453,12 +471,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 56,
   },
-  peopleBtn: { flexDirection: 'row', alignItems: 'center', width: 96 },
-  avatarStack: { borderRadius: 15, borderWidth: 2, borderColor: colors.avatarRing },
+  peopleBtn: { flexDirection: 'row', alignItems: 'center' },
   moreStack: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
@@ -467,25 +484,20 @@ const styles = StyleSheet.create({
   },
   moreText: { fontFamily: fonts.ui.bold, fontSize: 11, color: colors.inkSoft },
   boardName: {
-    textAlign: 'center',
     fontFamily: fonts.hand.bold,
-    fontSize: 24,
+    fontSize: 30,
     color: colors.ink,
-    paddingHorizontal: 8,
+    flexShrink: 1,
   },
-  boardTitle: { flex: 1, alignItems: 'center' },
-  boardSubtitle: { fontFamily: fonts.ui.regular, fontSize: 11, color: colors.inkSoft, marginTop: -2 },
-  settingsBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+  boardTitle: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  tagline: {
+    fontFamily: fonts.ui.regular,
+    fontSize: 13,
+    color: colors.inkSoft,
+    paddingHorizontal: 16,
+    marginTop: 2,
+    marginBottom: 8,
   },
-  settingsGlyph: { fontSize: 18, color: colors.inkSoft },
   banner: {
     fontFamily: fonts.ui.semibold,
     fontSize: 13,
@@ -497,20 +509,6 @@ const styles = StyleSheet.create({
   sections: { flex: 1 },
   pinnedSection: { flex: PINNED_FLEX },
   restSection: { flex: REST_FLEX },
-  sectionHeader: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 2 },
-  sectionTitle: {
-    fontFamily: fonts.ui.bold,
-    fontSize: 12,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    color: colors.inkSoft,
-  },
-  sectionDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.divider,
-    marginHorizontal: 16,
-    marginVertical: 6,
-  },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingBottom: 60 },
   emptyHand: { fontSize: 40, marginBottom: 12 },
   emptyTitle: { fontFamily: fonts.hand.bold, fontSize: 32, color: colors.ink, marginBottom: 6 },
@@ -553,23 +551,25 @@ const styles = StyleSheet.create({
   deleteZoneTextOver: {
     color: colors.white,
   },
-  fab: {
+  composerBtn: {
     position: 'absolute',
-    right: 22,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: colors.accent,
+    alignSelf: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 999,
+    backgroundColor: colors.ink,
+    paddingHorizontal: 22,
+    paddingVertical: 14,
     shadowColor: colors.shadow,
     shadowOpacity: 0.3,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
     elevation: 6,
   },
-  fabPressed: { transform: [{ scale: 0.94 }] },
-  fabGlyph: { fontSize: 34, lineHeight: 38, color: colors.white, marginTop: -2 },
+  composerPressed: { transform: [{ scale: 0.96 }] },
+  composerGlyph: { fontSize: 22, lineHeight: 24, color: colors.white, fontFamily: fonts.ui.bold },
+  composerText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.white },
   missingTitle: { fontFamily: fonts.hand.bold, fontSize: 30, color: colors.ink },
   missingSub: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.inkSoft, marginTop: 6 },
   missingBtn: {

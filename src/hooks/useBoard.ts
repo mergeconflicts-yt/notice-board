@@ -112,7 +112,10 @@ function deltaSince(cursor: string): string {
 
 /** Resolve an item's author from the loaded members (realtime rows have no
  *  profile embed). Re-run whenever members change so an unknown `createdBy`
- *  becomes an author once that member is known. */
+ *  becomes an author once that member is known. A `createdBy` that matches no
+ *  member and no profile means the author left (or is gone): attribute it as
+ *  a former member — same convention as `getMembers` — rather than dropping
+ *  the name line entirely. */
 function resolveAuthor(
   item: ItemWithAuthor,
   members: BoardMember[],
@@ -121,7 +124,16 @@ function resolveAuthor(
   if (item.author) return item;
   const author =
     previous?.author ?? members.find((m) => m.userId === item.createdBy)?.user ?? null;
-  return { ...item, author };
+  if (author || !item.createdBy) return { ...item, author };
+  return {
+    ...item,
+    author: {
+      id: item.createdBy,
+      displayName: 'Former member',
+      avatarPath: null,
+      createdAt: item.createdAt,
+    },
+  };
 }
 
 /** Apply a delta: upsert changed items, drop deleted/expired ones. */
@@ -223,7 +235,9 @@ function createBoardStore(boardId: string) {
           set({
             board: nextBoard,
             members: nextMembers,
-            items: content.items,
+            // Resolve against the fresh members too, so an item whose profile
+            // embed came back empty is attributed on first paint.
+            items: content.items.map((i) => resolveAuthor(i, nextMembers)),
             entries: content.entries,
             error: null,
           });

@@ -78,6 +78,16 @@ export const noteColors: Record<
 
 export const noteColorKeys = Object.keys(noteColors) as ItemColor[];
 
+/** Solid member-dot colours (board header + post attribution), hashed by user. */
+export const memberColors = [
+  '#6AA84F',
+  '#C05B4D',
+  '#4A7FB5',
+  '#C99A2E',
+  '#8E7CC3',
+  '#4FA3A3',
+] as const;
+
 /** Board cover tints. */
 export const boardColors: Record<BoardColor, string> = {
   sage: '#C9DCC0',

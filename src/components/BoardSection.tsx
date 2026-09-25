@@ -16,6 +16,7 @@ type Props = {
   onMove: (item: ItemWithAuthor, x: number, y: number) => void;
   onDragStart?: (item: ItemWithAuthor) => void;
   onDragUpdate?: (item: ItemWithAuthor, screenY: number) => void;
+  onDragEnd?: (item: ItemWithAuthor) => void;
   /** Shown in place of the canvas when the section has no items. */
   emptyHint?: string;
   /** Bumped when a drop wasn't persisted, to snap the note back. */
@@ -36,6 +37,7 @@ export function BoardSection({
   onMove,
   onDragStart,
   onDragUpdate,
+  onDragEnd,
   emptyHint,
   resetKey,
 }: Props) {
@@ -111,6 +113,7 @@ export function BoardSection({
                   onPress={onOpen}
                   onDragStart={onDragStart}
                   onDragUpdate={onDragUpdate}
+                  onDragEnd={onDragEnd}
                   onMove={handleMove}
                   onMeasure={handleMeasure}
                   resetKey={resetKey}
