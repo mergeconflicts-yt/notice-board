@@ -23,7 +23,7 @@ import { friendlyMessage, keepLonger as apiKeepLonger, signedPhotoUrl, uploadPho
 import { ItemWithAuthor } from '../../../types';
 
 /** Share of the board height reserved for the pinned-forever strip. */
-const PINNED_FLEX = 2;
+const PINNED_FLEX = 1.4;
 const REST_FLEX = 8;
 
 /** Height of the drag-to-delete target at the bottom of the screen. */

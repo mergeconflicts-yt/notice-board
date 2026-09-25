@@ -1,11 +1,27 @@
 import { ItemColor, ItemType } from '../types';
-import { noteColorKeys } from '../theme';
 
-/** Deterministic colour deal for an item id (used when the user doesn't pick). */
+/** Weighted colour deal for a new item (used when the user doesn't pick):
+ *  yellow 40, white 20, mint 15, blue 10, pink 10, lilac 5. Deterministic per
+ *  seed, so random ids land on the weights in aggregate. */
+const COLOR_WEIGHTS: [ItemColor, number][] = [
+  ['butter', 40],
+  ['paper', 20],
+  ['sage', 15],
+  ['sky', 10],
+  ['blush', 10],
+  ['lavender', 5],
+];
+
 export function colorForItem(seed: string): ItemColor {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  return noteColorKeys[h % noteColorKeys.length];
+  const roll = h % 100;
+  let acc = 0;
+  for (const [color, weight] of COLOR_WEIGHTS) {
+    acc += weight;
+    if (roll < acc) return color;
+  }
+  return 'butter';
 }
 
 /** Stable tilt in degrees, roughly ±4.5°. */

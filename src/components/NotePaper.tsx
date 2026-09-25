@@ -15,6 +15,8 @@ type Props = {
   /** Bare paper for the pinned strip: no shadow, no fastener (the card
    *  wrapper carries the shadow there so it isn't clipped). */
   flat?: boolean;
+  /** Compact type + padding for the pinned strip. */
+  compact?: boolean;
   /** Floor for the rendered height, so small papers still fill their slot. */
   minHeight?: number;
   /** Show every checklist row instead of the first few. */
@@ -30,10 +32,16 @@ type Props = {
 const TITLE_LINES = 3;
 const ENTRY_LIMIT = 6;
 
+/** Scale type down for the pinned strip (~75%, floored at 10). */
+function compactFont(full: number, compact: boolean): number {
+  return compact ? Math.max(10, Math.round(full * 0.75)) : full;
+}
+
 export function NotePaper({
   item,
   large = false,
   flat = false,
+  compact = false,
   minHeight,
   showAllEntries = false,
   maxEntries,
@@ -54,7 +62,7 @@ export function NotePaper({
   const bodyLen = bodyTrimmed.length;
   // Handwriting sized by length: a two-word note is a bold little slip, a
   // sentence is smaller, anything longer is body size.
-  const bodyFontSize = large
+  const bodyBase = large
     ? 26
     : item.type !== 'note'
       ? 18
@@ -63,6 +71,7 @@ export function NotePaper({
         : bodyLen <= 60
           ? 25
           : 20;
+  const bodyFontSize = compactFont(bodyBase, compact && !large);
   const heroNote = !large && item.type === 'note' && bodyLen > 0 && bodyLen <= 20 && !bodyTrimmed.includes('\n');
 
   const rawName = item.author?.displayName?.trim();
@@ -81,7 +90,7 @@ export function NotePaper({
           borderBottomRightRadius: 3,
           borderBottomLeftRadius: 4,
           minHeight: minHeight ?? undefined,
-          padding: large ? 22 : variant === 'photo' ? 14 : 16,
+          padding: compact ? 10 : large ? 22 : variant === 'photo' ? 14 : 16,
         },
         // boxShadow draws on both platforms; elevation would double-draw the
         // shadow on Android, so it stays off the paper.
@@ -113,9 +122,10 @@ export function NotePaper({
             large={large || showAllEntries}
             maxEntries={maxEntries}
             onToggleEntry={onToggleEntry}
+            compact={compact}
           />
         ) : variant === 'appointment' ? (
-          <TicketBody item={item} palette={palette} done={done} large={large} />
+          <TicketBody item={item} palette={palette} done={done} large={large} compact={compact} />
         ) : isPhoto ? (
           item.body?.trim() ? (
             <Text
@@ -146,7 +156,10 @@ export function NotePaper({
       </View>
 
       {authorName || age ? (
-        <Text numberOfLines={1} style={[styles.meta, { color: palette.ink }]}>
+        <Text
+          numberOfLines={1}
+          style={[styles.meta, { color: palette.ink, fontSize: compactFont(11.5, compact) }]}
+        >
           {[authorName, age].filter(Boolean).join(' · ')}
         </Text>
       ) : null}
@@ -159,24 +172,43 @@ function TicketBody({
   palette,
   done,
   large,
+  compact,
 }: {
   item: ItemWithAuthor;
   palette: { bg: string; ink: string; edge: string; shadow: string };
   done: boolean;
   large: boolean;
+  compact: boolean;
 }) {
   const parts = item.eventAt ? ticketDay(item.eventAt) : null;
   return (
     <View style={styles.ticketRow}>
       {parts ? (
         <View style={styles.calBlock}>
-          <Text style={styles.calDow}>{parts.dow}</Text>
-          <Text style={[styles.calDay, { color: palette.ink }]}>{parts.day}</Text>
-          <Text style={[styles.calMon, { color: palette.ink }]}>{parts.mon}</Text>
+          <Text style={[styles.calDow, { fontSize: compactFont(12, compact) }]}>{parts.dow}</Text>
+          <Text
+            style={[
+              styles.calDay,
+              {
+                color: palette.ink,
+                fontSize: compactFont(30, compact),
+                lineHeight: compactFont(32, compact),
+              },
+            ]}
+          >
+            {parts.day}
+          </Text>
+          <Text
+            style={[styles.calMon, { color: palette.ink, fontSize: compactFont(12, compact) }]}
+          >
+            {parts.mon}
+          </Text>
         </View>
       ) : null}
       <View style={styles.ticketMain}>
-        {parts ? <Text style={styles.dayLabel}>{parts.label}</Text> : null}
+        {parts ? (
+          <Text style={[styles.dayLabel, { fontSize: compactFont(13, compact) }]}>{parts.label}</Text>
+        ) : null}
         <Text
           numberOfLines={large ? undefined : TITLE_LINES}
           style={[
@@ -184,8 +216,8 @@ function TicketBody({
             styles.ticketText,
             {
               color: palette.ink,
-              fontSize: large ? 26 : 20,
-              lineHeight: large ? 30 : 24,
+              fontSize: large ? 26 : compactFont(20, compact),
+              lineHeight: large ? 30 : compactFont(24, compact),
               textDecorationLine: done ? 'line-through' : 'none',
               opacity: done ? 0.55 : 1,
             },
@@ -194,12 +226,24 @@ function TicketBody({
           {item.title ?? ''}
         </Text>
         {item.eventAt ? (
-          <Text style={[styles.ticketTime, { color: palette.ink }]}>
+          <Text
+            style={[
+              styles.ticketTime,
+              {
+                color: palette.ink,
+                fontSize: compactFont(19, compact),
+                lineHeight: compactFont(23, compact),
+              },
+            ]}
+          >
             {formatEventTime(item.eventAt)}
           </Text>
         ) : null}
         {item.place ? (
-          <Text style={[styles.place, { color: palette.ink }]} numberOfLines={2}>
+          <Text
+            style={[styles.place, { color: palette.ink, fontSize: compactFont(14, compact) }]}
+            numberOfLines={2}
+          >
             {item.place}
           </Text>
         ) : null}
@@ -214,12 +258,14 @@ function ListBody({
   large,
   maxEntries,
   onToggleEntry,
+  compact,
 }: {
   item: ItemWithAuthor;
   entries: ListEntry[];
   large: boolean;
   maxEntries?: number;
   onToggleEntry?: (entry: ListEntry) => void;
+  compact: boolean;
 }) {
   const sorted = [...entries].sort((a, b) => a.position - b.position);
   const visible = large ? sorted : sorted.slice(0, maxEntries ?? ENTRY_LIMIT);
@@ -227,7 +273,13 @@ function ListBody({
   return (
     <View>
       {item.title ? (
-        <Text style={[styles.listTitle, { color: colors.ink }]} numberOfLines={2}>
+        <Text
+          style={[
+            styles.listTitle,
+            { color: colors.ink, fontSize: compactFont(26, compact), lineHeight: compactFont(30, compact) },
+          ]}
+          numberOfLines={2}
+        >
           {item.title}
         </Text>
       ) : null}
@@ -237,15 +289,24 @@ function ListBody({
           const row = (
             <>
               <View
-                style={[styles.checkbox, { borderColor: colors.ink }, checked && styles.checkboxDone]}
+                style={[
+                  styles.checkbox,
+                  { borderColor: colors.ink },
+                  checked && styles.checkboxDone,
+                  compact && { width: 15, height: 15, borderRadius: 8 },
+                ]}
               >
-                {checked ? <Text style={styles.checkmark}>✓</Text> : null}
+                {checked ? (
+                  <Text style={[styles.checkmark, compact && { fontSize: 9 }]}>✓</Text>
+                ) : null}
               </View>
               <Text
                 style={[
                   styles.listText,
                   {
                     color: colors.ink,
+                    fontSize: compactFont(22, compact),
+                    lineHeight: compactFont(24, compact),
                     textDecorationLine: checked ? 'line-through' : 'none',
                     opacity: checked ? 0.55 : 1,
                   },
@@ -276,7 +337,7 @@ function ListBody({
         })}
       </View>
       {!large && truncated ? (
-        <Text style={[styles.listMore, { color: colors.ink }]}>
+        <Text style={[styles.listMore, { color: colors.ink, fontSize: compactFont(12, compact) }]}>
           +{sorted.length - visible.length} more
         </Text>
       ) : null}
