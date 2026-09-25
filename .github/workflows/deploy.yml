@@ -36,6 +36,25 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
+      - name: Check job prerequisites
+        # Before touching anything: an empty JOB_SECRET would make every job
+        # answer 403, and missing Vault secrets would leave them inert.
+        # Uses the session pooler — GitHub runners have no IPv6, so the
+        # direct db.<ref> host is unreachable.
+        run: |
+          if [ -z "${JOB_SECRET}" ]; then echo "JOB_SECRET secret is empty"; exit 1; fi
+          missing=$(psql "$SUPABASE_DB_URL" \
+            -tAc "select string_agg(name, ',') from vault.secrets where name in ('functions_url','job_secret')")
+          for want in functions_url job_secret; do
+            case ",$missing," in
+              *",$want,"*) ;;
+              *) echo "missing Vault secret: $want"; exit 1;;
+            esac
+          done
+        env:
+          JOB_SECRET: ${{ secrets.JOB_SECRET }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+
       - name: Push migrations
         run: supabase db push
         env:
@@ -53,21 +72,6 @@ jobs:
         run: supabase secrets set "JOB_SECRET=${{ secrets.JOB_SECRET }}"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-
-      - name: Check Vault job secrets
-        run: |
-          missing=$(PGPASSWORD="$SUPABASE_DB_PASSWORD" psql \
-            "host=db.$SUPABASE_PROJECT_REF.supabase.co port=5432 dbname=postgres user=postgres sslmode=require" \
-            -tAc "select string_agg(name, ',') from vault.secrets where name in ('functions_url','job_secret')")
-          for want in functions_url job_secret; do
-            case ",$missing," in
-              *",$want,"*) ;;
-              *) echo "missing Vault secret: $want"; exit 1;;
-            esac
-          done
-        env:
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
       - name: Lint remote schema
         run: supabase db lint --linked --level warning --fail-on warning

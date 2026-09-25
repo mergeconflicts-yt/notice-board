@@ -243,4 +243,11 @@ implemented slightly differently. Appended as work proceeds.
     `deploy.yml` now dry-runs migrations, deploys the Edge Functions, sets
     `JOB_SECRET`, verifies the `functions_url`/`job_secret` Vault secrets
     exist, and fails the remote lint on warnings.
+30. **Purge/count + deploy follow-ups (review M1–M2).** `photo_paths_in_use()`
+    is back to a single aggregate row (`paths` + `total`): PostgREST caps
+    function results at `max_rows = 1000`, so the one-row-per-photo shape made
+    every nightly purge fail its count guard (without deleting anything) past
+    1,000 photos. The deploy Vault check now runs pre-push over the session
+    pooler (`SUPABASE_DB_URL`; GitHub runners have no IPv6 for the direct
+    host), and fails fast on an empty `JOB_SECRET`.
 

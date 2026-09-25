@@ -1,6 +1,6 @@
 -- Phase 6: maintenance jobs (expire + rate-limit cleanup) and their schedule.
 begin;
-select plan(19);
+select plan(20);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000071', 'authenticated', 'authenticated');
@@ -80,13 +80,16 @@ values ('c0000000-0000-0000-0000-000000000076', 'b0000000-0000-0000-0000-0000000
         'photo', 'p', 'b0000000-0000-0000-0000-000000000071/c0000000-0000-0000-0000-000000000076/x.jpg',
         'a0000000-0000-0000-0000-000000000071');
 select ok(
-  'b0000000-0000-0000-0000-000000000071/c0000000-0000-0000-0000-000000000076/x.jpg'
-    = any(array(select path from public.photo_paths_in_use())),
-  'photo_paths_in_use lists an in-use path');
-select ok(
-  (select every(total = (select count(*) from public.items where photo_path is not null))
+  (select paths @> array['b0000000-0000-0000-0000-000000000071/c0000000-0000-0000-0000-000000000076/x.jpg']
    from public.photo_paths_in_use()),
+  'photo_paths_in_use lists an in-use path');
+select is(
+  (select total::integer from public.photo_paths_in_use()),
+  (select count(*)::integer from public.items where photo_path is not null),
   'photo_paths_in_use count matches its rows');
+select is(
+  (select count(*)::integer from (select * from public.photo_paths_in_use()) s),
+  1, 'photo_paths_in_use returns a single row regardless of size');
 select is(
   public.purge_items(array['c0000000-0000-0000-0000-000000000076']::uuid[]),
   1, 'purge_items deletes the batch');

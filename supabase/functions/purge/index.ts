@@ -104,15 +104,15 @@ Deno.serve(async (req: Request) => {
     // --- 3. Orphan photos ------------------------------------------------
     // Paths and their authoritative row count arrive from one snapshot; abort
     // if they disagree (a truncated list would delete live photos).
-    type InUseRow = { path: string; total: number | string };
+    type InUseSnapshot = { paths: string[]; total: number | string };
     const { data: inUseRows, error: inUseError } = await admin.rpc('photo_paths_in_use');
     if (inUseError) throw new Error(`photo_paths_in_use failed: ${inUseError.message}`);
-    const rows = (inUseRows ?? []) as InUseRow[];
-    const total = rows.length === 0 ? 0 : Number(rows[0].total);
-    if (rows.length !== total) {
-      throw new Error(`in-use path count mismatch (${rows.length} vs ${total})`);
+    const snapshot = ((inUseRows ?? []) as InUseSnapshot[])[0];
+    const used = new Set<string>(snapshot?.paths ?? []);
+    const total = Number(snapshot?.total ?? 0);
+    if (used.size !== total) {
+      throw new Error(`in-use path count mismatch (${used.size} vs ${total})`);
     }
-    const used = new Set<string>(rows.map((r) => r.path));
     const orphanCutoff = Date.now() - ORPHAN_HOURS * 3600 * 1000;
     let orphans = 0;
     if (outOfTime()) {

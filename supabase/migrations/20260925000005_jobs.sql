@@ -49,14 +49,17 @@ set search_path = '' as $$
 $$;
 
 -- Every photo path currently referenced by an item, plus the authoritative
--- row count from the same snapshot (one call, no paging). The count guards
--- against acting on a truncated list.
+-- row count from the same snapshot (one call, no paging). A single aggregate
+-- row, deliberately: PostgREST caps function results at max_rows (1000), so a
+-- one-row-per-photo shape would truncate above that and fail the count guard
+-- below on every run. The count guards against acting on a short list.
 create function public.photo_paths_in_use()
-returns table (path text, total bigint)
+returns table (paths text[], total bigint)
 language sql
 security definer
 set search_path = '' as $$
-  select i.photo_path, count(*) over ()
+  select coalesce(array_agg(i.photo_path), '{}'),
+         count(*)::bigint
   from public.items i
   where i.photo_path is not null;
 $$;

@@ -158,10 +158,15 @@ project's dashboard:
   job `database` = `supabase/setup-cli` → `supabase start` → `db reset` →
   `test db` → `db lint`.
 - **Deploy** (`.github/workflows/deploy.yml`, manual `workflow_dispatch`):
-  links a hosted project and runs `supabase db push`. Pick the environment
-  (`notice-dev`/`notice-prod`); each has its own `SUPABASE_PROJECT_REF` and
-  `SUPABASE_DB_PASSWORD` (plus a shared `SUPABASE_ACCESS_TOKEN`). Migrations
-  reach production only through this workflow.
+  dry-runs then pushes migrations, deploys the Edge Functions, sets
+  `JOB_SECRET`, verifies the `functions_url`/`job_secret` Vault secrets exist,
+  and lints the remote schema with warnings as failures. Pick the environment
+  (`notice-dev`/`notice-prod`); each has its own `SUPABASE_PROJECT_REF`,
+  `SUPABASE_DB_PASSWORD`, `JOB_SECRET`, and `SUPABASE_DB_URL` — the
+  **session-pooler** connection string (GitHub runners lack IPv6, so the
+  direct `db.<ref>` host is unreachable) — plus a shared
+  `SUPABASE_ACCESS_TOKEN`. Migrations reach production only through this
+  workflow.
 
 ## Secrets
 
