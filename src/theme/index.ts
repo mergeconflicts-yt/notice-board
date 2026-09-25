@@ -3,6 +3,7 @@ export {
   boardColorKeys,
   colors,
   doorTints,
+  handleTints,
   fastenerColors,
   memberColors,
   noteColors,

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, doorTints } from '../theme';
+import { doorTints, handleTints } from '../theme';
 import type { BoardColor } from '../types';
 
 /** Outer-corner radius, matching the website fridge silhouette. */
@@ -18,8 +18,9 @@ type Props = {
 
 /**
  * One enamel fridge door, mirroring the website hero: a board-tinted diagonal
- * gradient panel with a brushed-steel handle by the seam. The dark strip
- * between the doors is drawn by the board screen, not here.
+ * gradient panel with a soft sheen sweeping across it and an enamel handle in
+ * a deeper tone of the same door. The dark strip between the doors is drawn
+ * by the board screen, not here.
  */
 export function FridgeDoor({ color, placement, children }: Props) {
   const tint = doorTints[color];
@@ -32,8 +33,17 @@ export function FridgeDoor({ color, placement, children }: Props) {
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
+      {/* Soft diagonal shine across the enamel, like the website doors. */}
       <LinearGradient
-        colors={[...colors.steel]}
+        colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.32)', 'rgba(255,255,255,0)']}
+        locations={[0.45, 0.68, 0.9]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0.35 }}
+        style={styles.shine}
+        pointerEvents="none"
+      />
+      <LinearGradient
+        colors={[...handleTints[color]]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={[styles.handle, placement === 'top' ? styles.handleTop : styles.handleBottom]}
@@ -62,6 +72,13 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: OUTER_R,
     borderBottomRightRadius: OUTER_R,
   },
+  shine: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
   content: {
     flex: 1,
     paddingLeft: 30,
@@ -75,6 +92,6 @@ const styles = StyleSheet.create({
     width: 13,
     borderRadius: 7,
   },
-  handleTop: { bottom: 12, height: 56 },
+  handleTop: { bottom: 12, height: 110 },
   handleBottom: { top: 16, height: 130 },
 });

@@ -494,6 +494,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
+    marginTop: 44,
     height: 56,
   },
   profileBtn: { alignItems: 'center', justifyContent: 'center' },

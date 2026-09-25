@@ -117,6 +117,16 @@ export const doorTints: Record<BoardColor, { light: string; base: string; shade:
   charcoal: { light: '#D2CEC7', base: '#B9B4AD', shade: '#A09B93' },
 };
 
+/** Handle face per door colour: a deeper enamel tone that belongs with the
+ *  door instead of generic steel. */
+export const handleTints: Record<BoardColor, [string, string, string]> = {
+  sage: ['#A9C29B', '#8BA87D', '#6E8F61'],
+  blue: ['#9DBEDC', '#7FA3C6', '#5F86AC'],
+  clay: ['#D8A985', '#C08A63', '#A06B45'],
+  cream: ['#D9CBAE', '#C2B28E', '#A8976F'],
+  charcoal: ['#8E8980', '#736E66', '#57534C'],
+};
+
 /** The single fastener everywhere: round magnets in fixed colours (used by Pin). */
 export const fastenerColors = {
   magnets: ['#E4572E', '#F2B134', '#2A9D8F', '#3D5A98', '#D96C95'],
