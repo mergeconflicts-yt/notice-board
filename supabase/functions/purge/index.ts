@@ -3,7 +3,10 @@
 //   1. hard-deletes items soft-deleted > 30 days ago (and their photos);
 //   2. hard-deletes boards soft-deleted > 30 days ago (cascade);
 //   3. sweeps orphan photo files older than 24h;
-//   4. deletes avatars belonging to accounts that no longer exist.
+//   4. sweeps avatar files that are no longer a user's current avatar.
+// It stops starting new work after ~100s and reports partial results via
+// `timedOut`, so a huge backlog degrades to several nights instead of a
+// platform timeout.
 import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 import { authorized } from '../_shared/auth.ts';
 
@@ -12,6 +15,8 @@ const AVATARS = 'avatars';
 const ORPHAN_HOURS = 24;
 const BATCH = 1000;
 const CHUNK = 100; // per storage/`in()` request, to stay within URL/body limits
+const DEADLINE_MS = 100_000; // stop starting new work after ~100s
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type Obj = { path: string; createdAt: number };
 
@@ -56,22 +61,23 @@ async function removeObjects(admin: SupabaseClient, bucket: string, paths: strin
   return removed;
 }
 
-async function requireCount(query: PromiseLike<{ count: number | null; error: unknown }>): Promise<number> {
-  const { count, error } = await query;
-  if (error || count == null) throw new Error('count query failed');
-  return count;
-}
-
 Deno.serve(async (req: Request) => {
   if (!authorized(req)) return new Response('forbidden', { status: 403 });
 
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, serviceKey);
+  const deadline = Date.now() + DEADLINE_MS;
+  const outOfTime = () => Date.now() > deadline;
+  let timedOut = false;
 
   try {
     // --- 1. Purge expired items (batched) -------------------------------
     let purged = 0;
     for (let batch = 0; batch < 50; batch++) {
+      if (outOfTime()) {
+        timedOut = true;
+        break;
+      }
       const { data: stale, error } = await admin.rpc('expired_for_purge', { p_limit: BATCH });
       if (error) throw new Error(`expired_for_purge failed: ${error.message}`);
       if (!stale || stale.length === 0) break;
@@ -86,55 +92,78 @@ Deno.serve(async (req: Request) => {
     }
 
     // --- 2. Boards soft-deleted > 30 days ago, with no items left -------
-    const { data: boardsDeleted, error: boardError } = await admin.rpc('purge_boards');
-    if (boardError) throw new Error(`purge_boards failed: ${boardError.message}`);
+    let boardsDeleted: number | null = 0;
+    if (outOfTime()) {
+      timedOut = true;
+    } else {
+      const { data, error: boardError } = await admin.rpc('purge_boards');
+      if (boardError) throw new Error(`purge_boards failed: ${boardError.message}`);
+      boardsDeleted = data ?? 0;
+    }
 
     // --- 3. Orphan photos ------------------------------------------------
-    // One call for every in-use path; abort if it doesn't match the exact
-    // count (a truncated list would delete live photos).
-    const { data: inUse, error: inUseError } = await admin.rpc('photo_paths_in_use');
+    // Paths and their authoritative row count arrive from one snapshot; abort
+    // if they disagree (a truncated list would delete live photos).
+    type InUseRow = { path: string; total: number | string };
+    const { data: inUseRows, error: inUseError } = await admin.rpc('photo_paths_in_use');
     if (inUseError) throw new Error(`photo_paths_in_use failed: ${inUseError.message}`);
-    const exact = await requireCount(
-      admin.from('items').select('id', { count: 'exact', head: true }).not('photo_path', 'is', null),
-    );
-    if ((inUse ?? []).length !== exact) {
-      throw new Error(`in-use path count mismatch (${(inUse ?? []).length} vs ${exact})`);
+    const rows = (inUseRows ?? []) as InUseRow[];
+    const total = rows.length === 0 ? 0 : Number(rows[0].total);
+    if (rows.length !== total) {
+      throw new Error(`in-use path count mismatch (${rows.length} vs ${total})`);
     }
-    const used = new Set<string>(inUse ?? []);
+    const used = new Set<string>(rows.map((r) => r.path));
     const orphanCutoff = Date.now() - ORPHAN_HOURS * 3600 * 1000;
-    const toRemove = (await listAll(admin, PHOTOS))
-      .filter((o) => !used.has(o.path) && o.createdAt <= orphanCutoff)
-      .map((o) => o.path);
-    const orphans = toRemove.length > 0 ? await removeObjects(admin, PHOTOS, toRemove) : 0;
+    let orphans = 0;
+    if (outOfTime()) {
+      timedOut = true;
+    } else {
+      const toRemove = (await listAll(admin, PHOTOS))
+        .filter((o) => !used.has(o.path) && o.createdAt <= orphanCutoff)
+        .map((o) => o.path);
+      if (toRemove.length > 0) orphans = await removeObjects(admin, PHOTOS, toRemove);
+    }
 
     // --- 4. Avatar files that are no longer a user's current avatar ------
     // Removes avatars of deleted accounts AND stale/replaced files for living
     // users. Avatars should be uploaded as <user_id>/avatar.jpg with upsert;
-    // any other object under a folder is unreferenced and can go.
+    // any other object under a folder is unreferenced and can go. Replaced
+    // files get the same 24h age cutoff as orphan photos — the referenced
+    // profile row may briefly lag a fresh upload. Only well-formed ids hit
+    // the profiles lookup: a non-uuid folder would throw 22P02 on the uuid
+    // cast and 500 the whole run.
     const avatarObjects = await listAll(admin, AVATARS);
     const folders = [...new Set(avatarObjects.map((o) => o.path.split('/')[0]).filter(Boolean))];
+    const avatarCutoff = Date.now() - ORPHAN_HOURS * 3600 * 1000;
     let avatars = 0;
     for (const part of chunk(folders, CHUNK)) {
-      const { data: existing, error } = await admin
-        .from('profiles')
-        .select('id, avatar_path')
-        .in('id', part);
-      if (error) throw new Error(`profiles read failed: ${error.message}`);
-      const current = new Map(
-        (existing ?? []).map((p) => [p.id, p.avatar_path as string | null]),
-      );
+      if (outOfTime()) {
+        timedOut = true;
+        break;
+      }
+      const ids = part.filter((id) => UUID_RE.test(id));
+      const current = new Map<string, string | null>();
+      if (ids.length > 0) {
+        const { data: existing, error } = await admin
+          .from('profiles')
+          .select('id, avatar_path')
+          .in('id', ids);
+        if (error) throw new Error(`profiles read failed: ${error.message}`);
+        for (const p of existing ?? []) current.set(p.id, p.avatar_path as string | null);
+      }
       const stale = avatarObjects
         .filter((o) => {
           const uid = o.path.split('/')[0];
           if (!part.includes(uid)) return false;
+          if (!UUID_RE.test(uid)) return true; // junk folder: can never be referenced
           if (!current.has(uid)) return true; // account no longer exists
-          return o.path !== current.get(uid); // replaced / older file
+          return o.path !== current.get(uid) && o.createdAt <= avatarCutoff;
         })
         .map((o) => o.path);
       if (stale.length > 0) avatars += await removeObjects(admin, AVATARS, stale);
     }
 
-    return Response.json({ purged, boards: boardsDeleted ?? 0, orphans, avatars });
+    return Response.json({ purged, boards: boardsDeleted ?? 0, orphans, avatars, timedOut });
   } catch (e) {
     return new Response(e instanceof Error ? e.message : String(e), { status: 500 });
   }

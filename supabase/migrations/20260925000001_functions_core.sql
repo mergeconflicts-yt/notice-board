@@ -1226,6 +1226,15 @@ begin
     end loop;
   end if;
 
+  -- Authoritative cap check: the pre-check above subtracted p_removes without
+  -- verifying those ids belong to this list, so a batch could otherwise sneak
+  -- past 500. Recount what is actually there.
+  select count(*)::integer into v_total
+  from public.list_entries where item_id = p_item_id;
+  if v_total > 500 then
+    raise exception 'invalid_input';
+  end if;
+
   update public.items
   set title = p_title,
       color = p_color,

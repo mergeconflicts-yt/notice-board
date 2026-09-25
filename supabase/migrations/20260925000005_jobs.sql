@@ -48,15 +48,17 @@ set search_path = '' as $$
   limit p_limit;
 $$;
 
--- Every photo path currently referenced by an item (one call, no paging).
+-- Every photo path currently referenced by an item, plus the authoritative
+-- row count from the same snapshot (one call, no paging). The count guards
+-- against acting on a truncated list.
 create function public.photo_paths_in_use()
-returns text[]
+returns table (path text, total bigint)
 language sql
 security definer
 set search_path = '' as $$
-  select coalesce(array_agg(photo_path), '{}')
-  from public.items
-  where photo_path is not null;
+  select i.photo_path, count(*) over ()
+  from public.items i
+  where i.photo_path is not null;
 $$;
 
 -- Hard-delete a batch of items (ids passed in the POST body, not the URL).

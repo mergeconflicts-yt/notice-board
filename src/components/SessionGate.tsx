@@ -20,6 +20,7 @@ export function SessionGate() {
   const status = useSession((s) => s.status);
   const error = useSession((s) => s.error);
   const user = useSession((s) => s.user);
+  const markerAnon = useSession((s) => s.markerAnon);
   const init = useSession((s) => s.init);
   const signOut = useSession((s) => s.signOut);
   const startFresh = useSession((s) => s.startFresh);
@@ -72,8 +73,9 @@ export function SessionGate() {
 
   const confirmSignOut = () => {
     // Wording depends on whether signing out loses boards (anonymous) or just
-    // ends the session (linked).
-    const anonymous = user?.isAnonymous ?? true;
+    // ends the session (linked). The live user wins; otherwise the stored
+    // marker decides (it may be all we have on the signed-out screen).
+    const anonymous = user?.isAnonymous ?? markerAnon ?? true;
     Alert.alert(
       'Sign out?',
       anonymous
@@ -139,11 +141,20 @@ export function SessionGate() {
   }
 
   if (status === 'signedout') {
+    // An anonymous identity has no sign-in that can restore it — say so, and
+    // keep Start fresh as the way forward. (A usable sign-in is still offered:
+    // the account may have been linked after the marker was written.)
+    const lostAnon = markerAnon === true;
     return (
       <SafeAreaView style={[styles.overlay, styles.center]}>
-        <Text style={styles.title}>Sign in to restore your boards</Text>
+        <Text style={styles.title}>
+          {lostAnon ? 'Start fresh to continue' : 'Sign in to restore your boards'}
+        </Text>
         <Text style={styles.sub}>
-          {error ?? 'This device was signed in before. Sign in to get your boards back.'}
+          {error ??
+            (lostAnon
+              ? 'This device’s account can’t be reached. If you saved it with Apple, Google, or email, sign in — otherwise start fresh.'
+              : 'This device was signed in before. Sign in to get your boards back.')}
         </Text>
         <Button label="Sign in" onPress={() => router.push('/sign-in')} style={styles.btn} />
         <Button label="Start fresh" variant="soft" onPress={confirmStartFresh} style={styles.btn} />

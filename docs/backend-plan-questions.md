@@ -220,5 +220,27 @@ implemented slightly differently. Appended as work proceeds.
     while expiry uses the board zone — aligning display to the board zone is a
     follow-up. **F19** the deep link is `noticeboard://j/<token>` (route
     `/j/[token]`), matching the web `/j/<token>` path rather than the plan's
-    `join` wording.
+    `join`     wording.
+29. **Auth/session + jobs hardening (review N1–N8).** `/auth` exchanges a code
+    whenever it holds one the in-app flow isn't handling, even with a session
+    already present — a magic-link tap on a phone that already has an anonymous
+    session now swaps to the confirmed user instead of silently staying
+    anonymous. “Start fresh” removes the session locally (`scope: 'local'`) so
+    a deleted server user (403 `user_not_found` on a server round-trip) can't
+    loop it. The identity marker is now `{ id, isAnonymous }` (legacy bare ids
+    keep the old meaning) and the signed-out screen is worded from it, so lost
+    anonymous users aren't told to “sign in to restore”. Background launches
+    re-assert `stopAutoRefresh()` after `auth.initialize()` settles, since the
+    library's own visibility handling would otherwise restart the timer.
+    `edit_list` recounts after its writes so foreign remove-ids can't forge
+    500-cap headroom (regression-tested). The board composer only reuses a
+    pending id/path for a byte-identical draft, sends `photoPath` for photos
+    only, and drops the pending draft when the sheet closes. `purge` pre-filters
+    avatar folders with a uuid regex (a junk folder used to 22P02 the whole
+    run), stops starting new work after ~100s while reporting `timedOut`,
+    reads orphan paths plus their authoritative count from one
+    `photo_paths_in_use()` snapshot, and age-gates replaced avatar files.
+    `deploy.yml` now dry-runs migrations, deploys the Edge Functions, sets
+    `JOB_SECRET`, verifies the `functions_url`/`job_secret` Vault secrets
+    exist, and fails the remote lint on warnings.
 

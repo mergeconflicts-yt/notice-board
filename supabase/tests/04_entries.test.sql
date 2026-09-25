@@ -1,7 +1,7 @@
 -- Phase 1d: list entry RPCs — positions, ticks, edits, lifetime rule.
 -- Roles: O owner, M member, S stranger. Board B2 (O only) for cross-board.
 begin;
-select plan(52);
+select plan(54);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000031', 'authenticated', 'authenticated'),
@@ -281,6 +281,24 @@ set role authenticated;
 select throws_ok(
   $$select public.edit_list('c0000000-0000-0000-0000-0000000000c1', 2, 'Nope', 'sky', null, '[]', '[]', '{}')$$,
   'P0001', 'not_author', 'non-author cannot edit_list');
+reset role;
+
+-- edit_list: remove-ids from another list must not create cap headroom.
+insert into public.list_entries (id, item_id, board_id, text, position, created_by)
+select gen_random_uuid(), 'c0000000-0000-0000-0000-0000000000c1', (select id from t_b),
+       'filler', 1000 + g, 'a0000000-0000-0000-0000-000000000031'
+from generate_series(1, 498) g;
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000031', true);
+set role authenticated;
+select throws_ok(
+  $$select public.edit_list('c0000000-0000-0000-0000-0000000000c1', 2, 'Full', 'sky', null,
+    '[{"id":"d0000000-0000-0000-0000-0000000000c9","text":"sneak"}]', '[]',
+    array['e0000000-0000-0000-0000-000000000001','e0000000-0000-0000-0000-000000000002']::uuid[])$$,
+  'P0001', 'invalid_input', 'foreign remove-ids do not bypass the entry cap');
+select is(
+  (select count(*)::integer from public.list_entries
+   where item_id = 'c0000000-0000-0000-0000-0000000000c1'),
+  500, 'failed batch leaves the list untouched');
 reset role;
 
 select * from finish();

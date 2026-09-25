@@ -26,6 +26,18 @@ export default function RootLayout() {
     useSession.getState().init();
   }, []);
 
+  // The auth library's _initialize() wires its own visibility handling after
+  // effects run — which restarts the refresh timer and undoes a background
+  // stop. Re-assert the stop once initialization has settled.
+  useEffect(() => {
+    supabase.auth
+      .initialize()
+      .then(() => {
+        if (AppState.currentState !== 'active') void supabase.auth.stopAutoRefresh();
+      })
+      .catch(() => {});
+  }, []);
+
   // Refresh the session token while foregrounded; pause while backgrounded so
   // it doesn't burn battery or fail offline.
   useEffect(() => {

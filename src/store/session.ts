@@ -15,6 +15,9 @@ type SessionState = {
   status: SessionStatus;
   user: User | null;
   error: string | null;
+  /** Whether the last-seen identity was anonymous; drives the signed-out
+   *  wording (null when unknown). */
+  markerAnon: boolean | null;
   init: (captchaToken?: string, manual?: boolean) => Promise<void>;
   setDisplayName: (displayName: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -61,11 +64,26 @@ function scheduleRetry() {
   retryDelay = Math.min(retryDelay * 2, 30000);
 }
 
-async function readMarker(): Promise<string | null> {
-  return AsyncStorage.getItem(MARKER);
+type SessionMarker = { id: string; isAnonymous: boolean };
+
+async function readMarker(): Promise<SessionMarker | null> {
+  const raw = await AsyncStorage.getItem(MARKER);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<SessionMarker>;
+    if (parsed && typeof parsed.id === 'string') {
+      return { id: parsed.id, isAnonymous: parsed.isAnonymous === true };
+    }
+  } catch {
+    // Not JSON — fall through to the legacy bare-id handling below.
+  }
+  // Legacy bare-id marker (written before the flag existed): presence is all
+  // we know. Keep the old meaning — it may belong to a linked account — so
+  // sign-in stays offered.
+  return raw.length > 0 ? { id: raw, isAnonymous: false } : null;
 }
-async function writeMarker(userId: string): Promise<void> {
-  await AsyncStorage.setItem(MARKER, userId);
+async function writeMarker(userId: string, isAnonymous: boolean): Promise<void> {
+  await AsyncStorage.setItem(MARKER, JSON.stringify({ id: userId, isAnonymous }));
 }
 async function clearMarker(): Promise<void> {
   await AsyncStorage.removeItem(MARKER);
@@ -146,6 +164,7 @@ async function runInit(
         set({
           status: 'signedout',
           error: 'Sign in to restore your boards.',
+          markerAnon: marker?.isAnonymous ?? null,
         });
         return;
       }
@@ -164,9 +183,9 @@ async function runInit(
       data: { user: current },
     } = await supabase.auth.getUser();
     if (!current) throw new Error('not_authenticated');
-    await writeMarker(current.id);
-    const profile = await loadProfile(current.id);
     const isAnonymous = (current as { is_anonymous?: boolean }).is_anonymous === true;
+    await writeMarker(current.id, isAnonymous);
+    const profile = await loadProfile(current.id);
     // A successful bootstrap restores the default retry cadence.
     resetRetry();
     set({
@@ -201,6 +220,7 @@ export const useSession = create<SessionState>((set) => ({
   status: 'loading',
   user: null,
   error: null,
+  markerAnon: null,
 
   init: (captchaToken, manual = false) => {
     // Single-flight: a second start reuses the in-progress bootstrap instead
@@ -229,7 +249,7 @@ export const useSession = create<SessionState>((set) => ({
       // sign-out must leave the stored identity for the next launch to offer
       // (rather than silently mint a new user).
       await clearMarker();
-      set({ user: null, status: 'loading', error: null });
+      set({ user: null, status: 'loading', error: null, markerAnon: null });
     } finally {
       // Always clear the flag — if it stayed set, the next real sign-out would
       // be mistaken for a lost session and ignored.
@@ -238,9 +258,18 @@ export const useSession = create<SessionState>((set) => ({
   },
 
   startFresh: async () => {
-    // Explicitly abandon the old identity, then start anonymous.
-    await clearMarker();
-    await useSession.getState().init();
+    // Explicitly abandon the old identity, then start anonymous. The stored
+    // session is removed locally only: if the server user is already gone, a
+    // server round-trip 403s (user_not_found) while keeping the stored
+    // session, and the next init() would land on the same dead identity.
+    intentionalSignOut = true;
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+      await clearMarker();
+      await useSession.getState().init();
+    } finally {
+      intentionalSignOut = false;
+    }
   },
 
   deleteAccount: async () => {
@@ -261,7 +290,7 @@ export const useSession = create<SessionState>((set) => ({
 supabase.auth.onAuthStateChange((event, session) => {
   if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
     if (session?.user) {
-      void writeMarker(session.user.id);
+      void writeMarker(session.user.id, session.user.is_anonymous === true);
       void loadProfile(session.user.id)
         .then((profile) => {
           if (profile) {
@@ -287,6 +316,7 @@ supabase.auth.onAuthStateChange((event, session) => {
           user: null,
           status: 'signedout',
           error: 'Sign in to restore your boards.',
+          markerAnon: marker.isAnonymous,
         });
       }
     });

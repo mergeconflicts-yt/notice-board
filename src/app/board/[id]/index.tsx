@@ -28,6 +28,20 @@ const REST_FLEX = 8;
 /** Height of the drag-to-delete target at the bottom of the screen. */
 const DELETE_ZONE_HEIGHT = 96;
 
+/** Fingerprint of a post draft: two submits may share a client id only when
+ *  they are the same type with the same content. */
+function draftKey(draft: NoteDraft): string {
+  return JSON.stringify({
+    t: draft.type,
+    b: draft.body,
+    ti: draft.title,
+    e: draft.eventAt,
+    p: draft.place,
+    u: draft.photoUri,
+    entries: draft.entries,
+  });
+}
+
 export default function BoardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const boardId = id as string;
@@ -59,9 +73,14 @@ export default function BoardScreen() {
   const overDeleteRef = useRef(false);
   // A failed post keeps its client id + uploaded path, so retrying reuses them
   // instead of creating a second item (post_item is idempotent on p_id).
-  const pendingDraftRef = useRef<{ id: string; photoPath: string | null; photoUri: string | null } | null>(
-    null,
-  );
+  // The reuse is keyed to the exact draft: a *different* post must get a
+  // fresh id, or its content would be silently dropped onto the old one.
+  const pendingDraftRef = useRef<{
+    id: string;
+    photoPath: string | null;
+    photoUri: string | null;
+    key: string;
+  } | null>(null);
 
   const openItem = (item: ItemWithAuthor) => router.push(`/board/${boardId}/note/${item.id}`);
 
@@ -206,19 +225,26 @@ export default function BoardScreen() {
   const handleAdd = async (draft: NoteDraft) => {
     setSubmitting(true);
     const pending = pendingDraftRef.current;
-    const itemId = pending?.id ?? randomId();
-    let photoPath = pending?.photoPath ?? null;
-    if (draft.type === 'photo' && draft.photoUri && (!photoPath || pending?.photoUri !== draft.photoUri)) {
-      try {
-        photoPath = await uploadPhoto(boardId, itemId, draft.photoUri);
-      } catch (e) {
-        // The upload isn't routed through useBoard, so surface its error here.
-        useToast.getState().show(friendlyMessage(e));
-        setSubmitting(false);
-        return;
+    // Same draft retried (e.g. a lost response): keep its id/path. Anything
+    // else is a new post and gets a fresh id.
+    const reuse = pending !== null && pending.key === draftKey(draft);
+    const itemId = reuse ? pending.id : randomId();
+    let photoPath: string | null = null;
+    if (draft.type === 'photo' && draft.photoUri) {
+      if (reuse && pending.photoPath && pending.photoUri === draft.photoUri) {
+        photoPath = pending.photoPath;
+      } else {
+        try {
+          photoPath = await uploadPhoto(boardId, itemId, draft.photoUri);
+        } catch (e) {
+          // The upload isn't routed through useBoard, so surface its error here.
+          useToast.getState().show(friendlyMessage(e));
+          setSubmitting(false);
+          return;
+        }
       }
     }
-    pendingDraftRef.current = { id: itemId, photoPath, photoUri: draft.photoUri };
+    pendingDraftRef.current = { id: itemId, photoPath, photoUri: draft.photoUri, key: draftKey(draft) };
     try {
       await createItem({
         id: itemId,
@@ -236,10 +262,17 @@ export default function BoardScreen() {
       setSheetOpen(false);
     } catch {
       // createItem already surfaced the error via useBoard; keep the pending
-      // id/path so a retry doesn't duplicate the post or re-upload.
+      // entry so an unchanged retry doesn't duplicate the post or re-upload.
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSheetClose = () => {
+    // Dismissing the composer abandons the draft: a later post must not reuse
+    // a stale id/path.
+    pendingDraftRef.current = null;
+    setSheetOpen(false);
   };
 
   if (loading && !board) {
@@ -403,7 +436,7 @@ export default function BoardScreen() {
       <AddNoteSheet
         visible={sheetOpen}
         submitting={submitting}
-        onClose={() => setSheetOpen(false)}
+        onClose={handleSheetClose}
         onSubmit={handleAdd}
       />
     </SafeAreaView>

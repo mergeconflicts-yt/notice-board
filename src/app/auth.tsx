@@ -22,15 +22,17 @@ export default function AuthCallbackScreen() {
   useEffect(() => {
     void (async () => {
       try {
-        const {
-          data: { session: existing },
-        } = await supabase.auth.getSession();
-        if (!existing && code && !isAuthFlowActive()) {
+        // Exchange whenever we hold a code the in-app flow isn't handling — even
+        // if a session (typically an anonymous one) already exists. Redeeming
+        // the code swaps the session to the confirmed user; otherwise the
+        // email tap silently leaves them anonymous.
+        if (code && !isAuthFlowActive()) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (error) throw error;
-        } else if (!existing && isAuthFlowActive()) {
-          // The in-app browser flow is exchanging this same code; wait for its
-          // session rather than redeeming the code a second time.
+        } else if (!code || isAuthFlowActive()) {
+          // Either the in-app browser flow is exchanging this same code (wait
+          // for its session rather than redeeming it a second time), or there
+          // is no code and the user just needs whatever session exists.
           for (let i = 0; i < 20; i++) {
             const { data } = await supabase.auth.getSession();
             if (data.session) break;
