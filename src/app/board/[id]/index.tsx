@@ -21,6 +21,7 @@ import { BoardSwitcher } from '../../../components/BoardSwitcher';
 import { useBoard, randomId } from '../../../hooks/useBoard';
 import { useToast } from '../../../store/toast';
 import { friendlyMessage, keepLonger as apiKeepLonger, signedPhotoUrl, uploadPhoto } from '../../../lib/api';
+import { rememberBoard } from '../../../lib/lastBoard';
 import { ItemWithAuthor } from '../../../types';
 
 /** Share of the board height reserved for the pinned-forever strip. */
@@ -88,6 +89,11 @@ export default function BoardScreen() {
   } | null>(null);
 
   const openItem = (item: ItemWithAuthor) => router.push(`/board/${boardId}/note/${item.id}`);
+
+  // Remember this board so a returning launch reopens it (see index.tsx).
+  useEffect(() => {
+    void rememberBoard(boardId);
+  }, [boardId]);
 
   // Two board regions: pinned-forever posts up top (30%), everything else below.
   const pinnedItems = useMemo(() => items.filter((i) => i.pinned), [items]);

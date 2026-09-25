@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { KeychainError, LargeSecureStore } from '../lib/secureStore';
+import { forgetBoard } from '../lib/lastBoard';
 import {
   deleteAccount as apiDeleteAccount,
   friendlyMessage,
@@ -318,6 +319,7 @@ export const useSession = create<SessionState>((set) => ({
       // sign-out must leave the stored identity for the next launch to offer
       // (rather than silently mint a new user).
       await clearMarker();
+      await forgetBoard();
       set({ user: null, status: 'loading', error: null, markerAnon: null });
     } finally {
       // Always clear the flag — if it stayed set, the next real sign-out would
@@ -336,6 +338,7 @@ export const useSession = create<SessionState>((set) => ({
     try {
       await supabase.auth.signOut({ scope: 'local' });
       await clearMarker();
+      await forgetBoard();
       await useSession.getState().init();
     } finally {
       intentionalSignOut = false;
@@ -348,6 +351,7 @@ export const useSession = create<SessionState>((set) => ({
       await apiDeleteAccount();
       // The account is gone: clear the marker so init() starts a fresh identity.
       await clearMarker();
+      await forgetBoard();
     } finally {
       intentionalSignOut = false;
     }

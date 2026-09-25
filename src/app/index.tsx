@@ -2,12 +2,17 @@ import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 import { colors, fonts, noteColors } from '../theme';
 import { Button } from '../components/Button';
 import { IdentitySheet } from '../components/IdentitySheet';
 import { useSession } from '../store/session';
 import { useMyBoards } from '../hooks/useBoards';
+import { forgetBoard, recallBoard } from '../lib/lastBoard';
+
+// Restore the last board only once per app launch: doing it on every mount of
+// home would trap the user (pressing Back would bounce straight back in).
+let restoredThisLaunch = false;
 
 type Deco = { text: string; color: keyof typeof noteColors; top: string; left: string; rotate: string; size: number };
 
@@ -21,8 +26,9 @@ const DECOS: Deco[] = [
 export default function StartScreen() {
   const user = useSession((s) => s.user);
   const status = useSession((s) => s.status);
+  const pathname = usePathname();
   const setDisplayName = useSession((s) => s.setDisplayName);
-  const { boards, error: boardsError } = useMyBoards();
+  const { boards, loading: boardsLoading, error: boardsError } = useMyBoards();
   const [identityFor, setIdentityFor] = useState<'create' | 'join' | null>(null);
   const [identitySaving, setIdentitySaving] = useState(false);
   const [identityError, setIdentityError] = useState<string | null>(null);
@@ -49,6 +55,22 @@ export default function StartScreen() {
       alive = false;
     };
   }, [status, boards.length, user]);
+
+  // Returning user: jump straight back into the last board they had open.
+  // Only when home is reached normally (not a deep link) and the board is still
+  // one of theirs; once per launch so Back can still reach home.
+  useEffect(() => {
+    // Only on the real home route: never hijack a deep link (invite/board).
+    if (pathname !== '/' || status !== 'ready' || boardsLoading || restoredThisLaunch) return;
+    restoredThisLaunch = true;
+    void (async () => {
+      const last = await recallBoard();
+      if (!last) return;
+      if (boards.some((b) => b.id === last)) router.replace(`/board/${last}`);
+      // No longer one of theirs (left/deleted): stop re-reading it every launch.
+      else await forgetBoard();
+    })();
+  }, [pathname, status, boardsLoading, boards]);
 
   const dismissSavePrompt = () => {
     setShowSavePrompt(false);
