@@ -60,6 +60,12 @@ export const colors = {
 
   white: '#FFFFFF',
   black: '#000000',
+
+  // Fridge chrome
+  /** Dark cabinet strip visible between the two fridge doors. */
+  seam: '#2B2620',
+  /** Brushed-steel face of the vertical door handles, light edge to dark. */
+  steel: ['#FAF8F3', '#E6E1D4', '#C6C0B0', '#9D9787'],
 } as const;
 
 /** Paper palettes for the seven item colours: main colour, ink, then the
@@ -100,6 +106,16 @@ export const boardColors: Record<BoardColor, string> = {
 };
 
 export const boardColorKeys = Object.keys(boardColors) as BoardColor[];
+
+/** Enamel door tints per board colour: light face, base, shaded edge —
+ *  the website fridge doors sprayed onto the app board. */
+export const doorTints: Record<BoardColor, { light: string; base: string; shade: string }> = {
+  sage: { light: '#DCE8D6', base: '#C9DCC0', shade: '#A9BE9C' },
+  blue: { light: '#D3E3F2', base: '#BCD2E8', shade: '#9DBBD9' },
+  clay: { light: '#F1D8C6', base: '#E5C3AE', shade: '#D0A78D' },
+  cream: { light: '#FFFFFF', base: '#FFFDF7', shade: '#E7DCC6' },
+  charcoal: { light: '#D2CEC7', base: '#B9B4AD', shade: '#A09B93' },
+};
 
 /** The single fastener everywhere: round magnets in fixed colours (used by Pin). */
 export const fastenerColors = {

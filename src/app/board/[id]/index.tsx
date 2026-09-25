@@ -10,11 +10,12 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { colors, boardColors, fonts } from '../../../theme';
+import { colors, fonts } from '../../../theme';
 import { BoardSection } from '../../../components/BoardSection';
 import { PinnedStrip } from '../../../components/PinnedStrip';
+import { FridgeDoor } from '../../../components/FridgeDoor';
 import { MemberDot } from '../../../components/MemberDot';
 import { AddNoteSheet, NoteDraft } from '../../../components/AddNoteSheet';
 import { BoardSwitcher } from '../../../components/BoardSwitcher';
@@ -26,8 +27,8 @@ import { rememberBoard } from '../../../lib/lastBoard';
 import { ItemWithAuthor } from '../../../types';
 
 /** Share of the board height reserved for the pinned-forever strip. */
-const PINNED_FLEX = 1.4;
-const REST_FLEX = 8;
+const PINNED_FLEX = 3.2;
+const REST_FLEX = 7;
 
 /** Height of the drag-to-delete target at the bottom of the screen. */
 const DELETE_ZONE_HEIGHT = 96;
@@ -311,11 +312,11 @@ export default function BoardScreen() {
 
   if (loading && !board) {
     return (
-      <SafeAreaView style={styles.safe}>
+      <View style={[styles.safe, { backgroundColor: colors.background }]}>
         <View style={styles.center}>
           <ActivityIndicator color={colors.accent} />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -324,7 +325,7 @@ export default function BoardScreen() {
       // A failed load is not a missing board — offer a retry instead of
       // claiming the board is gone.
       return (
-        <SafeAreaView style={styles.safe}>
+        <View style={[styles.safe, { backgroundColor: colors.background }]}>
           <View style={styles.center}>
             <Text style={styles.missingTitle}>Can’t open this board</Text>
             <Text style={styles.missingSub}>{error}</Text>
@@ -335,11 +336,11 @@ export default function BoardScreen() {
               <Text style={styles.missingBackText}>Back to start</Text>
             </Pressable>
           </View>
-        </SafeAreaView>
+        </View>
       );
     }
     return (
-      <SafeAreaView style={styles.safe}>
+      <View style={[styles.safe, { backgroundColor: colors.background }]}>
         <View style={styles.center}>
           <Text style={styles.missingTitle}>This board is gone</Text>
           <Text style={styles.missingSub}>It may have been deleted by its owner.</Text>
@@ -347,14 +348,14 @@ export default function BoardScreen() {
             <Text style={styles.missingBtnText}>Back to start</Text>
           </Pressable>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   const isEmpty = items.length === 0;
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: boardColors[board.color] }]} edges={['top']}>
+    <View style={[styles.safe, { backgroundColor: colors.seam }]}>
       {/* Left-to-right sheen so every shadow agrees on one light source. */}
       <LinearGradient
         colors={['rgba(255,255,255,0.16)', 'rgba(255,255,255,0)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.06)']}
@@ -364,57 +365,60 @@ export default function BoardScreen() {
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
-      <View style={styles.header}>
-        <Pressable
-          hitSlop={8}
-          onPress={() => setSwitcherOpen(true)}
-          style={styles.boardTitle}
-          accessibilityRole="button"
-          accessibilityLabel="Switch boards"
-        >
-          <Text style={styles.boardName} numberOfLines={1}>{board.name}</Text>
-          <MaterialCommunityIcons name="chevron-down" size={22} color={colors.ink} />
-        </Pressable>
+      <View style={styles.sections}>
+        <View style={styles.pinnedSection}>
+          <FridgeDoor color={board.color} placement="top">
+            <View style={styles.header}>
+              <Pressable
+                hitSlop={8}
+                onPress={() => setSwitcherOpen(true)}
+                style={styles.boardTitle}
+                accessibilityRole="button"
+                accessibilityLabel="Switch boards"
+              >
+                <Text style={styles.boardName} numberOfLines={1}>{board.name}</Text>
+                <MaterialCommunityIcons name="chevron-down" size={22} color={colors.ink} />
+              </Pressable>
 
-        <Pressable
-          hitSlop={8}
-          onPress={() => router.push('/profile')}
-          style={styles.profileBtn}
-          accessibilityRole="button"
-          accessibilityLabel="Your profile and settings"
-        >
-          <MemberDot seed={me?.id ?? 'me'} name={me?.displayName ?? 'Someone'} size={36} />
-        </Pressable>
-      </View>
-      <Text style={styles.tagline}>📌 Always here</Text>
+              <Pressable
+                hitSlop={8}
+                onPress={() => router.push('/profile')}
+                style={styles.profileBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Your profile and settings"
+              >
+                <MemberDot seed={me?.id ?? 'me'} name={me?.displayName ?? 'Someone'} size={36} />
+              </Pressable>
+            </View>
+            <Text style={styles.tagline}>📌 Always here</Text>
 
-      {error ? <Text style={styles.banner}>{error}</Text> : null}
+            {error ? <Text style={styles.banner}>{error}</Text> : null}
 
-      {isEmpty ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyHand}>✍️</Text>
-          <Text style={styles.emptyTitle}>Leave the first note</Text>
-          <Text style={styles.emptySub}>Pin something up — everyone here will see it.</Text>
-          <Pressable onPress={() => setSheetOpen(true)} style={styles.emptyBtn}>
-            <Text style={styles.emptyBtnText}>+ Add note</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <View style={styles.sections}>
-          <View style={styles.pinnedSection}>
             <PinnedStrip
               items={pinnedItems}
               entries={entries}
               photoUrls={photoUrls}
               onOpen={openItem}
             />
-          </View>
+          </FridgeDoor>
+        </View>
 
-          <View style={styles.divider} />
+        <View style={styles.seam} />
 
-          <View style={styles.restSection}>
-            <BoardSection
-              items={restItems}
+        <View style={styles.restSection}>
+          <FridgeDoor color={board.color} placement="bottom">
+            {isEmpty ? (
+              <View style={styles.empty}>
+                <Text style={styles.emptyHand}>✍️</Text>
+                <Text style={styles.emptyTitle}>Leave the first note</Text>
+                <Text style={styles.emptySub}>Pin something up — everyone here will see it.</Text>
+                <Pressable onPress={() => setSheetOpen(true)} style={styles.emptyBtn}>
+                  <Text style={styles.emptyBtnText}>+ Add note</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <BoardSection
+                items={restItems}
               entries={entries}
               photoUrls={photoUrls}
               entering={entering}
@@ -425,10 +429,11 @@ export default function BoardScreen() {
               onDragEnd={handleDragEnd}
               resetKey={dragReset}
               emptyHint="Everything else lives here."
-            />
-          </View>
+              />
+            )}
+          </FridgeDoor>
         </View>
-      )}
+      </View>
 
       {dragActive ? (
         <View
@@ -477,7 +482,7 @@ export default function BoardScreen() {
         currentBoardId={boardId}
         onClose={() => setSwitcherOpen(false)}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -503,24 +508,21 @@ const styles = StyleSheet.create({
     fontFamily: fonts.ui.regular,
     fontSize: 13,
     color: colors.inkSoft,
-    paddingHorizontal: 16,
     marginTop: 2,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   banner: {
     fontFamily: fonts.ui.semibold,
     fontSize: 13,
     color: colors.danger,
     textAlign: 'center',
-    paddingHorizontal: 16,
     paddingBottom: 4,
   },
   sections: { flex: 1 },
   pinnedSection: { flex: PINNED_FLEX },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginHorizontal: 16,
+  seam: {
+    height: 10,
+    backgroundColor: colors.seam,
   },
   restSection: { flex: REST_FLEX, overflow: 'hidden' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingBottom: 60 },

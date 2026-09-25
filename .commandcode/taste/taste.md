@@ -1,1 +1,2 @@
 - Prefers website/marketing copy that leads with concrete, relatable real-life pain points to create emotional resonance before presenting the solution. Confidence: 0.75
+- Prefers exact visual parity between website and app — same background/design language reused across surfaces rather than platform-specific reinterpretations. Confidence: 0.8

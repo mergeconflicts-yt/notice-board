@@ -2,6 +2,7 @@ export {
   boardColors,
   boardColorKeys,
   colors,
+  doorTints,
   fastenerColors,
   memberColors,
   noteColors,
