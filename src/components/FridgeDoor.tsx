@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, doorTints, handleTints } from '../theme';
+import { colors, doorTints } from '../theme';
 import type { BoardColor } from '../types';
 
 /** Outer-corner radius, matching the website fridge silhouette. */
@@ -22,9 +22,9 @@ type Props = {
 
 /**
  * One enamel fridge door, mirroring the website hero: a board-tinted diagonal
- * gradient panel with a soft sheen sweeping across it and an enamel handle in
- * a deeper tone of the same door. The dark strip between the doors is drawn
- * by the board screen, not here.
+ * gradient panel with a soft sheen sweeping across it and a chrome bar
+ * handle. The dark strip between the doors is drawn by the board screen,
+ * not here.
  */
 export function FridgeDoor({ color, placement, children }: Props) {
   const tint = doorTints[color];
@@ -52,8 +52,10 @@ export function FridgeDoor({ color, placement, children }: Props) {
         style={styles.shine}
         pointerEvents="none"
       />
+      {/* Chrome bar handle: bright face, dark spine, bright edge. */}
       <LinearGradient
-        colors={[...handleTints[color]]}
+        colors={['#F4F2EC', '#CFC9BB', '#8F8878', '#E8E4D8']}
+        locations={[0, 0.35, 0.7, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={[styles.handle, placement === 'top' ? styles.handleTop : styles.handleBottom]}
