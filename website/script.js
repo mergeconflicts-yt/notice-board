@@ -76,9 +76,7 @@ document.querySelectorAll('#faq details').forEach((d) => {
     timers.forEach(clearTimeout);
     timers = [];
     stage.classList.remove('playing', 'striking', 'clearing', 'revealing');
-    fridge.classList.remove('intro-dim');
     void stage.offsetWidth; // restart CSS animations
-    fridge.classList.add('intro-dim');
     stage.classList.add('playing');
     const chaosMs = pops.length * POP_GAP + HOLD;
     later(() => stage.classList.add('striking'), chaosMs);
@@ -89,7 +87,6 @@ document.querySelectorAll('#faq details').forEach((d) => {
       if (note) note.setAttribute('aria-hidden', 'false');
     }, strikeMs);
     later(() => {
-      fridge.classList.remove('intro-dim');
       stage.classList.remove('playing', 'striking', 'clearing', 'revealing');
     }, strikeMs + NOTE_HOLD);
   }

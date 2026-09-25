@@ -98,28 +98,54 @@ body {
   background: radial-gradient(ellipse at center, rgba(62, 54, 46, 0.3), transparent 70%);
 }
 .fridge {
-  position: relative; border-radius: 26px; overflow: hidden;
+  position: relative;
   flex: 1;
   display: flex; flex-direction: column;
-  background: linear-gradient(135deg, #d8e5cd 0%, var(--board-sage) 35%, #b3c8a4 100%);
-  border: 3px solid #9db68f;
-  box-shadow: 0 30px 60px var(--shadow), inset 0 2px 2px rgba(255, 255, 255, 0.7), inset 0 -4px 8px rgba(62, 54, 46, 0.18);
+  gap: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
   touch-action: none;
 }
-/* soft enamel sheen sweeping across both doors */
-.fridge::before {
-  content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none;
-  background: linear-gradient(105deg, transparent 55%, rgba(255, 255, 255, 0.28) 78%, transparent 92%);
-}
+/* board tag sits above the doors */
 .board-tag {
-  position: absolute; top: 14px; right: 16px; z-index: 5;
+  position: absolute; top: 22px; right: 28px; z-index: 6;
   background: rgba(255,255,255,.85); border-radius: 999px;
   font-size: 0.78rem; font-weight: 700; padding: 0.2rem 0.8rem;
   box-shadow: 0 2px 4px rgba(0,0,0,.12);
 }
-.fridge-door { position: relative; padding: 2.2rem 1rem 1rem 3.4rem; }
-.fridge-top { flex: 32; display: flex; gap: 0.8rem; align-content: start; }
-.fridge-bottom { flex: 68; display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; align-content: start; overflow: hidden; }
+/* each door carries its own radius: outer corners 28px like the fridge
+   silhouette, gap-facing corners tighter at 10px. The dark strip between
+   them is the door's own bottom/top edge, not a separate element. */
+.fridge-door {
+  position: relative; padding: 2.2rem 1rem 1rem 3.4rem;
+  background: linear-gradient(135deg, #d8e5cd 0%, var(--board-sage) 35%, #b3c8a4 100%);
+  border: none;
+  box-shadow: inset 0 2px 2px rgba(255, 255, 255, 0.7), inset 0 -4px 8px rgba(62, 54, 46, 0.18), 0 30px 60px var(--shadow);
+  overflow: hidden;
+}
+/* enamel sheen per door */
+.fridge-door::after {
+  content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none; border-radius: inherit;
+  background: linear-gradient(105deg, transparent 55%, rgba(255, 255, 255, 0.28) 78%, transparent 92%);
+}
+.fridge-top {
+  flex: 32; display: flex; gap: 0.8rem; align-content: start;
+  border-radius: 36px 36px 16px 16px;
+  margin-bottom: -10px; z-index: 2;
+}
+.fridge-bottom {
+  flex: 68; display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; align-content: start;
+  border-radius: 16px 16px 36px 36px;
+  margin-top: -10px; z-index: 2;
+}
+/* tall dark strip tucked behind both doors — only its middle shows */
+.fridge-seam {
+  height: 30px; margin: 0; flex: none;
+  background: #2b2620;
+  z-index: 1;
+}
 /* shrink papers slightly inside the fridge so all six notes fit the doors */
 .fridge-door .paper { padding: 16px 12px 8px; }
 .fridge-door .note-body { font-size: 21px; }
@@ -133,14 +159,6 @@ body {
 .fridge-door .photo-img { margin: 4px 0 6px; }
 .fridge-door .photo-cap { font-size: 15px; }
 .fridge-door .meta { margin-top: 6px; }
-/* rubber gasket + gap between freezer and fridge doors */
-.fridge-seam {
-  position: relative; z-index: 4; height: 14px; margin: 0;
-  background: linear-gradient(#2f2a24, #54493c 45%, #221d17);
-  border-top: 1px solid rgba(255, 255, 255, 0.35);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.5);
-  box-shadow: 0 4px 5px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-}
 /* vertical bar handles — one per door, aligned on the left */
 .handle {
   position: absolute; left: 18px; width: 16px; border-radius: 9px;
@@ -256,14 +274,23 @@ body {
 .scribble { font-size: 1.2rem; color: var(--ink-soft); text-align: right; margin-top: 0.2rem; }
 .scribble-arrow { display: inline-block; transform: rotate(40deg); }
 
-/* ---- hero intro: dim fridge -> fast pops -> simultaneous strike ->
-   "Only what matters" -> fridge brightens. Everything quick. ---- */
-/* fridge starts dimmed, brightens on reveal */
-.fridge .fridge-door, .fridge .fridge-seam, .fridge .board-tag { transition: opacity 0.5s, filter 0.5s; }
-.fridge.intro-dim .fridge-door, .fridge.intro-dim .fridge-seam, .fridge.intro-dim .board-tag { opacity: 0.35; filter: saturate(0.6); }
-.chaos-layer { position: absolute; inset: -20px -14px -28px -30px; z-index: 10; pointer-events: none; }
+/* ---- hero intro: frosted veil -> fast pops -> simultaneous strike ->
+   "Only what matters" -> veil lifts. Everything quick. ---- */
+.chaos-layer { position: absolute; inset: 0; z-index: 10; pointer-events: none; }
+/* translucent backdrop behind the popups: fridge stays full-bright underneath.
+   Veil sits exactly on the fridge; the bubbles keep their rightward shift. */
+.chaos-layer::before {
+  content: ''; position: absolute; inset: 0; border-radius: 36px 36px 36px 36px;
+  background: rgba(251, 245, 233, 0.45);
+  backdrop-filter: blur(2px);
+  opacity: 0; transition: opacity 0.3s;
+}
+.fridge-stage.playing .chaos-layer::before,
+.fridge-stage.striking .chaos-layer::before { opacity: 1; }
+.fridge-stage.clearing .chaos-layer::before { opacity: 0; }
 .chat-pop {
   position: absolute; left: var(--x); top: var(--y);
+  margin-left: 22px;
   display: flex; flex-direction: column; line-height: 1.25;
   max-width: 62%;
   background: #fff; border-radius: 14px; padding: 0.35rem 0.8rem;
