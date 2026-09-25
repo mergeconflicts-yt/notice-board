@@ -307,10 +307,12 @@ function ListBody({
 const styles = StyleSheet.create({
   paper: {
     borderWidth: 1,
-    shadowOpacity: 0.22,
-    shadowRadius: 7,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    // Deep, soft drop shadow so notes read as physically placed on the board
+    // rather than painted flat onto it.
+    shadowOpacity: 0.38,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 8,
   },
   body: { flexGrow: 1, justifyContent: 'center' },
   holes: {
