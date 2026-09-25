@@ -31,23 +31,23 @@ export function FastenerView({ fastener }: { fastener: Fastener }) {
 const styles = StyleSheet.create({
   magnet: {
     position: 'absolute',
-    top: -11,
-    marginLeft: -12,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    top: -9,
+    marginLeft: -9,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     zIndex: 2,
     // Drop shadow only: inset and gradient highlights are web-only props, so
     // the roundness comes from a plain glint dot instead.
-    boxShadow: '0 3px 5px rgba(0,0,0,0.35)',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.35)',
   },
   glint: {
     position: 'absolute',
-    top: 4,
-    left: 5,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    top: 3,
+    left: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: 'rgba(255,255,255,0.55)',
   },
 });
