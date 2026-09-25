@@ -250,4 +250,32 @@ implemented slightly differently. Appended as work proceeds.
     1,000 photos. The deploy Vault check now runs pre-push over the session
     pooler (`SUPABASE_DB_URL`; GitHub runners have no IPv6 for the direct
     host), and fails fast on an empty `JOB_SECRET`.
+31. **Welcome onboarding + 6-digit email codes.** Nothing signs in
+    automatically now: a fresh install (and a lost session) lands on a
+    `welcome` screen offering Apple/Google/email/guest. Email is a 6-digit
+    code (`signInWithOtp` → `verifyOtp`), not a magic link — no deep link, no
+    PKCE verifier, works when the email opens elsewhere. Guest auth is
+    unchanged (anonymous user); "Save your account" links Apple/Google via
+    `linkIdentity` or confirms email via `updateUser` + `verifyOtp(type:
+    'email_change')`. Identity conflicts (`identity_already_exists`/
+    `email_exists`) show a "sign in instead" dialog; no account merging.
+    `handle_new_user` claims `full_name`/`name` (trimmed, ≤40) or falls back
+    to "Someone". Deliberate scope notes: the invite deep-link shows a generic
+    "You're invited" header before auth (board details need an authenticated
+    `preview_invite`, which stays authenticated to keep its per-user rate
+    limit), then auto-joins right after; `startFresh` now lands on `welcome`
+    rather than minting a guest; native Apple/Google sheets
+    (`expo-apple-authentication` + Google Sign-In `signInWithIdToken`) are the
+    planned follow-up, with the existing browser OAuth kept for v1. Email
+    templates must include `{{ .Token }}` (dashboard setting, see
+    infrastructure.md).
+32. **Invite landing previews before sign-in.** The invite screen (panel 5)
+    shows the board name/inviter on a fresh install, so `preview_invite_token`
+    is granted to `anon`. It accepts only the 128-bit link *token*, never the
+    short code — guessing it is infeasible, and the guessable code path stays
+    behind the authenticated, per-user rate-limited `preview_invite`. The
+    Welcome/progress screens were rebuilt to the mock (paper + magnet decor,
+    dark Apple / outlined Google+email buttons, underlined guest link, a
+    warning step for guest, and email → code → one-time name sheet), and
+    Profile now leads with "Guest on this phone" and a Save card.
 

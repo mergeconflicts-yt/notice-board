@@ -230,6 +230,43 @@ begin
 end;
 $$;
 
+-- Public, token-only preview for the invite landing screen (a fresh install
+-- has no session yet). Safe because it accepts only the 128-bit link token —
+-- never the short code, which is guessable and stays behind the authenticated,
+-- per-user rate-limited preview_invite. Token guessing is infeasible.
+create function public.preview_invite_token(p_token text)
+returns table (board_name text, invited_by text, member_first_names text[], member_count integer)
+language plpgsql
+security definer
+set search_path = '' as $$
+declare
+  v_inv public.invites%rowtype;
+  v_board public.boards%rowtype;
+begin
+  select * into v_inv
+  from public.invites
+  where token_hash = extensions.digest(coalesce(p_token, ''), 'sha256');
+  select * into v_board
+  from public.boards
+  where id = v_inv.board_id and deleted_at is null;
+  if v_inv.id is null
+     or v_inv.revoked_at is not null
+     or v_inv.expires_at <= now()
+     or v_board.id is null then
+    return;
+  end if;
+  board_name := v_board.name;
+  select display_name into invited_by from public.profiles where id = v_inv.created_by;
+  select coalesce(array_agg(split_part(p.display_name, ' ', 1) order by m.joined_at, m.user_id), '{}')
+    into member_first_names
+  from public.board_members m
+  join public.profiles p on p.id = m.user_id
+  where m.board_id = v_board.id;
+  select count(*)::integer into member_count from public.board_members where board_id = v_board.id;
+  return next;
+end;
+$$;
+
 create function public.accept_invite(p_token_or_code text, p_display_name text default null)
 returns uuid
 language plpgsql
@@ -298,6 +335,10 @@ grant execute on function public.reset_invite_link(uuid) to authenticated;
 
 revoke all on function public.preview_invite(text) from public, anon;
 grant execute on function public.preview_invite(text) to authenticated;
+
+-- Token-only preview is reachable before sign-in (invite landing screen).
+revoke all on function public.preview_invite_token(text) from public;
+grant execute on function public.preview_invite_token(text) to anon, authenticated;
 
 revoke all on function public.accept_invite(text, text) from public, anon;
 grant execute on function public.accept_invite(text, text) to authenticated;

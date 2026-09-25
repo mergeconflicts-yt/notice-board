@@ -1,15 +1,18 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase, turnstileSiteKey } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { KeychainError, LargeSecureStore } from '../lib/secureStore';
 import {
   deleteAccount as apiDeleteAccount,
   friendlyMessage,
+  sendSignupCode,
+  signInProvider,
   updateProfile,
+  verifySignupCode,
 } from '../lib/api';
 import { User } from '../types';
 
-type SessionStatus = 'loading' | 'ready' | 'offline' | 'needsCaptcha' | 'signedout';
+type SessionStatus = 'loading' | 'ready' | 'offline' | 'signedout' | 'welcome' | 'name';
 
 type SessionState = {
   status: SessionStatus;
@@ -19,6 +22,18 @@ type SessionState = {
    *  wording (null when unknown). */
   markerAnon: boolean | null;
   init: (captchaToken?: string, manual?: boolean) => Promise<void>;
+  /** Guest path: explicit anonymous sign-in, then the normal ready path. */
+  continueAsGuest: (captchaToken?: string) => Promise<void>;
+  /** Apple/Google path: provider sign-in, immediate name claim, then ready. */
+  continueWithProvider: (provider: 'apple' | 'google') => Promise<void>;
+  /** Email path: send the 6-digit code (no state change). */
+  sendEmailCode: (email: string, captchaToken?: string) => Promise<void>;
+  /** Email path: redeem the code, then the normal ready path. */
+  verifyEmailCode: (email: string, code: string) => Promise<void>;
+  /** Arm the one-time "what's your name?" step for the next email sign-up. */
+  beginNameCheck: () => void;
+  /** Save the name from that step and continue. */
+  completeName: (name: string) => Promise<void>;
   setDisplayName: (displayName: string) => Promise<void>;
   signOut: () => Promise<void>;
   /** Abandon a lost identity and start a fresh anonymous account. */
@@ -41,6 +56,9 @@ let intentionalSignOut = false;
 // Single-flight: overlapping init() calls share one bootstrap, so two starts
 // can't each create an anonymous user.
 let inFlightInit: Promise<void> | null = null;
+// Armed by the email sign-up flow: the next successful auth that lands on an
+// unnamed account shows the one-time "what's your name?" step instead of ready.
+let nameCheck = false;
 
 /** Cancel a pending retry. Deliberately does NOT reset the backoff — init()
  *  runs on every retry, and resetting here made the delay stay at 2s forever. */
@@ -168,15 +186,10 @@ async function runInit(
         });
         return;
       }
-      // Genuine first launch.
-      if (turnstileSiteKey && !captchaToken) {
-        set({ status: 'needsCaptcha', error: null });
-        return;
-      }
-      const { error } = await supabase.auth.signInAnonymously({
-        options: captchaToken ? { captchaToken } : undefined,
-      });
-      if (error) throw error;
+      // Genuine first launch: show Welcome. Nothing signs in automatically
+      // any more — every path (guest included) is an explicit choice there.
+      set({ status: 'welcome', error: null });
+      return;
     }
 
     const {
@@ -188,6 +201,9 @@ async function runInit(
     const profile = await loadProfile(current.id);
     // A successful bootstrap restores the default retry cadence.
     resetRetry();
+    // Email sign-up has no provider name: ask once, then continue.
+    const showName = nameCheck && !isAnonymous && (profile?.displayName ?? 'Someone') === 'Someone';
+    if (showName) nameCheck = false;
     set({
       user: {
         ...(profile ?? {
@@ -198,7 +214,7 @@ async function runInit(
         }),
         isAnonymous,
       },
-      status: 'ready',
+      status: showName ? 'name' : 'ready',
       error: null,
     });
   } catch (e) {
@@ -232,6 +248,59 @@ export const useSession = create<SessionState>((set) => ({
     return inFlightInit;
   },
 
+  continueAsGuest: async (captchaToken) => {
+    const { error } = await supabase.auth.signInAnonymously({
+      options: captchaToken ? { captchaToken } : undefined,
+    });
+    if (error) throw error;
+    await useSession.getState().init();
+  },
+
+  continueWithProvider: async (provider) => {
+    await signInProvider(provider);
+    // Apple only sends the name on first sign-in — claim it immediately.
+    // (handle_new_user already set it server-side; this is the fallback.)
+    try {
+      const {
+        data: { user: fresh },
+      } = await supabase.auth.getUser();
+      const meta = fresh?.user_metadata as { full_name?: string; name?: string } | undefined;
+      const name = (meta?.full_name?.trim() || meta?.name?.trim() || '').slice(0, 40).trim();
+      if (fresh && name) {
+        const profile = await loadProfile(fresh.id);
+        if (!profile || profile.displayName === 'Someone') {
+          await updateProfile(name);
+        }
+      }
+    } catch {
+      // Best effort only.
+    }
+    await useSession.getState().init();
+  },
+
+  sendEmailCode: async (email, captchaToken) => {
+    await sendSignupCode(email, captchaToken);
+  },
+
+  verifyEmailCode: async (email, code) => {
+    // Deliberately no init(): the auth listener takes over. If a name step is
+    // armed it shows status 'name'; otherwise it goes straight to ready.
+    await verifySignupCode(email, code);
+    // The listener should have fired synchronously above; fall back to init
+    // if it hasn't (e.g. a listener that defers).
+    if (useSession.getState().status === 'welcome') await useSession.getState().init();
+  },
+
+  beginNameCheck: () => {
+    nameCheck = true;
+  },
+
+  completeName: async (name) => {
+    const current = useSession.getState().user;
+    const user = await updateProfile(name);
+    set({ user: { ...user, isAnonymous: current?.isAnonymous ?? false }, status: 'ready', error: null });
+  },
+
   setDisplayName: async (displayName) => {
     // update_profile coalesces avatar_path, so renaming never clears it.
     const current = useSession.getState().user;
@@ -258,10 +327,11 @@ export const useSession = create<SessionState>((set) => ({
   },
 
   startFresh: async () => {
-    // Explicitly abandon the old identity, then start anonymous. The stored
-    // session is removed locally only: if the server user is already gone, a
-    // server round-trip 403s (user_not_found) while keeping the stored
-    // session, and the next init() would land on the same dead identity.
+    // Explicitly abandon the old identity, then land on Welcome (no marker,
+    // so init() offers the four options instead of minting a guest). The
+    // stored session is removed locally only: if the server user is already
+    // gone, a server round-trip 403s (user_not_found) while keeping the
+    // stored session, and the next init() would land on the same dead identity.
     intentionalSignOut = true;
     try {
       await supabase.auth.signOut({ scope: 'local' });
@@ -294,9 +364,12 @@ supabase.auth.onAuthStateChange((event, session) => {
       void loadProfile(session.user.id)
         .then((profile) => {
           if (profile) {
+            const isAnon = session.user.is_anonymous === true;
+            const showName = nameCheck && !isAnon && profile.displayName === 'Someone';
+            if (showName) nameCheck = false;
             useSession.setState({
-              user: { ...profile, isAnonymous: session.user.is_anonymous === true },
-              status: 'ready',
+              user: { ...profile, isAnonymous: isAnon },
+              status: showName ? 'name' : 'ready',
               error: null,
             });
           }

@@ -526,6 +526,20 @@ export async function resetInviteLink(boardId: string): Promise<void> {
   if (error) raise(error);
 }
 
+/** Pre-auth preview for the invite landing screen: link tokens only. */
+export async function previewInviteToken(token: string): Promise<InvitePreview | null> {
+  const { data, error } = await supabase.rpc('preview_invite_token', { p_token: token });
+  if (error) raise(error);
+  const row = data?.[0];
+  if (!row) return null;
+  return {
+    boardName: row.board_name,
+    invitedBy: row.invited_by,
+    memberFirstNames: row.member_first_names ?? [],
+    memberCount: row.member_count,
+  };
+}
+
 export async function previewInvite(tokenOrCode: string): Promise<InvitePreview | null> {
   const { data, error } = await supabase.rpc('preview_invite', { p_token_or_code: tokenOrCode });
   if (error) raise(error);
@@ -622,13 +636,41 @@ export async function signInProvider(provider: OAuthProvider): Promise<void> {
   await oauthFlow('signin', provider);
 }
 
-export async function linkEmail(email: string): Promise<void> {
-  const { error } = await supabase.auth.updateUser(
-    { email },
-    { emailRedirectTo: Linking.createURL('auth') },
-  );
+/** True when the error means the identity already belongs to another account
+ *  (linking it here would orphan one side or the other — no merging in v1). */
+export function isIdentityConflict(error: unknown): boolean {
+  const message =
+    error instanceof ApiError
+      ? error.message
+      : String((error as { message?: string })?.message ?? error);
+  return /identity_already_exists|email_exists/i.test(message);
+}
+
+/** The signed-in account's email and provider, for the profile screen. */
+export async function myAccount(): Promise<{ email: string | null; provider: string | null }> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const identities = (user as { identities?: { provider?: string }[] } | null)?.identities;
+  return { email: user?.email ?? null, provider: identities?.[0]?.provider ?? null };
+}
+
+/** Send a 6-digit sign-in/up code. Creates the account if it doesn't exist —
+ *  one flow, no separate sign-up vs sign-in. No redirect: the code works even
+ *  when the email is opened on another device. */
+export async function sendSignupCode(email: string, captchaToken?: string): Promise<void> {
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: { shouldCreateUser: true, captchaToken },
+  });
   if (error) raise(error);
-  // Confirm the change actually took effect before reporting success.
+}
+
+/** Redeem a 6-digit code from sendSignupCode. */
+export async function verifySignupCode(email: string, token: string): Promise<void> {
+  const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
+  if (error) raise(error);
+  // Confirm a session actually exists before reporting success.
   const {
     data: { user },
     error: userError,
@@ -636,18 +678,22 @@ export async function linkEmail(email: string): Promise<void> {
   if (userError || !user) raise({ message: userError?.message ?? 'not_authenticated' });
 }
 
-/** Email magic-link sign-in to an existing account. Never creates an account
- *  (a typo must not spawn an empty one). Production captcha is passed through. */
-export async function signInEmail(email: string, captchaToken?: string): Promise<void> {
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      shouldCreateUser: false,
-      emailRedirectTo: Linking.createURL('auth'),
-      captchaToken,
-    },
-  });
+/** Start attaching an email to the current (guest) account; the code that
+ *  arrives confirms it via confirmEmailChange. */
+export async function requestEmailChange(email: string): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ email });
   if (error) raise(error);
+}
+
+/** Confirm a pending email change with its 6-digit code. */
+export async function confirmEmailChange(email: string, token: string): Promise<void> {
+  const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email_change' });
+  if (error) raise(error);
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError || !user) raise({ message: userError?.message ?? 'not_authenticated' });
 }
 
 // ---------------------------------------------------------------------------

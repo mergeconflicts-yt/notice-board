@@ -29,9 +29,10 @@ export default function StartScreen() {
   const [showSavePrompt, setShowSavePrompt] = useState(false);
 
   // Dismissible "save your account" nudge: 2+ boards, or 7 days after first
-  // launch (docs/plan.md §8 step 4). Never blocking.
+  // launch (docs/plan.md §8 step 4). Guests only — signed-up users are safe.
+  // Never blocking.
   useEffect(() => {
-    if (status !== 'ready') return;
+    if (status !== 'ready' || !user || !user.isAnonymous) return;
     let alive = true;
     void (async () => {
       const dismissed = await AsyncStorage.getItem('notice.savePromptDismissed');
@@ -47,7 +48,7 @@ export default function StartScreen() {
     return () => {
       alive = false;
     };
-  }, [status, boards.length]);
+  }, [status, boards.length, user]);
 
   const dismissSavePrompt = () => {
     setShowSavePrompt(false);
@@ -121,7 +122,7 @@ export default function StartScreen() {
         </View>
 
         <View style={styles.footer}>
-          {showSavePrompt ? (
+          {showSavePrompt && user?.isAnonymous ? (
             <View style={styles.prompt}>
               <Text style={styles.promptText}>Save your account so you don’t lose your boards.</Text>
               <View style={styles.promptActions}>
@@ -163,9 +164,11 @@ export default function StartScreen() {
           <Pressable onPress={() => router.push('/profile')} style={styles.you} hitSlop={8}>
             <Text style={styles.youText}>You · {user?.displayName ?? 'Someone'}</Text>
           </Pressable>
-          <Pressable onPress={() => router.push('/sign-in')} style={styles.you} hitSlop={8}>
-            <Text style={styles.signInText}>Already have an account? Sign in</Text>
-          </Pressable>
+          {user && user.isAnonymous ? (
+            <Pressable onPress={() => router.push('/profile')} style={styles.you} hitSlop={8}>
+              <Text style={styles.signInText}>Save your account</Text>
+            </Pressable>
+          ) : null}
         </View>
       </ScrollView>
 

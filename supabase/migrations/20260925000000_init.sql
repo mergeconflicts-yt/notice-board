@@ -190,9 +190,19 @@ returns trigger
 language plpgsql
 security definer
 set search_path = '' as $$
+declare
+  v_name text := coalesce(
+    nullif(btrim(new.raw_user_meta_data ->> 'full_name'), ''),
+    nullif(btrim(new.raw_user_meta_data ->> 'name'), '')
+  );
 begin
+  -- First sign-in via Apple/Google carries the name in user_metadata (Apple
+  -- only sends it once), so claim it here, inside the 1–40 display check.
+  if v_name is null or char_length(v_name) > 40 then
+    v_name := 'Someone';
+  end if;
   insert into public.profiles (id, display_name)
-  values (new.id, 'Someone')
+  values (new.id, v_name)
   on conflict (id) do nothing;
   return new;
 end;

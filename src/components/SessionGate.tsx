@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, usePathname } from 'expo-router';
+import { router, useLocalSearchParams, usePathname } from 'expo-router';
 import { colors, fonts } from '../theme';
 import { Button } from './Button';
-import { Turnstile } from './Turnstile';
-import { turnstileSiteKey } from '../lib/supabase';
-import { INVITE_BASE_URL } from '../lib/inviteLinks';
+import { Welcome } from './Welcome';
+import { NameStep } from './NameStep';
 import { friendlyMessage } from '../lib/api';
 import { useSession } from '../store/session';
 
@@ -23,52 +21,11 @@ export function SessionGate() {
   const markerAnon = useSession((s) => s.markerAnon);
   const init = useSession((s) => s.init);
   const signOut = useSession((s) => s.signOut);
-  const startFresh = useSession((s) => s.startFresh);
   const pathname = usePathname();
-
-  // Captcha failures must NOT call init() again: that remounts the challenge,
-  // which fails again, forever. Keep the error here and retry the challenge
-  // (with growing backoff) instead.
-  const [captchaError, setCaptchaError] = useState<string | null>(null);
-  const [captchaNonce, setCaptchaNonce] = useState(0);
-  const captchaDelay = useRef(1000);
-  const captchaTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const clearCaptchaTimer = useCallback(() => {
-    if (captchaTimer.current) clearTimeout(captchaTimer.current);
-    captchaTimer.current = null;
-  }, []);
-  useEffect(() => clearCaptchaTimer, [clearCaptchaTimer]);
-
-  const handleCaptchaToken = useCallback(
-    (token: string) => {
-      clearCaptchaTimer();
-      captchaDelay.current = 1000;
-      setCaptchaError(null);
-      void init(token);
-    },
-    [clearCaptchaTimer, init],
-  );
-
-  const handleCaptchaError = useCallback((message: string) => {
-    setCaptchaError(message);
-    if (captchaTimer.current) return;
-    captchaTimer.current = setTimeout(() => {
-      captchaTimer.current = null;
-      setCaptchaError(null);
-      setCaptchaNonce((n) => n + 1);
-    }, captchaDelay.current);
-    captchaDelay.current = Math.min(captchaDelay.current * 2, 30000);
-  }, []);
-
-  const retryCaptcha = useCallback(() => {
-    clearCaptchaTimer();
-    captchaDelay.current = 1000;
-    setCaptchaError(null);
-    setCaptchaNonce((n) => n + 1);
-  }, [clearCaptchaTimer]);
+  const { token: inviteToken } = useLocalSearchParams<{ token?: string }>();
 
   // The overlay must not cover the screens that resolve it.
-  const exempt = pathname === '/sign-in' || pathname === '/auth';
+  const exempt = pathname === '/sign-in' || pathname === '/auth' || pathname === '/welcome';
   if (status === 'ready' || exempt) return null;
 
   const confirmSignOut = () => {
@@ -98,68 +55,19 @@ export function SessionGate() {
     );
   };
 
-  const confirmStartFresh = () => {
-    Alert.alert(
-      'Start fresh?',
-      'You won’t be able to get the old account’s boards back. This can’t be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Start fresh', style: 'destructive', onPress: () => void startFresh() },
-      ],
-    );
-  };
-
-  if (status === 'needsCaptcha' && turnstileSiteKey) {
-    if (!INVITE_BASE_URL) {
-      return (
-        <SafeAreaView style={[styles.overlay, styles.center]}>
-          <Text style={styles.title}>One quick check</Text>
-          <Text style={styles.sub}>
-            This build is missing EXPO_PUBLIC_INVITE_BASE_URL, so the human check can’t load.
-          </Text>
-        </SafeAreaView>
-      );
-    }
+  if (status === 'welcome' || status === 'signedout') {
+    const token = Array.isArray(inviteToken) ? inviteToken[0] : inviteToken;
+    // Must be the full-screen overlay: rendered bare it would sit *beside* the
+    // home screen instead of covering it (the two-onboarding-screens bug).
     return (
-      <SafeAreaView style={[styles.overlay, styles.center]}>
-        <Text style={styles.title}>One quick check</Text>
-        <Text style={styles.sub}>
-          {captchaError ? 'Couldn’t load the check.' : 'Confirm you’re human to continue.'}
-        </Text>
-        {captchaError ? (
-          <Button label="Retry" onPress={retryCaptcha} style={styles.btn} />
-        ) : (
-          <Turnstile
-            key={captchaNonce}
-            siteKey={turnstileSiteKey}
-            onToken={handleCaptchaToken}
-            onError={handleCaptchaError}
-          />
-        )}
-      </SafeAreaView>
+      <View style={styles.fill}>
+        <Welcome mode={status === 'signedout' ? 'resume' : 'fresh'} inviteToken={token ?? null} />
+      </View>
     );
   }
 
-  if (status === 'signedout') {
-    // An anonymous identity has no sign-in that can restore it — say so, and
-    // keep Start fresh as the way forward. (A usable sign-in is still offered:
-    // the account may have been linked after the marker was written.)
-    const lostAnon = markerAnon === true;
-    return (
-      <SafeAreaView style={[styles.overlay, styles.center]}>
-        <Text style={styles.title}>
-          {lostAnon ? 'Start fresh to continue' : 'Sign in to restore your boards'}
-        </Text>
-        <Text style={styles.sub}>
-          {error ??
-            (lostAnon
-              ? 'This device’s account can’t be reached. If you saved it with Apple, Google, or email, sign in — otherwise start fresh.'
-              : 'This device was signed in before. Sign in to get your boards back.')}
-        </Text>
-        <Button label="Sign in" onPress={() => router.push('/sign-in')} style={styles.btn} />
-        <Button label="Start fresh" variant="soft" onPress={confirmStartFresh} style={styles.btn} />
-      </SafeAreaView>
-    );
+  if (status === 'name') {
+    return <NameStep />;
   }
 
   if (status === 'offline') {
@@ -191,6 +99,17 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: colors.background,
     paddingHorizontal: 32,
+    zIndex: 100,
+    elevation: 100,
+  },
+  // Like `overlay` but without the padding: Welcome brings its own.
+  fill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: colors.background,
     zIndex: 100,
     elevation: 100,
   },

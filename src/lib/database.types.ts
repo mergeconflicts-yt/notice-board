@@ -712,6 +712,15 @@ export type Database = {
           member_first_names: string[]
         }[]
       }
+      preview_invite_token: {
+        Args: { p_token: string }
+        Returns: {
+          board_name: string
+          invited_by: string
+          member_count: number
+          member_first_names: string[]
+        }[]
+      }
       promote_longest_member: {
         Args: { p_board_id: string }
         Returns: undefined

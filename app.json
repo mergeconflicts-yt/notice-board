@@ -9,7 +9,8 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.noticeboard.app"
+      "bundleIdentifier": "com.noticeboard.app",
+      "usesAppleSignIn": true
     },
     "android": {
       "adaptiveIcon": {

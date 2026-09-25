@@ -1,7 +1,7 @@
 import { Pressable, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { colors, fonts } from '../theme';
 
-type Variant = 'primary' | 'soft';
+type Variant = 'primary' | 'soft' | 'accent';
 
 type Props = {
   label: string;
@@ -48,6 +48,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  accent: {
+    backgroundColor: colors.accent,
+  },
   text: {
     fontFamily: fonts.ui.bold,
     fontSize: 16,
@@ -57,6 +60,9 @@ const styles = StyleSheet.create({
   },
   softText: {
     color: colors.ink,
+  },
+  accentText: {
+    color: colors.white,
   },
   pressed: {
     opacity: 0.85,

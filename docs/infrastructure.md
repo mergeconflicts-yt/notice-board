@@ -140,7 +140,22 @@ project's dashboard:
 - **Email confirmations on** (`Auth → Email → Confirm email`). With manual
   linking enabled and confirmations off, anyone could link an email they don't
   control and claim it.
+- **Email templates show the code**: the Magic Link, Confirm signup and Change
+  Email templates must contain `{{ .Token }}` (the 6-digit code), not only
+  `{{ .ConfirmationURL }}` — the app only accepts the code. `[auth.email]` sets
+  `otp_length = 6` and `otp_expiry = 600`; raise `[auth.rate_limit]
+  email_sent` for the code flow.
 - **Anonymous sign-ins on** and a per-IP rate limit (Auth → Rate Limits).
+- **Apple provider on** (`Auth → Providers → Apple`): Apple Developer Services
+  ID as Client ID + the `.p8` private key as Secret (needs a paid Apple
+  Developer account). Without this, "Continue with Apple" opens a provider
+  error page.
+- **Google provider on** (`Auth → Providers → Google`): Google Cloud OAuth
+  client ID + client secret. Register the Supabase callback URL
+  (`https://<ref>.supabase.co/auth/v1/callback`) as an authorized redirect URI
+  in the Google console, plus the iOS bundle id / Android package + SHA-1 on
+  the respective OAuth clients. Without this, "Continue with Google" fails the
+  same way.
 
 ## Tests & CI
 

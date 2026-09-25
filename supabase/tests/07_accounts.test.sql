@@ -1,7 +1,7 @@
 -- Phase 5: account deletion keeps shared boards and posts.
 -- O deletes their account; M is a co-member of a shared board.
 begin;
-select plan(10);
+select plan(14);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000061', 'authenticated', 'authenticated'),
@@ -65,6 +65,25 @@ select is(
 select is(
   (select deleted_at is null from public.boards where id = 'b0000000-0000-0000-0000-000000000062'),
   true, 'shared board still alive after auth user removal');
+
+-- handle_new_user claims the provider name (trimmed, 1–40 chars) or falls back.
+insert into auth.users (id, aud, role, raw_user_meta_data) values
+  ('a0000000-0000-0000-0000-000000000071', 'authenticated', 'authenticated', '{"full_name":"  Ada Lovelace  "}'),
+  ('a0000000-0000-0000-0000-000000000072', 'authenticated', 'authenticated', '{"name":"Grace"}'),
+  ('a0000000-0000-0000-0000-000000000073', 'authenticated', 'authenticated', '{}'),
+  ('a0000000-0000-0000-0000-000000000074', 'authenticated', 'authenticated', '{"full_name":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}');
+select is(
+  (select display_name from public.profiles where id = 'a0000000-0000-0000-0000-000000000071'),
+  'Ada Lovelace', 'full_name is claimed and trimmed');
+select is(
+  (select display_name from public.profiles where id = 'a0000000-0000-0000-0000-000000000072'),
+  'Grace', 'name is the fallback');
+select is(
+  (select display_name from public.profiles where id = 'a0000000-0000-0000-0000-000000000073'),
+  'Someone', 'missing name falls back');
+select is(
+  (select display_name from public.profiles where id = 'a0000000-0000-0000-0000-000000000074'),
+  'Someone', 'over-long name falls back');
 
 select * from finish();
 rollback;

@@ -10,7 +10,7 @@ const out = fs.mkdtempSync(path.join(os.tmpdir(), 'notice-unit-'));
 
 try {
   execSync(
-    'npx tsc src/utils/layout.ts src/utils/note.ts src/utils/id.ts src/utils/invite.ts ' +
+    'npx tsc src/utils/layout.ts src/utils/note.ts src/utils/id.ts src/utils/invite.ts src/utils/emailCode.ts ' +
       'src/lib/sessionCrypto.ts ' +
       'src/types/index.ts src/theme/index.ts src/theme/colors.ts src/theme/fonts.ts ' +
       '--ignoreConfig --outDir ' + JSON.stringify(out) +

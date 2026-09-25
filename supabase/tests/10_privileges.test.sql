@@ -6,14 +6,16 @@ select plan(5);
 
 -- Trigger functions (return `trigger`) can't be called over the API and are
 -- PUBLIC-executable by default, so they're excluded from both checks.
--- No other public function is executable by anon (which inherits PUBLIC).
+-- The only anon-callable function is the token-only invite preview (the link
+-- landing screen needs it before any session exists).
 select ok(
   (select count(*) from pg_proc p
    join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public'
      and p.prorettype <> 'pg_catalog.trigger'::regtype
-     and has_function_privilege('anon', p.oid, 'execute')) = 0,
-  'no callable public function is executable by anon');
+     and has_function_privilege('anon', p.oid, 'execute')
+     and p.proname <> 'preview_invite_token') = 0,
+  'no other public function is executable by anon');
 
 -- Every callable function executable by authenticated is a known API function
 -- or a policy helper. A new function that forgets its revoke fails this.
@@ -33,8 +35,8 @@ select ok(
         'post_item', 'edit_item', 'edit_list', 'set_pinned', 'set_done', 'keep_longer',
         'remove_item', 'restore_item', 'list_removed_items', 'set_item_position',
         'add_entry', 'set_entry_checked', 'edit_entry', 'remove_entry',
-        'get_invite_link', 'reset_invite_link', 'preview_invite', 'accept_invite',
-        'delete_account'
+        'get_invite_link', 'reset_invite_link', 'preview_invite', 'preview_invite_token',
+        'accept_invite', 'delete_account'
       )
   ),
   'no unexpected function is executable by authenticated');

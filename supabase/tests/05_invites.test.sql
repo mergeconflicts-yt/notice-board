@@ -1,7 +1,7 @@
 -- Phase 1d: invite links — issue/reuse/rotate/revoke, preview, accept, limits.
 -- Roles: O owner, M member, S joiner, T probe, U probe.
 begin;
-select plan(50);
+select plan(53);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000041', 'authenticated', 'authenticated'),
@@ -34,6 +34,21 @@ select ok(
   (select token ~ '^[A-Za-z0-9_-]{22}$' and code ~ '^[A-Z2-9]{5}-[A-Z2-9]{5}$'
    from t_link),
   'link format: 22-char base64url token, dashed code');
+reset role;
+
+-- The invite landing screen previews before any session: anon may use the
+-- link token, but never the guessable short code.
+grant select on t_link to anon;
+set role anon;
+select is(
+  (select board_name from public.preview_invite_token((select token from t_link))),
+  'Invites', 'anon previews the board by link token');
+select is(
+  (select member_count from public.preview_invite_token((select code from t_link))),
+  null, 'anon token preview rejects the short code');
+select throws_ok(
+  $$select public.preview_invite((select token from t_link))$$,
+  '42501', null, 'anon cannot use the authenticated preview');
 reset role;
 
 -- M joins via fixture and gets the identical link.

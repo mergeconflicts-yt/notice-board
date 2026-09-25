@@ -1,10 +1,9 @@
 # Prod checklist
 
-## 1. Nothing has actually run yet. 
-None of the tests ran in my sandbox. Run these locally, and all must pass:
+## 1. Run these locally, and all must pass:
 - `supabase db reset && supabase test db`
 - `supabase db lint --level warning --fail-on warning`
-- `npm ci && npm run typecheck && npm run lint && node scripts/run-unit-tests.cjs`
+- `npm ci --legacy-peer-deps && npm run typecheck && npm run lint && node scripts/run-unit-tests.cjs` (plain `npm ci` fails on Expo 57 peer conflicts)
 
 ## 2. Device tests on a production build, not Expo Go:
 - Apple and Google linking, and signing in on a second phone
@@ -15,14 +14,14 @@ None of the tests ran in my sandbox. Run these locally, and all must pass:
 - deleting an account
 
 ## 3. Production Supabase settings
-`config.tom1` only covers your local setup, so the hosted project needs:
+`config.toml` only covers your local setup, so the hosted project needs:
 - captcha on (it's `enabled = false` locally)
 - email confirmations on
 - custom SMTP (the built-in sender only sends a couple of emails an hour)
 - `noticeboard://auth` in the redirect URLs
 - the Vault secrets `invite`, `functions_url` and `job_secret`
 - `JOB_SECRET`, `SUPABASE_DB_URL` and the other secrets in GitHub
-- a manual run of deploy. yml
+- a manual run of deploy.yml
 - a check of `http_failures()` the next day to confirm the nightly jobs ran
 
 ## 4. Store requirements:
