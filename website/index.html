@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Notice Board — Just the information. None of the noise.</title>
+<meta name="description" content="The shopping list, the Wi-Fi password, Saturday's plan. Pinned where everyone can see them, not buried 200 messages up in the family chat." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<header class="nav">
+  <a class="brand" href="#top"><span class="brand-pin" aria-hidden="true"></span><span class="hand brand-name">Notice Board</span></a>
+  <nav class="nav-links">
+    <a href="#no-noise">No noise</a>
+    <a href="#how-it-works">How it works</a>
+    <a href="#privacy">Privacy</a>
+    <a href="#questions">Questions</a>
+  </nav>
+  <a class="btn btn-dark btn-small" href="#get-the-app">Get the app</a>
+</header>
+
+<main id="top">
+
+  <!-- 1 · HERO -->
+  <section class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow">The fridge door, in everyone's pocket</p>
+      <h1 class="hand hero-title">Just the<br />information.<br /><span class="hl">None of the</span><br /><span class="hl">noise.</span></h1>
+      <p class="lede">The shopping list, the Wi-Fi password, Saturday's plan. Pinned where everyone can see them, not buried 200 messages up in the family chat.</p>
+      <ul class="no-list">
+        <li><span class="x" aria-hidden="true">✕</span> No chats or replies</li>
+        <li><span class="x" aria-hidden="true">✕</span> No pings for every post</li>
+        <li><span class="x" aria-hidden="true">✕</span> Nothing buried in scroll</li>
+      </ul>
+      <div class="store-row">
+        <a class="store-btn" href="#get-the-app" aria-label="Download on the App Store">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="11" y="18" x2="13" y="18"/></svg>
+          <span><small>Download on the</small><strong>App Store</strong></span>
+        </a>
+        <a class="store-btn" href="#get-the-app" aria-label="Get it on Google Play">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M5 3.5v17l13-8.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          <span><small>Get it on</small><strong>Google Play</strong></span>
+        </a>
+      </div>
+      <p class="guest-note"><span class="tick" aria-hidden="true">✓</span> Try it as a guest. No account, no email, no sign-up.</p>
+    </div>
+
+    <div class="hero-board">
+      <div class="fridge-stage" id="fridgeStage">
+      <div class="fridge" id="fridge" aria-label="A fridge door with pinned notes">
+        <span class="board-tag">Kranthi Family</span>
+        <div class="fridge-door fridge-top">
+          <span class="handle"></span>
+          <!-- note: short body -> 33px bold hero -->
+          <div class="paper c-butter drag" style="--r:-2deg; --px:62%"><span class="pin pin-red"></span>
+            <p class="note-body note-hero">Wi-Fi: HomeNet<br />sunflower22</p>
+            <p class="meta">Dad · 2 h</p>
+          </div>
+          <!-- note: short body -> 33px bold hero -->
+          <div class="paper c-sage drag" style="--r:1.5deg; --px:41%"><span class="pin pin-teal"></span>
+            <p class="note-body note-hero">Trash: Tue &amp;<br />Fri</p>
+            <p class="meta">Mom · Yesterday</p>
+          </div>
+        </div>
+        <div class="fridge-seam"></div>
+        <div class="fridge-door fridge-bottom">
+          <span class="handle"></span>
+          <!-- list -->
+          <div class="paper c-paper drag" style="--r:-1deg; --px:55%"><span class="pin pin-blue"></span>
+            <p class="list-title">Groceries</p>
+            <ul class="entries">
+              <li class="entry done"><button type="button" aria-pressed="true"><span class="checkbox"><span class="checkmark">✓</span></span><span class="entry-text">Milk</span></button></li>
+              <li class="entry"><button type="button" aria-pressed="false"><span class="checkbox"></span><span class="entry-text">Bread</span></button></li>
+              <li class="entry done"><button type="button" aria-pressed="true"><span class="checkbox"><span class="checkmark">✓</span></span><span class="entry-text">Coffee</span></button></li>
+              <li class="entry"><button type="button" aria-pressed="false"><span class="checkbox"></span><span class="entry-text">Chicken</span></button></li>
+            </ul>
+            <p class="meta">Dad · 2 h</p>
+          </div>
+          <!-- date ticket -->
+          <div class="paper c-sky drag" style="--r:1deg; --px:48%"><span class="pin pin-yellow"></span>
+            <div class="ticket">
+              <div class="cal"><div class="cal-dow">SAT</div><div class="cal-day">26</div><div class="cal-mon">SEP</div></div>
+              <div><div class="day-label">SATURDAY</div><p class="ticket-title">Dentist</p><p class="ticket-time">10:30 AM</p></div>
+            </div>
+            <p class="meta">Mom · Yesterday</p>
+          </div>
+          <!-- note: medium body -> 25px semibold -->
+          <div class="paper c-lavender drag" style="--r:-1.5deg; --px:58%"><span class="pin pin-red"></span>
+            <p class="note-body">Grandma visits Saturday ♥</p>
+            <p class="meta">Riya · 3 h</p>
+          </div>
+          <!-- photo: 4:3 image + centred caption -->
+          <div class="paper c-paper drag" style="--r:2deg; --px:44%"><span class="pin pin-pink"></span>
+            <div class="photo-img" aria-hidden="true"><span class="sun"></span></div>
+            <p class="photo-cap">Goa!</p>
+            <p class="meta">Dad · 5 h</p>
+          </div>
+        </div>
+      </div>
+      <div class="chaos-layer" id="chaosLayer" aria-hidden="true">
+        <span class="chat-pop" style="--x:50%; --y:2%; --r:2deg"><b>Dad</b>who took my charger</span>
+        <span class="chat-pop" style="--x:-4%; --y:12%; --r:-5deg"><b>Riya</b>😂😂😂</span>
+        <span class="chat-pop" style="--x:36%; --y:30%; --r:-2deg"><b>Mom</b>seen by 4</span>
+        <span class="chat-pop mini" style="--x:64%; --y:37%; --r:3deg">ok</span>
+        <span class="chat-pop" style="--x:-5%; --y:55%; --r:3deg"><b>Riya</b>[sticker]</span>
+        <span class="chat-pop mini" style="--x:47%; --y:60%; --r:-2deg"><b>Dad</b>👍</span>
+        <span class="chat-pop" style="--x:2%; --y:88%; --r:-3deg"><b>Riya</b>lol</span>
+        <span class="chat-pop" style="--x:33%; --y:90%; --r:1deg"><b>Mom</b>did anyone see my msg??</span>
+      </div>
+      <div class="paper c-butter reveal-note" id="revealNote" aria-hidden="true"><span class="pin pin-red" style="--px:55%"></span>
+        <p class="note-body note-hero">Only what<br />matters</p>
+        <p class="meta">Notice Board · pinned</p>
+      </div>
+      </div>
+      <button class="link-btn" id="noiseToggle" type="button"><span aria-hidden="true">↺</span> <span id="noiseLabel">Replay the intro</span></button>
+      <p class="hand scribble" aria-hidden="true">go on, move them <span class="scribble-arrow">⤵</span></p>
+    </div>
+  </section>
+
+  <!-- 2 · NO NOISE -->
+  <section class="section" id="no-noise">
+    <p class="eyebrow">Only information. No noise.</p>
+    <h2 class="hand section-title">Stop scrolling up for the Wi-Fi password.</h2>
+    <div class="compare">
+      <figure class="chat-mock">
+        <div class="chat-head"><strong>Family ❤️</strong><span class="unread">128</span></div>
+        <div class="chat-body">
+          <div class="msg"><small>Dad</small><p>Who took my charger</p></div>
+          <div class="msg right"><p class="pill">not me</p></div>
+          <div class="msg"><small>Riya</small><p>😂😂😂</p></div>
+          <div class="msg"><small>Mom</small><p>Dinner at 8</p></div>
+          <div class="msg highlight"><small>Dad</small><p>New wifi pw is sunflower22</p></div>
+          <div class="msg"><small>Riya</small><p>[sticker]</p></div>
+        </div>
+        <figcaption>Found it? It scrolled away an hour ago.</figcaption>
+      </figure>
+      <div class="compare-arrow" aria-hidden="true">→</div>
+      <figure class="compare-note">
+        <div class="paper c-butter big-note" style="--px:60%"><span class="pin pin-red"></span>
+          <p class="note-body note-hero">Wi-Fi: HomeNet<br />sunflower22</p>
+          <p class="meta">Dad · pinned</p>
+        </div>
+        <figcaption>One note. Always in the same place.</figcaption>
+      </figure>
+    </div>
+    <div class="trio">
+      <div><h3>No conversations</h3><p>No replies, threads, reactions or "seen by". You post it and you're done, so nothing turns into a debate.</p></div>
+      <div><h3>No pings for every post</h3><p>The board doesn't buzz each time someone adds a note. Look at it when you need it, like the fridge.</p></div>
+      <div><h3>Nothing gets buried</h3><p>Posts stay where they were put instead of scrolling away. Important things can be pinned to the top for good.</p></div>
+    </div>
+  </section>
+
+  <!-- 3 · NOT BOLTED ON -->
+  <section class="section struck">
+    <div class="struck-copy">
+      <p class="eyebrow">Built in, not bolted on</p>
+      <p class="hand struck-list">
+        <span class="crossed">Replies</span><br />
+        <span class="crossed">Reactions</span><br />
+        <span class="crossed">Read receipts</span><br />
+        <span class="crossed">A buzz for every post</span><br />
+        <span class="kept">Just what everyone needs to know.</span>
+      </p>
+      <p class="lede">These aren't settings you have to find. The app simply doesn't have them, so the board can't turn into another chat.</p>
+    </div>
+    <div class="paper c-paper rules-card" style="--r:1deg; --px:52%">
+      <span class="pin pin-teal"></span>
+      <h3 class="hand">House rules for this board</h3>
+      <ol class="hand rules">
+        <li>Only things everyone needs to see.</li>
+        <li>No replies, so nothing turns into a thread.</li>
+        <li>No pings. Look when you need it.</li>
+        <li>Things leave once they're done.</li>
+      </ol>
+      <p class="meta">Pinned on every new board</p>
+    </div>
+  </section>
+
+  <!-- 4 · FOUR KINDS -->
+  <section class="section">
+    <p class="eyebrow">Four kinds of paper</p>
+    <h2 class="hand section-title">Everything a fridge door holds.</h2>
+    <div class="kinds">
+      <!-- note -->
+      <div class="paper c-butter" style="--r:-1.5deg; --px:40%"><span class="pin pin-red"></span>
+        <h3 class="hand">Notes</h3>
+        <p class="note-body" style="font-size:20px">"Dinner's in the oven." "Back by 9." The little messages that keep a house running.</p>
+      </div>
+      <!-- list -->
+      <div class="paper c-paper" style="--r:1deg; --px:57%"><span class="pin pin-blue"></span>
+        <h3 class="hand">Lists</h3>
+        <p class="list-title" style="font-size:22px">Saturday shop</p>
+        <ul class="entries" style="font-size:18px">
+          <li class="entry" style="font-size:18px"><span class="checkbox"></span><span class="entry-text">Eggs</span></li>
+          <li class="entry done" style="font-size:18px"><span class="checkbox"><span class="checkmark">✓</span></span><span class="entry-text">Milk</span></li>
+        </ul>
+      </div>
+      <!-- date ticket -->
+      <div class="paper c-sky" style="--r:-1deg; --px:46%"><span class="pin pin-yellow"></span>
+        <h3 class="hand">Dates</h3>
+        <div class="ticket">
+          <div class="cal"><div class="cal-dow">SUN</div><div class="cal-day">27</div><div class="cal-mon">SEP</div></div>
+          <div><div class="day-label">TOMORROW</div><p class="ticket-title" style="font-size:18px">School play</p></div>
+        </div>
+      </div>
+      <!-- photo -->
+      <div class="paper c-paper" style="--r:1.5deg; --px:61%"><span class="pin pin-pink"></span>
+        <h3 class="hand">Photos</h3>
+        <div class="photo-img" aria-hidden="true"><span class="sun"></span></div>
+        <p class="photo-cap" style="font-size:16px">Parking spot B2</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 · TIDIES ITSELF -->
+  <section class="section tidy">
+    <div class="tidy-copy">
+      <p class="eyebrow">The board tidies itself</p>
+      <h2 class="hand section-title">Nothing hangs around forever.</h2>
+      <p class="lede">Real fridge doors fill up with notes nobody reads. Here, things leave on their own once they've done their job.</p>
+      <dl class="expiry">
+        <div><dt class="hand">Notes</dt><dd>leave after a week</dd></div>
+        <div><dt class="hand">Photos</dt><dd>leave after two weeks</dd></div>
+        <div><dt class="hand">Dates</dt><dd>leave the day after</dd></div>
+        <div><dt class="hand">Lists</dt><dd>leave two days after everything's ticked</dd></div>
+        <div><dt class="hand">Pinned</dt><dd>stay until you unpin them, like the Wi-Fi password</dd></div>
+      </dl>
+      <p class="restore">Removed something by mistake? You can bring it back for 30 days.</p>
+    </div>
+    <div class="tidy-board">
+      <div class="mini-board">
+        <!-- list, like the app renders it -->
+        <div class="paper c-paper shop-list" style="--r:0deg; --px:50%">
+          <span class="pin pin-teal"></span>
+          <p class="list-title">Saturday shop</p>
+          <ul class="entries" id="shopList">
+            <li class="entry"><button type="button" aria-pressed="false"><span class="checkbox"></span><span class="entry-text">Eggs</span></button></li>
+            <li class="entry"><button type="button" aria-pressed="false"><span class="checkbox"></span><span class="entry-text">Rice</span></button></li>
+            <li class="entry"><button type="button" aria-pressed="false"><span class="checkbox"></span><span class="entry-text">Tomatoes</span></button></li>
+          </ul>
+          <p class="meta" id="shopLeft">Dad · 3 left</p>
+        </div>
+      </div>
+      <p class="hand scribble">tick them all ↑</p>
+    </div>
+  </section>
+
+  <!-- 6 · HOW IT WORKS -->
+  <section class="section" id="how-it-works">
+    <p class="eyebrow">How it works</p>
+    <h2 class="hand section-title">Up and running before the kettle boils.</h2>
+    <div class="steps">
+      <div class="step"><span class="num num-red">1</span><h3>Make a board</h3><p>Give it a name and a door colour. Start as a guest, or with Apple, Google or your email.</p></div>
+      <div class="step"><span class="num num-yellow">2</span><h3>Send the link</h3><p>Share one invite link in your family chat. Tapping it opens the board. There's no code to type.</p></div>
+      <div class="step"><span class="num num-teal">3</span><h3>Everyone pins</h3><p>Notes, lists, dates and photos show up for everyone right away, on every phone.</p></div>
+    </div>
+  </section>
+
+  <!-- 7 · MADE FOR -->
+  <section class="section">
+    <p class="eyebrow">Made for</p>
+    <h2 class="hand section-title">Anyone who shares a fridge. Or doesn't.</h2>
+    <div class="tags">
+      <span class="tag sticky-yellow hand" style="--r:-1deg">Families</span>
+      <span class="tag sticky-sky hand" style="--r:1deg">Roommates</span>
+      <span class="tag sticky-blush hand" style="--r:-1.5deg">Couples</span>
+      <span class="tag sticky-mint hand" style="--r:1.5deg">Grandparents</span>
+      <span class="tag sticky-lilac hand" style="--r:-1deg">Sports clubs</span>
+      <span class="tag sticky-sage hand" style="--r:1deg">Small teams</span>
+    </div>
+    <p class="lede">Keep one board per group, like "Home", "Flat 4B" and "Badminton Sundays", and switch between them from the board name.</p>
+  </section>
+
+  <!-- 8 · PRIVACY -->
+  <section class="section" id="privacy">
+    <p class="eyebrow">Private by default</p>
+    <h2 class="hand section-title">Your fridge door, not a social network.</h2>
+    <div class="privacy-grid">
+      <div><p class="p-icon" aria-hidden="true">🔒</p><h3>Invite only</h3><p>Only people with your board's link can join, and the owner can remove anyone.</p></div>
+      <div><p class="p-icon" aria-hidden="true">🚫</p><h3>No ads</h3><p>No feeds, no followers and nothing to scroll. Just the board.</p></div>
+      <div><p class="p-icon" aria-hidden="true">🛡️</p><h3>Minimal data</h3><p>A display name, what you post, and an email only if you choose to save your account.</p></div>
+      <div><p class="p-icon" aria-hidden="true">🗑️</p><h3>Delete any time</h3><p>Delete your account from the app. Your posts stay on the board as "Former member".</p></div>
+    </div>
+  </section>
+
+  <!-- 9 · QUESTIONS -->
+  <section class="section" id="questions">
+    <p class="eyebrow">Questions</p>
+    <h2 class="hand section-title">Good questions.</h2>
+    <div class="faq" id="faq">
+      <details open>
+        <summary>Do I need an account?<span aria-hidden="true">✕</span></summary>
+        <p>No. Tap "Use as guest" and you're on a board in seconds. You can save your account later with Apple, Google or email, and every board comes with you.</p>
+      </details>
+      <details>
+        <summary>What happens if I delete the app as a guest?<span aria-hidden="true">+</span></summary>
+        <p>Your guest account lives on that phone, so deleting the app can lose it. Save it with Apple, Google or email first and your boards follow you to any phone.</p>
+      </details>
+      <details>
+        <summary>Can people reply to a post?<span aria-hidden="true">+</span></summary>
+        <p>No — there are no replies, threads or reactions. You post it and you're done, so nothing turns into a debate.</p>
+      </details>
+      <details>
+        <summary>Will it keep sending me notifications?<span aria-hidden="true">+</span></summary>
+        <p>No. The board never buzzes when someone posts. Open it when you need it, like walking up to the fridge.</p>
+      </details>
+      <details>
+        <summary>Who can see my board?<span aria-hidden="true">+</span></summary>
+        <p>Only people you invite. Boards are invite-only, and the owner can remove anyone at any time.</p>
+      </details>
+      <details>
+        <summary>Can I get something back after removing it?<span aria-hidden="true">+</span></summary>
+        <p>Yes. Removed notes stay restorable for 30 days before they're gone for good.</p>
+      </details>
+      <details>
+        <summary>Does everyone need the same kind of phone?<span aria-hidden="true">+</span></summary>
+        <p>No. Notice Board works on iPhone and Android, and everyone sees the same board right away.</p>
+      </details>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta" id="get-the-app">
+    <h2 class="hand">Put something on the board.</h2>
+    <p class="lede">Start a board for your home in under a minute.</p>
+    <div class="store-row center">
+      <a class="store-btn" href="#" aria-label="Download on the App Store">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="11" y="18" x2="13" y="18"/></svg>
+        <span><small>Download on the</small><strong>App Store</strong></span>
+      </a>
+      <a class="store-btn" href="#" aria-label="Get it on Google Play">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M5 3.5v17l13-8.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        <span><small>Get it on</small><strong>Google Play</strong></span>
+      </a>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <p>© 2026 Notice Board</p>
+  <nav><a href="#privacy">Privacy</a><a href="#">Terms</a><a href="#">Contact</a></nav>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
