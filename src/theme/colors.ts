@@ -108,23 +108,23 @@ export const boardColors: Record<BoardColor, string> = {
 export const boardColorKeys = Object.keys(boardColors) as BoardColor[];
 
 /** Enamel door tints per board colour: light face, base, shaded edge —
- *  the website fridge doors sprayed onto the app board. */
+ *  deeper enamel so the fridge reads solid against the notes. */
 export const doorTints: Record<BoardColor, { light: string; base: string; shade: string }> = {
-  sage: { light: '#DCE8D6', base: '#C9DCC0', shade: '#A9BE9C' },
-  blue: { light: '#D3E3F2', base: '#BCD2E8', shade: '#9DBBD9' },
-  clay: { light: '#F1D8C6', base: '#E5C3AE', shade: '#D0A78D' },
-  cream: { light: '#FFFFFF', base: '#FFFDF7', shade: '#E7DCC6' },
-  charcoal: { light: '#D2CEC7', base: '#B9B4AD', shade: '#A09B93' },
+  sage: { light: '#B9CFAE', base: '#9DB68F', shade: '#7A9670' },
+  blue: { light: '#A4C2DE', base: '#82A5CB', shade: '#6084AD' },
+  clay: { light: '#D9A984', base: '#C08A63', shade: '#9C6846' },
+  cream: { light: '#EDE0C6', base: '#DCCCA8', shade: '#BCA87F' },
+  charcoal: { light: '#A8A39B', base: '#8B8680', shade: '#69645D' },
 };
 
 /** Handle face per door colour: a deeper enamel tone that belongs with the
  *  door instead of generic steel. */
 export const handleTints: Record<BoardColor, [string, string, string]> = {
-  sage: ['#A9C29B', '#8BA87D', '#6E8F61'],
-  blue: ['#9DBEDC', '#7FA3C6', '#5F86AC'],
-  clay: ['#D8A985', '#C08A63', '#A06B45'],
-  cream: ['#D9CBAE', '#C2B28E', '#A8976F'],
-  charcoal: ['#8E8980', '#736E66', '#57534C'],
+  sage: ['#7A9670', '#5F7E56', '#47603F'],
+  blue: ['#6084AD', '#4A6A8F', '#354E6B'],
+  clay: ['#9C6846', '#7E5236', '#5F3D28'],
+  cream: ['#BCA87F', '#9E8B62', '#7D6D49'],
+  charcoal: ['#69645D', '#524E48', '#3A372F'],
 };
 
 /** The single fastener everywhere: round magnets in fixed colours (used by Pin). */
