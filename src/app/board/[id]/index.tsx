@@ -9,7 +9,6 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { colors, fonts } from '../../../theme';
@@ -356,15 +355,6 @@ export default function BoardScreen() {
 
   return (
     <View style={[styles.safe, { backgroundColor: colors.seam }]}>
-      {/* Left-to-right sheen so every shadow agrees on one light source. */}
-      <LinearGradient
-        colors={['rgba(255,255,255,0.16)', 'rgba(255,255,255,0)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.06)']}
-        locations={[0, 0.22, 0.78, 1]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
       <View style={styles.sections}>
         <View style={styles.pinnedSection}>
           <FridgeDoor color={board.color} placement="top">
@@ -402,8 +392,6 @@ export default function BoardScreen() {
             />
           </FridgeDoor>
         </View>
-
-        <View style={styles.seam} />
 
         <View style={styles.restSection}>
           <FridgeDoor color={board.color} placement="bottom">
@@ -521,10 +509,6 @@ const styles = StyleSheet.create({
   },
   sections: { flex: 1 },
   pinnedSection: { flex: PINNED_FLEX },
-  seam: {
-    height: 10,
-    backgroundColor: colors.seam,
-  },
   restSection: { flex: REST_FLEX, overflow: 'hidden' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingBottom: 60 },
   emptyHand: { fontSize: 40, marginBottom: 12 },

@@ -1,13 +1,17 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { doorTints, handleTints } from '../theme';
+import { colors, doorTints, handleTints } from '../theme';
 import type { BoardColor } from '../types';
 
 /** Outer-corner radius, matching the website fridge silhouette. */
-const OUTER_R = 28;
+const OUTER_R = 60;
 /** Gap-side radius where the door meets the dark seam. */
-const GAP_R = 14;
+const GAP_R = 10;
+/** Thick cabinet frame around the doors. */
+const FRAME = 10;
+/** Thinner frame edge where the doors meet the middle seam. */
+const FRAME_SEAM = 5;
 
 type Props = {
   color: BoardColor;
@@ -25,7 +29,13 @@ type Props = {
 export function FridgeDoor({ color, placement, children }: Props) {
   const tint = doorTints[color];
   return (
-    <View style={[styles.door, placement === 'top' ? styles.topRadii : styles.bottomRadii]}>
+    <View
+      style={[
+        styles.frame,
+        placement === 'top' ? styles.frameTop : styles.frameBottom,
+      ]}
+    >
+      <View style={[styles.door, placement === 'top' ? styles.topRadii : styles.bottomRadii]}>
       <LinearGradient
         colors={[tint.light, tint.base, tint.shade]}
         start={{ x: 0, y: 0 }}
@@ -50,15 +60,37 @@ export function FridgeDoor({ color, placement, children }: Props) {
         pointerEvents="none"
       />
       <View style={styles.content}>{children}</View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // Thick cabinet frame around the door, drawn as solid padding so the border
+  // renders evenly (uneven per-side borderWidth clips on rounded corners).
+  frame: {
+    flex: 1,
+    backgroundColor: colors.seam,
+  },
+  frameTop: {
+    borderTopLeftRadius: OUTER_R + FRAME,
+    borderTopRightRadius: OUTER_R + FRAME,
+    borderBottomLeftRadius: GAP_R + FRAME,
+    borderBottomRightRadius: GAP_R + FRAME,
+    padding: FRAME,
+    paddingBottom: FRAME_SEAM,
+  },
+  frameBottom: {
+    borderTopLeftRadius: GAP_R + FRAME,
+    borderTopRightRadius: GAP_R + FRAME,
+    borderBottomLeftRadius: OUTER_R + FRAME,
+    borderBottomRightRadius: OUTER_R + FRAME,
+    padding: FRAME,
+    paddingTop: FRAME_SEAM,
+  },
   door: {
     flex: 1,
     overflow: 'hidden',
-    boxShadow: '0 6px 14px -6px rgba(20, 30, 25, 0.35)',
   },
   topRadii: {
     borderTopLeftRadius: OUTER_R,
