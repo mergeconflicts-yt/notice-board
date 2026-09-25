@@ -41,41 +41,44 @@ export function PinnedStrip({ items, entries, photoUrls, onOpen }: Props) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.row}
         >
-          {items.map((item) => (
-            <Pressable
-              key={item.id}
-              onPress={() => onOpen(item)}
-              style={[styles.card, cardH != null && { height: cardH }]}
-              accessibilityRole="button"
-              accessibilityLabel={item.title ?? item.body ?? 'Pinned post'}
-            >
-              {item.type === 'photo' ? (
-                <PhotoCard
-                  url={item.photoPath ? photoUrls[item.photoPath] ?? null : null}
-                  caption={item.body}
-                />
-              ) : (
-                <View style={styles.clip}>
-                  <NotePaper
-                    item={item}
-                    maxEntries={maxEntries}
-                    entries={entries.filter((e) => e.itemId === item.id)}
+          {items.map((item) => {
+            // 6-digit hex, so a `00` alpha suffix is valid.
+            const bg = item.color === 'paper' ? colors.paper : noteColors[item.color].bg;
+            return (
+              <Pressable
+                key={item.id}
+                onPress={() => onOpen(item)}
+                style={[styles.card, styles.cardShadow, cardH != null && { height: cardH }]}
+                accessibilityRole="button"
+                accessibilityLabel={item.title ?? item.body ?? 'Pinned post'}
+              >
+                {item.type === 'photo' ? (
+                  <PhotoCard
+                    url={item.photoPath ? photoUrls[item.photoPath] ?? null : null}
+                    caption={item.body}
                   />
-                  {/* Cards taller than the strip are clipped; fade the cut
-                      edge so it reads as intentional, in the card's own paper
-                      colour. Photo cards letterbox and never clip. */}
-                  <LinearGradient
-                    colors={[
-                      'transparent',
-                      item.color === 'paper' ? colors.paper : noteColors[item.color].bg,
-                    ]}
-                    style={styles.fade}
-                    pointerEvents="none"
-                  />
-                </View>
-              )}
-            </Pressable>
-          ))}
+                ) : (
+                  <View style={styles.clip}>
+                    <NotePaper
+                      item={item}
+                      flat
+                      maxEntries={maxEntries}
+                      entries={entries.filter((e) => e.itemId === item.id)}
+                    />
+                    {/* Cards taller than the strip are clipped; fade the cut
+                        edge so it reads as intentional, in the card's own
+                        paper colour. 'transparent' is rgba(0,0,0,0), which
+                        would blend through grey — use the bg with zero alpha. */}
+                    <LinearGradient
+                      colors={[`${bg}00`, bg]}
+                      style={styles.fade}
+                      pointerEvents="none"
+                    />
+                  </View>
+                )}
+              </Pressable>
+            );
+          })}
         </ScrollView>
       )}
     </View>
@@ -90,7 +93,7 @@ function PhotoCard({ url, caption }: { url: string | null; caption: string | nul
         <Image
           source={{ uri: url }}
           style={styles.photo}
-          resizeMode="contain"
+          resizeMode="cover"
           accessible
           accessibilityLabel={caption?.trim() || 'Pinned photo'}
         />
@@ -116,6 +119,12 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   card: { width: CARD_W },
+  // The shadow lives on the card wrapper (not the paper) so `overflow:
+  // 'hidden' on the clip can't cut it off.
+  cardShadow: {
+    borderRadius: 4,
+    boxShadow: '0 1px 1px rgba(0,0,0,0.08), 0 8px 14px -8px rgba(20,30,25,0.4)',
+  },
   clip: { flex: 1, overflow: 'hidden', borderRadius: 4 },
   fade: {
     position: 'absolute',

@@ -99,29 +99,7 @@ export const boardColors: Record<BoardColor, string> = {
 
 export const boardColorKeys = Object.keys(boardColors) as BoardColor[];
 
-/** Decorative junk-drawer fastener colours (used by Pin). */
+/** The single fastener everywhere: round magnets in fixed colours (used by Pin). */
 export const fastenerColors = {
-  pins: ['#E2574C', '#3E7CB1', '#F2B134', '#6AA84F', '#8E7CC3'],
-  tapes: [
-    'rgba(244, 227, 178, 0.92)',
-    'rgba(238, 196, 205, 0.88)',
-    'rgba(186, 212, 238, 0.88)',
-    'rgba(201, 221, 190, 0.88)',
-  ],
-  stickers: ['#F6C445', '#F194B4', '#9CCB86', '#8FB8DE', '#C3B2E8', '#F49E4C'],
-  clip: '#3E362E',
-  metal: '#C9CFD6',
-  metalEdge: '#9AA1A9',
-  metalDark: '#7C838C',
-  scotch: 'rgba(238, 242, 246, 0.65)',
-  scotchBody: 'rgba(238, 242, 246, 0.6)',
-  scotchEdge: 'rgba(255, 255, 255, 0.7)',
-  sheen: 'rgba(255, 255, 255, 0.55)',
-  glint: 'rgba(255, 255, 255, 0.75)',
-  tapeEdge: 'rgba(255, 255, 255, 0.35)',
-  shadow: 'rgba(62, 54, 46, 0.28)',
-  shadowSoft: 'rgba(62, 54, 46, 0.25)',
-  outline: 'rgba(0, 0, 0, 0.14)',
-  outlineStrong: 'rgba(0, 0, 0, 0.3)',
-  outlineFaint: 'rgba(0, 0, 0, 0.08)',
+  magnets: ['#E4572E', '#F2B134', '#2A9D8F', '#3D5A98', '#D96C95'],
 } as const;

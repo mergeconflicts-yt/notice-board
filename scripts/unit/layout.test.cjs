@@ -54,13 +54,19 @@ describe('computeBoardLayout', () => {
   it('uses two columns and keeps same-column items from overlapping', () => {
     const items = Array.from({ length: 6 }, () => mk('note', { body: 'hello there' }));
     const out = computeBoardLayout(items);
-    const xs = [...new Set(items.map((i) => out.get(i.id).x))];
-    assert.equal(xs.length, 2, 'exactly two column x positions');
-    // Group by column and verify vertical stacks never overlap.
-    for (const x of xs) {
+    // Auto items sit near one of the two column origins (0.04 and 0.51):
+    // the anti-grid jitter moves them by at most ±1.5% of board width.
+    const origins = [0.04, 0.51];
+    const colOf = (x) => (Math.abs(x - origins[0]) <= Math.abs(x - origins[1]) ? 0 : 1);
+    for (const item of items) {
+      const x = out.get(item.id).x;
+      assert.ok(Math.abs(x - origins[colOf(x)]) <= 0.016, `near a column origin: ${x}`);
+    }
+    // Group by nearest column and verify vertical stacks never overlap.
+    for (const c of [0, 1]) {
       const col = items
         .map((i) => out.get(i.id))
-        .filter((p) => p.x === x)
+        .filter((p) => colOf(p.x) === c)
         .sort((p, q) => p.y - q.y);
       for (let i = 1; i < col.length; i++) {
         assert.ok(col[i].y >= col[i - 1].y + col[i - 1].h, 'columns stack without overlap');

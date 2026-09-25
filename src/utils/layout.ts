@@ -1,4 +1,5 @@
 import { ItemWithAuthor } from '../types';
+import { seeded } from './id';
 import { rotationForItem } from './note';
 
 /** Reference board width in points; x/width are stored as fractions. */
@@ -51,7 +52,8 @@ type Dims = Pick<ItemWithAuthor, 'id' | 'type' | 'body' | 'title' | 'eventAt'>;
  *  post can never be given too little room and overlap its neighbour. */
 export type MeasuredHeights = Record<string, number>;
 
-/** Rough height estimate (ref points) at the given width fraction. */
+/** Rough height estimate (ref points) at the given width fraction. Mirrors the
+ *  handwriting size tiers in NotePaper so first paint doesn't jump. */
 export function estimateItemHeight(item: Dims, wFrac: number): number {
   const widthPx = wFrac * REF_W;
   const charsPerLine = Math.max(8, widthPx / 11);
@@ -65,13 +67,12 @@ export function estimateItemHeight(item: Dims, wFrac: number): number {
     case 'date':
       return 40 + 28 * lines(item.title, 3) + 54;
     default: {
-      // Short one-liners render big (hero treatment) — estimate accordingly so
-      // the first paint doesn't overlap before measured heights arrive.
       const trimmed = (item.body ?? '').trim();
       if (trimmed.length > 0 && trimmed.length <= 20 && !trimmed.includes('\n')) {
         return 60 + 40 * lines(item.body, 6);
       }
-      return 34 + 24 * lines(item.body, 6);
+      const perLine = trimmed.length <= 60 ? 30 : 24;
+      return (trimmed.length <= 60 ? 50 : 34) + perLine * lines(item.body, 6);
     }
   }
 }
@@ -99,9 +100,15 @@ export function computeBoardLayout(
     const column = bottoms[0] <= bottoms[1] ? 0 : 1;
     const columnX = column === 0 ? 0.04 : 0.04 + COLUMN_W + COLUMN_GAP;
     const manual = item.layout?.manual ? item.layout : null;
+    // Break the grid a little: nudge auto-placed items by a stable,
+    // per-item jitter. Manual spots are untouched, and settleNoOverlap still
+    // clamps x and prevents any overlap.
+    const rand = seeded(item.id + ':x');
+    const jitterX = (rand() - 0.5) * 0.03;
+    const jitterY = Math.round(rand() * 10);
     const settled = settleNoOverlap(
-      manual ? manual.x : columnX,
-      manual ? manual.y : bottoms[column],
+      manual ? manual.x : columnX + jitterX,
+      manual ? manual.y : bottoms[column] + jitterY,
       w,
       h,
       placed,

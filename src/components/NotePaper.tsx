@@ -2,9 +2,7 @@ import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { ItemWithAuthor, ListEntry } from '../types';
 import { colors, noteColors, fonts } from '../theme';
 import { FastenerView, fastenerForItem } from './Pin';
-import { MemberDot } from './MemberDot';
 import {
-  PaperVariant,
   formatEventTime,
   ticketDay,
   timeAgo,
@@ -14,6 +12,9 @@ import {
 type Props = {
   item: ItemWithAuthor;
   large?: boolean;
+  /** Bare paper for the pinned strip: no shadow, no fastener (the card
+   *  wrapper carries the shadow there so it isn't clipped). */
+  flat?: boolean;
   /** Floor for the rendered height, so small papers still fill their slot. */
   minHeight?: number;
   /** Show every checklist row instead of the first few. */
@@ -26,19 +27,13 @@ type Props = {
   photoUrl?: string | null;
 };
 
-const RADIUS: Record<PaperVariant, number> = {
-  note: 2,
-  list: 6,
-  appointment: 2,
-  photo: 4,
-};
-
 const TITLE_LINES = 3;
 const ENTRY_LIMIT = 6;
 
 export function NotePaper({
   item,
   large = false,
+  flat = false,
   minHeight,
   showAllEntries = false,
   maxEntries,
@@ -52,14 +47,23 @@ export function NotePaper({
   const age = timeAgo(item.createdAt);
 
   const isPhoto = variant === 'photo';
-  const isList = variant === 'list';
   const cardBg = item.color === 'paper' ? colors.paper : palette.bg;
   const borderColor = item.color === 'paper' ? colors.paperEdge : palette.edge;
 
   const bodyTrimmed = item.type === 'note' ? (item.body ?? '').trim() : '';
-  // A short one-liner note gets the big hero treatment.
-  const heroNote = bodyTrimmed.length > 0 && bodyTrimmed.length <= 20 && !bodyTrimmed.includes('\n');
-  const bodyFontSize = large ? 26 : heroNote ? 32 : item.type === 'note' ? 20 : 18;
+  const bodyLen = bodyTrimmed.length;
+  // Handwriting sized by length: a two-word note is a bold little slip, a
+  // sentence is smaller, anything longer is body size.
+  const bodyFontSize = large
+    ? 26
+    : item.type !== 'note'
+      ? 18
+      : bodyLen > 0 && bodyLen <= 20 && !bodyTrimmed.includes('\n')
+        ? 33
+        : bodyLen <= 60
+          ? 25
+          : 20;
+  const heroNote = !large && item.type === 'note' && bodyLen > 0 && bodyLen <= 20 && !bodyTrimmed.includes('\n');
 
   const rawName = item.author?.displayName?.trim();
   const authorName = rawName ? rawName : item.createdBy ? null : 'Former member';
@@ -72,26 +76,21 @@ export function NotePaper({
           backgroundColor: cardBg,
           borderColor,
           borderWidth: item.color === 'paper' ? 1 : 0,
-          shadowColor: palette.shadow,
-          borderRadius: RADIUS[variant],
+          borderTopLeftRadius: 3,
+          borderTopRightRadius: 5,
+          borderBottomRightRadius: 3,
+          borderBottomLeftRadius: 4,
           minHeight: minHeight ?? undefined,
           padding: large ? 22 : variant === 'photo' ? 14 : 16,
-          paddingTop: isList ? (large ? 34 : 30) : undefined,
         },
+        // boxShadow draws on both platforms; elevation would double-draw the
+        // shadow on Android, so it stays off the paper.
+        flat ? { boxShadow: undefined } : styles.raised,
       ]}
     >
-      <View accessible={false}>
-        <FastenerView fastener={fastenerForItem(item.id, variant)} />
-      </View>
-
-      {isList ? (
-        <View style={styles.holes} pointerEvents="none" accessible={false}>
-          {[0, 1, 2, 3, 4].map((i) => (
-            <View key={i} style={styles.tornHole}>
-              <View style={styles.tornSlit} />
-              <View style={styles.hole} />
-            </View>
-          ))}
+      {!flat ? (
+        <View accessible={false}>
+          <FastenerView fastener={fastenerForItem(item.id)} />
         </View>
       ) : null}
 
@@ -147,28 +146,9 @@ export function NotePaper({
       </View>
 
       {authorName || age ? (
-        <View style={styles.attribution}>
-          {authorName ? (
-            <>
-              <MemberDot
-                seed={item.createdBy ?? authorName}
-                name={authorName}
-                size={large ? 26 : 22}
-              />
-              <Text
-                numberOfLines={1}
-                style={[styles.signature, { color: palette.ink, fontSize: large ? 20 : 16 }]}
-              >
-                {authorName}
-              </Text>
-            </>
-          ) : null}
-          {age ? (
-            <Text style={[styles.age, { color: palette.ink }]}>
-              {authorName ? `· ${age}` : age}
-            </Text>
-          ) : null}
-        </View>
+        <Text numberOfLines={1} style={[styles.meta, { color: palette.ink }]}>
+          {[authorName, age].filter(Boolean).join(' · ')}
+        </Text>
       ) : null}
     </View>
   );
@@ -307,33 +287,14 @@ function ListBody({
 const styles = StyleSheet.create({
   paper: {
     borderWidth: 1,
-    // Deep, soft drop shadow so notes read as physically placed on the board
-    // rather than painted flat onto it.
-    shadowOpacity: 0.38,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 8,
+  },
+  // Two layers like real paper on a surface: a tight contact shadow where it
+  // touches, and a soft drop that falls below it. boxShadow draws on both
+  // platforms; elevation would double-draw the shadow on Android.
+  raised: {
+    boxShadow: '0 1px 1px rgba(0,0,0,0.08), 0 10px 18px -8px rgba(20,30,25,0.45)',
   },
   body: { flexGrow: 1, justifyContent: 'center' },
-  holes: {
-    position: 'absolute',
-    top: 0,
-    left: 18,
-    right: 18,
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    zIndex: 1,
-  },
-  tornHole: { alignItems: 'center', width: 12 },
-  tornSlit: { width: 5, height: 9, backgroundColor: colors.background, marginBottom: -3 },
-  hole: {
-    width: 11,
-    height: 11,
-    borderRadius: 6,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.divider,
-  },
   image: { width: '100%', marginBottom: 10, marginTop: 6, backgroundColor: colors.imageWash },
   text: { fontFamily: fonts.hand.semibold },
   photoCaption: { textAlign: 'center' },
@@ -382,13 +343,11 @@ const styles = StyleSheet.create({
   checkmark: { color: colors.paper, fontSize: 12, fontWeight: '800', marginTop: -1 },
   listText: { flex: 1, fontFamily: fonts.hand.regular, fontSize: 22, lineHeight: 24 },
   listMore: { fontFamily: fonts.ui.semibold, fontSize: 12, opacity: 0.6, marginTop: 8 },
-  attribution: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginTop: 12,
-    gap: 6,
+  meta: {
+    marginTop: 10,
+    fontFamily: fonts.ui.semibold,
+    fontSize: 11.5,
+    opacity: 0.7,
+    textAlign: 'right',
   },
-  signature: { flexShrink: 1, fontFamily: fonts.hand.semibold, opacity: 0.85 },
-  age: { fontFamily: fonts.ui.semibold, fontSize: 12, opacity: 0.65 },
 });

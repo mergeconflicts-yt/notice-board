@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { colors, boardColors, fonts } from '../../../theme';
@@ -345,6 +346,15 @@ export default function BoardScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: boardColors[board.color] }]} edges={['top']}>
+      {/* Left-to-right sheen so every shadow agrees on one light source. */}
+      <LinearGradient
+        colors={['rgba(255,255,255,0.16)', 'rgba(255,255,255,0)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.06)']}
+        locations={[0, 0.22, 0.78, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
       <View style={styles.header}>
         <Pressable
           hitSlop={8}
