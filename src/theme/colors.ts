@@ -62,18 +62,20 @@ export const colors = {
   black: '#000000',
 } as const;
 
-/** Paper palettes for the seven item colours. */
+/** Paper palettes for the seven item colours: main colour, ink, then the
+ *  shadow-side colour as the edge. (`peach` holds Announcement green — the
+ *  key names are internal only; the DB enum is untouched.) */
 export const noteColors: Record<
   ItemColor,
   { bg: string; ink: string; edge: string; shadow: string }
 > = {
-  butter: { bg: '#FCEFB4', ink: '#4A3E22', edge: '#E9D98F', shadow: 'rgba(168, 143, 66, 0.28)' },
-  blush: { bg: '#FAD9DD', ink: '#53343C', edge: '#EBBFC6', shadow: 'rgba(188, 124, 136, 0.28)' },
-  sage: { bg: '#DBEBCB', ink: '#2E4330', edge: '#C4D9AE', shadow: 'rgba(106, 138, 90, 0.26)' },
-  sky: { bg: '#D7E7F7', ink: '#263E57', edge: '#BBD3EC', shadow: 'rgba(94, 138, 182, 0.26)' },
-  lavender: { bg: '#E6E0F5', ink: '#3D3458', edge: '#CFC6E8', shadow: 'rgba(122, 108, 168, 0.26)' },
-  peach: { bg: '#FADFCB', ink: '#5A3A22', edge: '#EEC7A9', shadow: 'rgba(190, 130, 84, 0.26)' },
-  paper: { bg: '#FFFDF7', ink: '#3E362E', edge: '#EAE0CC', shadow: 'rgba(120, 108, 88, 0.22)' },
+  butter: { bg: '#FFF3A6', ink: '#4A3E22', edge: '#F2DF78', shadow: 'rgba(168, 143, 66, 0.28)' },
+  blush: { bg: '#F8DDE0', ink: '#53343C', edge: '#EEC5CA', shadow: 'rgba(188, 124, 136, 0.28)' },
+  sage: { bg: '#DDF3D5', ink: '#2E4330', edge: '#C6E5BC', shadow: 'rgba(106, 138, 90, 0.26)' },
+  sky: { bg: '#DCECF8', ink: '#263E57', edge: '#C5DDED', shadow: 'rgba(94, 138, 182, 0.26)' },
+  lavender: { bg: '#E9E0F6', ink: '#3D3458', edge: '#D7C9EC', shadow: 'rgba(122, 108, 168, 0.26)' },
+  peach: { bg: '#D4F0DC', ink: '#2F4A34', edge: '#BDE2C7', shadow: 'rgba(90, 140, 105, 0.28)' },
+  paper: { bg: '#FFFDF7', ink: '#3E362E', edge: '#F2EEE5', shadow: 'rgba(120, 108, 88, 0.22)' },
 };
 
 export const noteColorKeys = Object.keys(noteColors) as ItemColor[];
