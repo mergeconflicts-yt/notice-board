@@ -19,6 +19,7 @@ import { MemberDot } from '../../../components/MemberDot';
 import { AddNoteSheet, NoteDraft } from '../../../components/AddNoteSheet';
 import { BoardSwitcher } from '../../../components/BoardSwitcher';
 import { useBoard, randomId } from '../../../hooks/useBoard';
+import { useSession } from '../../../store/session';
 import { useToast } from '../../../store/toast';
 import { friendlyMessage, keepLonger as apiKeepLonger, signedPhotoUrl, uploadPhoto } from '../../../lib/api';
 import { rememberBoard } from '../../../lib/lastBoard';
@@ -50,11 +51,11 @@ function draftKey(draft: NoteDraft): string {
 export default function BoardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const boardId = id as string;
+  const me = useSession((s) => s.user);
   const insets = useSafeAreaInsets();
   const { height: windowH } = useWindowDimensions();
   const {
     board,
-    members,
     items,
     entries,
     loading,
@@ -377,19 +378,12 @@ export default function BoardScreen() {
 
         <Pressable
           hitSlop={8}
-          onPress={() => router.push(`/board/${boardId}/people`)}
-          style={styles.peopleBtn}
+          onPress={() => router.push('/profile')}
+          style={styles.profileBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Your profile and settings"
         >
-          {members.slice(0, 4).map((m, i) => (
-            <View key={m.userId} style={{ zIndex: 10 - i, marginLeft: i === 0 ? 0 : -8 }}>
-              <MemberDot seed={m.userId} name={m.user.displayName} size={30} />
-            </View>
-          ))}
-          {members.length > 4 ? (
-            <View style={[styles.moreStack, { marginLeft: -8 }]}>
-              <Text style={styles.moreText}>+{members.length - 4}</Text>
-            </View>
-          ) : null}
+          <MemberDot seed={me?.id ?? 'me'} name={me?.displayName ?? 'Someone'} size={36} />
         </Pressable>
       </View>
       <Text style={styles.tagline}>📌 Always here</Text>
@@ -495,18 +489,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 56,
   },
-  peopleBtn: { flexDirection: 'row', alignItems: 'center' },
-  moreStack: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  moreText: { fontFamily: fonts.ui.bold, fontSize: 11, color: colors.inkSoft },
+  profileBtn: { alignItems: 'center', justifyContent: 'center' },
   boardName: {
     fontFamily: fonts.hand.bold,
     fontSize: 30,

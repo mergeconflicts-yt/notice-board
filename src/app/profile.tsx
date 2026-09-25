@@ -99,6 +99,25 @@ export default function ProfileScreen() {
     }
   };
 
+  const confirmSignOut = () => {
+    // A guest identity has no sign-in to come back to, so warn that leaving
+    // loses the boards; a saved account just ends the session.
+    Alert.alert(
+      'Sign out?',
+      isGuest
+        ? 'You’ll lose this account and every board you’re on. This can’t be undone. Save your account first to keep them.'
+        : 'You’ll be signed out. Sign back in to get your boards again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign out',
+          style: 'destructive',
+          onPress: () => void signOutHere(),
+        },
+      ],
+    );
+  };
+
   const confirmDelete = () => {
     Alert.alert(
       'Delete your account?',
@@ -191,15 +210,15 @@ export default function ProfileScreen() {
               </Pressable>
             )}
           </View>
-        ) : (
-          <Pressable style={styles.darkRow} onPress={() => void signOutHere()}>
-            <MaterialCommunityIcons name="logout" size={20} color={colors.white} />
-            <Text style={styles.darkRowText}>Sign out</Text>
-          </Pressable>
-        )}
+        ) : null}
 
         <Pressable style={styles.nameLink} onPress={() => setEditingName((v) => !v)}>
           <Text style={styles.nameLinkText}>Your name</Text>
+        </Pressable>
+
+        <Pressable style={styles.signOutRow} onPress={confirmSignOut}>
+          <MaterialCommunityIcons name="logout" size={20} color={colors.ink} />
+          <Text style={styles.signOutText}>Sign out</Text>
         </Pressable>
 
         <Pressable style={styles.dangerRow} onPress={confirmDelete}>
@@ -268,18 +287,11 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   saveRowText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.ink },
-  darkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    height: 54,
-    borderRadius: 999,
-    backgroundColor: colors.ink,
-    marginTop: 22,
-  },
+  darkRow: { backgroundColor: colors.ink, borderColor: colors.ink },
   darkRowText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.white },
   nameLink: { marginTop: 24, paddingVertical: 10 },
+  signOutRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
+  signOutText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.ink },
   nameLinkText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.ink },
   dangerRow: { marginTop: 6, paddingVertical: 12 },
   dangerText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.danger },
