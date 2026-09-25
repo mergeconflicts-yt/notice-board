@@ -127,6 +127,19 @@ export const handleTints: Record<BoardColor, [string, string, string]> = {
   charcoal: ['#69645D', '#524E48', '#3A372F'],
 };
 
+/** Nameplate face per door colour: lighter enamel than the door with a
+ *  darker engraved edge and screw heads. */
+export const plateTints: Record<
+  BoardColor,
+  { bg: string; edge: string; screw: string; screwEdge: string }
+> = {
+  sage: { bg: '#CBDDBF', edge: '#8AA37C', screw: '#6E8F61', screwEdge: '#4E6A44' },
+  blue: { bg: '#C3D8EC', edge: '#7CA0C2', screw: '#5F86AC', screwEdge: '#42607E' },
+  clay: { bg: '#EAC9AE', edge: '#B9835C', screw: '#9C6846', screwEdge: '#73492E' },
+  cream: { bg: '#F4EAD2', edge: '#C4AC7E', screw: '#A8976F', screwEdge: '#7D6D49' },
+  charcoal: { bg: '#BDB8B0', edge: '#7E7972', screw: '#57534C', screwEdge: '#38352F' },
+};
+
 /** The single fastener everywhere: round magnets in fixed colours (used by Pin). */
 export const fastenerColors = {
   magnets: ['#E4572E', '#F2B134', '#2A9D8F', '#3D5A98', '#D96C95'],

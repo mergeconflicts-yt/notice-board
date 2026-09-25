@@ -4,6 +4,7 @@ export {
   colors,
   doorTints,
   handleTints,
+  plateTints,
   fastenerColors,
   memberColors,
   noteColors,

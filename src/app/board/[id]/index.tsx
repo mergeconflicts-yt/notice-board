@@ -11,7 +11,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { colors, fonts } from '../../../theme';
+import { colors, fonts, plateTints } from '../../../theme';
 import { BoardSection } from '../../../components/BoardSection';
 import { PinnedStrip } from '../../../components/PinnedStrip';
 import { FridgeDoor } from '../../../components/FridgeDoor';
@@ -352,6 +352,7 @@ export default function BoardScreen() {
   }
 
   const isEmpty = items.length === 0;
+  const plate = board ? plateTints[board.color] : plateTints.cream;
 
   return (
     <View style={[styles.safe, { backgroundColor: colors.seam }]}>
@@ -362,12 +363,14 @@ export default function BoardScreen() {
               <Pressable
                 hitSlop={8}
                 onPress={() => setSwitcherOpen(true)}
-                style={styles.boardTitle}
+                style={[styles.nameplate, { backgroundColor: plate.bg, borderColor: plate.edge }]}
                 accessibilityRole="button"
                 accessibilityLabel="Switch boards"
               >
+                <View style={[styles.screw, { backgroundColor: plate.screw, borderColor: plate.screwEdge }]} />
                 <Text style={styles.boardName} numberOfLines={1}>{board.name}</Text>
-                <MaterialCommunityIcons name="chevron-down" size={22} color={colors.ink} />
+                <MaterialCommunityIcons name="chevron-down" size={18} color={colors.inkSoft} />
+                <View style={[styles.screw, { backgroundColor: plate.screw, borderColor: plate.screwEdge }]} />
               </Pressable>
 
               <Pressable
@@ -488,11 +491,31 @@ const styles = StyleSheet.create({
   profileBtn: { alignItems: 'center', justifyContent: 'center' },
   boardName: {
     fontFamily: fonts.hand.bold,
-    fontSize: 30,
+    fontSize: 24,
     color: colors.ink,
     flexShrink: 1,
+    textAlign: 'center',
   },
-  boardTitle: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  // Enamel door nameplate screwed onto the top door, tinted with the fridge.
+  nameplate: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    marginRight: 10,
+    boxShadow: '0 2px 3px rgba(0,0,0,0.3)',
+  },
+  screw: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
   tagline: {
     fontFamily: fonts.ui.regular,
     fontSize: 13,
