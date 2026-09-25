@@ -17,6 +17,17 @@ type Props = {
  * caller's boards with member counts, New board, Join with an invite, and
  * Board settings.
  */
+export function boardAcronym(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '?';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return words
+    .slice(0, 3)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+}
+
 export function BoardSwitcher({ visible, currentBoardId, onClose }: Props) {
   const { boards, reload } = useMyBoards();
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -68,7 +79,9 @@ export function BoardSwitcher({ visible, currentBoardId, onClose }: Props) {
                 accessibilityRole="button"
                 accessibilityLabel={`Open ${b.name}`}
               >
-                <View style={[styles.chip, { backgroundColor: boardColors[b.color] }]} />
+                <View style={[styles.chip, { backgroundColor: boardColors[b.color] }]}>
+                  <Text style={styles.chipText}>{boardAcronym(b.name)}</Text>
+                </View>
                 <View style={styles.rowText}>
                   <Text style={styles.name} numberOfLines={1}>
                     {b.name}
@@ -178,7 +191,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: colors.border,
   },
-  chip: { width: 46, height: 46, borderRadius: 12 },
+  chip: {
+    width: 46,
+    height: 46,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.ink },
   rowText: { flex: 1 },
   name: { fontFamily: fonts.ui.semibold, fontSize: 17, color: colors.ink },
   sub: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.inkSoft, marginTop: 2 },

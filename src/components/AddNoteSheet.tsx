@@ -13,8 +13,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { DateTimePopup } from './DateTimePopup';
 import { colors, fonts, noteColors, noteColorKeys } from '../theme';
 import { ItemColor, ItemType, ItemWithAuthor } from '../types';
 import { colorForItem, parseListItems } from '../utils/note';
@@ -100,7 +100,8 @@ export function AddNoteSheet({
   const [eventAt, setEventAt] = useState<Date>(() => defaultEventAt());
   const [pinned, setPinned] = useState(false);
   const [keepExtra, setKeepExtra] = useState(0);
-  const [openPicker, setOpenPicker] = useState<'date' | 'time' | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
   const [picking, setPicking] = useState(false);
   const [wasOpen, setWasOpen] = useState(false);
   const rowInputRefs = useRef(new Map<string, TextInput | null>());
@@ -139,13 +140,41 @@ export function AddNoteSheet({
         setEventAt(defaultEventAt());
       }
       setPhotoUri(null);
-      setOpenPicker(null);
+      setPickerOpen(false);
       setPinned(false);
       setKeepExtra(0);
     }
   }
 
   const cycleKeep = () => setKeepExtra((e) => (e + 1) % KEEP_STOPS);
+
+  const openDatePicker = () => {
+    setPickerMode('date');
+    setPickerOpen(true);
+  };
+
+  const openTimePicker = () => {
+    setPickerMode('time');
+    setPickerOpen(true);
+  };
+
+  const confirmPickedDate = (selected: Date) => {
+    setEventAt((prev) => {
+      const next = new Date(prev);
+      next.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
+      return next;
+    });
+    setPickerOpen(false);
+  };
+
+  const confirmPickedTime = (selected: Date) => {
+    setEventAt((prev) => {
+      const next = new Date(prev);
+      next.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
+      return next;
+    });
+    setPickerOpen(false);
+  };
 
   // Focus a freshly added row once it has mounted, and keep it in view.
   useEffect(() => {
@@ -464,8 +493,10 @@ export function AddNoteSheet({
                 </View>
                 <View style={styles.dtRow}>
                   <Pressable
-                    style={[styles.dtTrigger, openPicker === 'date' && styles.dtTriggerActive]}
-                    onPress={() => setOpenPicker((p) => (p === 'date' ? null : 'date'))}
+                    style={[styles.dtTrigger, pickerOpen && pickerMode === 'date' && styles.dtTriggerActive]}
+                    onPress={openDatePicker}
+                    accessibilityRole="button"
+                    accessibilityLabel="Pick a date"
                   >
                     <MaterialCommunityIcons name="calendar-month-outline" size={20} color={colors.accentDeep} />
                     <Text style={styles.dtTriggerText}>
@@ -473,8 +504,10 @@ export function AddNoteSheet({
                     </Text>
                   </Pressable>
                   <Pressable
-                    style={[styles.dtTrigger, openPicker === 'time' && styles.dtTriggerActive]}
-                    onPress={() => setOpenPicker((p) => (p === 'time' ? null : 'time'))}
+                    style={[styles.dtTrigger, pickerOpen && pickerMode === 'time' && styles.dtTriggerActive]}
+                    onPress={openTimePicker}
+                    accessibilityRole="button"
+                    accessibilityLabel="Pick a time"
                   >
                     <MaterialCommunityIcons name="clock-outline" size={20} color={colors.accentDeep} />
                     <Text style={styles.dtTriggerText}>
@@ -482,26 +515,16 @@ export function AddNoteSheet({
                     </Text>
                   </Pressable>
                 </View>
-                {openPicker ? (
-                  <DateTimePicker
-                    value={eventAt}
-                    mode={openPicker}
-                    display={Platform.OS === 'ios' ? 'inline' : 'default'}
-                    minimumDate={todayStart}
-                    onValueChange={(_e, selected) => {
-                      setEventAt((prev) => {
-                        const next = new Date(prev);
-                        if (openPicker === 'date') {
-                          next.setFullYear(selected.getFullYear(), selected.getMonth(), selected.getDate());
-                        } else {
-                          next.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
-                        }
-                        return next;
-                      });
-                      if (Platform.OS === 'android') setOpenPicker(null);
-                    }}
-                  />
-                ) : null}
+                <DateTimePopup
+                  visible={pickerOpen}
+                  mode={pickerMode}
+                  onModeChange={setPickerMode}
+                  value={eventAt}
+                  minimumDate={todayStart}
+                  onConfirmDate={confirmPickedDate}
+                  onConfirmTime={confirmPickedTime}
+                  onClose={() => setPickerOpen(false)}
+                />
               </View>
             ) : null}
           </ScrollView>

@@ -34,7 +34,6 @@
           "photosPermission": "Allow Notice Board to access your photos so you can pin pictures to the board."
         }
       ],
-      "@react-native-community/datetimepicker",
       "expo-secure-store"
     ]
   }

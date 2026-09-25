@@ -118,7 +118,9 @@ export function BoardNote({
       // eslint-disable-next-line react-hooks/refs -- gesture callbacks run off-render
       .onUpdate((e) => {
         const x = startRef.current.x + e.translationX;
-        const y = startRef.current.y + e.translationY;
+        // Never let a held note cross the divider into the pinned strip:
+        // clamp its top edge to the section's top.
+        const y = Math.max(0, startRef.current.y + e.translationY);
         posRef.current = { x, y };
         posX.setValue(x);
         posY.setValue(y);

@@ -22,6 +22,10 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+html { -webkit-text-size-adjust: 100%; }
+
+img { max-width: 100%; }
+
 body {
   font-family: var(--ui);
   background: var(--bg);
@@ -30,6 +34,7 @@ body {
   color: var(--ink);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
 }
 
 .hand { font-family: var(--hand); font-weight: 600; }
@@ -44,6 +49,17 @@ body {
 }
 
 .section { max-width: 1120px; margin: 0 auto; padding: 4.5rem 1.5rem; }
+.section-tight-bottom { padding-bottom: 1.5rem; }
+.section-tight-top { padding-top: 1.5rem; }
+/* alternating full-bleed bands: wrap a section in .band > .section */
+.band { padding: 0; }
+.band-cream { background: #F7EFDD; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.band-white { background: var(--paper); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.band-sage { background: #EDF3E6; border-top: 1px solid #DCE5D2; border-bottom: 1px solid #DCE5D2; }
+/* handwritten bridge stitching the pain section to the fix section */
+.section-connector { text-align: center; padding: 0.5rem 1rem 0; color: var(--ink-soft); }
+.section-connector p { font-size: 1.6rem; transform: rotate(-2deg); }
+.connector-arrow { font-size: 1.8rem; color: var(--accent-deep); line-height: 1; }
 .section-title { font-size: clamp(2.4rem, 5vw, 3.6rem); line-height: 1.05; margin-bottom: 1.5rem; }
 .lede { color: var(--ink-soft); font-size: 1.05rem; max-width: 34rem; }
 
@@ -67,15 +83,16 @@ body {
 .btn-dark { background: var(--dark); color: #fff; }
 .btn-small { padding: 0.5rem 1.1rem; font-size: 0.9rem; }
 
-/* hero — both columns share one row height so fridge matches the copy panel */
+/* hero — copy panel wider, fridge narrower, same row height */
 .hero {
   max-width: 1200px; margin: 0 auto; padding: 3rem 1.5rem 4rem;
-  display: grid; grid-template-columns: 1fr 1.05fr; gap: 3rem; align-items: stretch;
+  display: grid; grid-template-columns: 1.25fr 0.8fr; gap: 3rem; align-items: stretch;
 }
-.hero-title { font-size: clamp(3.2rem, 7vw, 5.4rem); line-height: 1.02; margin: 0.3rem 0 1rem; }
-.hl { background: linear-gradient(transparent 55%, #f3d9c8 55%); padding: 0 0.15em; }
-.no-list { list-style: none; margin: 1.2rem 0 1.6rem; display: flex; flex-wrap: wrap; gap: 0.5rem 1.4rem; font-weight: 700; font-size: 0.95rem; }
-.x { color: var(--accent-deep); margin-right: 0.35rem; }
+/* hero struck list: struck items smaller, closing line on one row */
+.hero-struck { font-size: clamp(2.6rem, 4.5vw, 3.6rem); line-height: 1.22; margin: 0.6rem 0 1rem; }
+.hero-struck .crossed { font-size: 0.72em; }
+.hero-copy .lede { margin-bottom: 1.4rem; }
+.hero-copy .store-row { margin-bottom: 0.2rem; }
 .store-row { display: flex; gap: 0.8rem; flex-wrap: wrap; }
 .store-row.center { justify-content: center; }
 .store-btn {
@@ -90,13 +107,10 @@ body {
 .guest-note { margin-top: 0.9rem; font-size: 0.9rem; color: var(--ink-soft); }
 .tick { color: #6aa84f; font-weight: 800; }
 
-/* stage: unclipped wrapper around the fridge so intro popups can spill over */
-.fridge-stage { position: relative; flex: 1; display: flex; flex-direction: column; }
+/* stage: unclipped wrapper around the fridge so intro popups can spill over.
+   One unified soft shadow lives here so both doors cast together. */
+.fridge-stage { position: relative; flex: 1; display: flex; flex-direction: column; filter: drop-shadow(0 18px 22px rgba(92, 76, 54, 0.28)); }
 .hero-board { position: relative; display: flex; flex-direction: column; }
-.hero-board::after {
-  content: ''; display: block; height: 22px; margin-top: -4px;
-  background: radial-gradient(ellipse at center, rgba(62, 54, 46, 0.3), transparent 70%);
-}
 .fridge {
   position: relative;
   flex: 1;
@@ -122,7 +136,7 @@ body {
   position: relative; padding: 2.2rem 1rem 1rem 3.4rem;
   background: linear-gradient(135deg, #d8e5cd 0%, var(--board-sage) 35%, #b3c8a4 100%);
   border: none;
-  box-shadow: inset 0 2px 2px rgba(255, 255, 255, 0.7), inset 0 -4px 8px rgba(62, 54, 46, 0.18), 0 30px 60px var(--shadow);
+  box-shadow: inset 0 2px 2px rgba(255, 255, 255, 0.7), inset 0 -4px 8px rgba(62, 54, 46, 0.18);
   overflow: hidden;
 }
 /* enamel sheen per door */
@@ -131,12 +145,13 @@ body {
   background: linear-gradient(105deg, transparent 55%, rgba(255, 255, 255, 0.28) 78%, transparent 92%);
 }
 .fridge-top {
-  flex: 32; display: flex; gap: 0.8rem; align-content: start;
+  flex: 24; display: flex; gap: 0.8rem; align-items: flex-start; align-content: start;
   border-radius: 36px 36px 16px 16px;
   margin-bottom: -10px; z-index: 2;
+  padding-top: 3.2rem;
 }
 .fridge-bottom {
-  flex: 68; display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; align-content: start;
+  flex: 76; display: grid; grid-template-columns: 1.35fr 1fr; gap: 0.8rem; align-items: start; align-content: start;
   border-radius: 16px 16px 36px 36px;
   margin-top: -10px; z-index: 2;
 }
@@ -146,26 +161,35 @@ body {
   background: #2b2620;
   z-index: 1;
 }
-/* shrink papers slightly inside the fridge so all six notes fit the doors */
-.fridge-door .paper { padding: 16px 12px 8px; }
-.fridge-door .note-body { font-size: 21px; }
-.fridge-door .note-hero { font-size: 24px; }
-.fridge-door .list-title { font-size: 21px; line-height: 24px; }
-.fridge-door .entry { font-size: 17px; line-height: 20px; padding: 4px 0 3px; }
-.fridge-door .checkbox { width: 16px; height: 16px; }
-.fridge-door .cal-day { font-size: 24px; line-height: 26px; }
-.fridge-door .ticket-title { font-size: 17px; line-height: 20px; }
-.fridge-door .ticket-time { font-size: 15px; line-height: 18px; }
-.fridge-door .photo-img { margin: 4px 0 6px; }
-.fridge-door .photo-cap { font-size: 15px; }
-.fridge-door .meta { margin-top: 6px; }
+/* shrunken type shared by door notes and lifted (free) notes */
+.fridge .paper { padding: 16px 12px 8px; align-self: start; justify-self: stretch; max-width: 100%; }
+.fridge .note-body { font-size: 21px; }
+.fridge .note-hero { font-size: 24px; }
+.fridge .list-title { font-size: 23px; line-height: 26px; font-weight: 600; }
+.fridge .entry { font-size: 19px; line-height: 22px; padding: 4px 0 3px; font-weight: 600; }
+.fridge .entry-text { font-weight: 600; }
+.fridge .checkbox { width: 16px; height: 16px; }
+.fridge .cal-day { font-size: 24px; line-height: 26px; }
+.fridge .ticket-title { font-size: 17px; line-height: 20px; }
+.fridge .ticket-time { font-size: 15px; line-height: 18px; }
+.fridge .photo-card { justify-self: stretch; }
+.fridge .photo-img { margin: 4px 0 6px; aspect-ratio: 1 / 1; }
+.fridge .photo-cap { font-size: 16px; font-weight: 700; }
+.fridge .meta { margin-top: 6px; }
+/* free notes: lifted out of the door flow, pinned anywhere on the fridge */
+.fridge .paper.free {
+  position: absolute; margin: 0; z-index: 20;
+  cursor: grabbing;
+}
+/* invisible placeholder keeps the door layout frozen while a note is lifted */
+.drag-placeholder { flex: none; visibility: hidden; pointer-events: none; }
 /* vertical bar handles — one per door, aligned on the left */
 .handle {
   position: absolute; left: 18px; width: 16px; border-radius: 9px;
   background: linear-gradient(90deg, #faf8f3 0%, #e6e1d4 30%, #c6c0b0 62%, #9d9787 100%);
   box-shadow: 2px 3px 5px rgba(0, 0, 0, 0.35), inset 0 1px 1px #fff, inset 0 -1px 1px rgba(0, 0, 0, 0.2);
 }
-.fridge-top .handle { top: 32px; height: 120px; }
+.fridge-top .handle { bottom: 28px; height: 120px; }
 .fridge-bottom .handle { top: 28px; height: 190px; }
 
 /* ---- papers: faithful to NotePaper + Pin in the app ----
@@ -255,13 +279,12 @@ body {
 .ticket-time { font-size: 19px; line-height: 23px; font-weight: 700; margin-top: 2px; }
 .ticket-place { font-family: var(--ui); font-weight: 600; font-size: 14px; margin-top: 6px; opacity: 0.85; }
 
-/* photo: 4:3 image, centred caption */
+/* photo: real image, centred caption */
 .photo-img {
   position: relative; width: 100%; aspect-ratio: 4 / 3; border-radius: 2px;
-  margin: 6px 0 10px; overflow: hidden;
-  background: linear-gradient(#a9cdf0 55%, #4e8a5a 55%, #4e8a5a 72%, #c9a86a 72%);
+  margin: 6px 0 10px; overflow: hidden; background: #e8e2d4;
 }
-.sun { position: absolute; top: 22%; left: 18%; width: 26px; height: 26px; border-radius: 50%; background: #ffd94d; box-shadow: 0 0 12px #ffd94d; }
+.photo-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .photo-cap { text-align: center; font-size: 18px; }
 
 /* attribution: "Dad · 2 h" */
@@ -271,8 +294,8 @@ body {
 }
 
 .link-btn { background: none; border: none; color: var(--ink-soft); font: inherit; font-size: 0.85rem; font-weight: 700; text-decoration: underline; cursor: pointer; margin-top: 0.8rem; }
-.scribble { font-size: 1.2rem; color: var(--ink-soft); text-align: right; margin-top: 0.2rem; }
-.scribble-arrow { display: inline-block; transform: rotate(40deg); }
+.hero-board .scribble { font-size: 1.2rem; color: var(--ink-soft); text-align: left; margin-top: 0.6rem; padding-left: 2.5rem; }
+.scribble-arrow { display: inline-block; transform: rotate(-35deg); }
 
 /* ---- hero intro: frosted veil -> fast pops -> simultaneous strike ->
    "Only what matters" -> veil lifts. Everything quick. ---- */
@@ -324,21 +347,64 @@ body {
 .fridge-stage.revealing .reveal-note { animation: note-drop 0.35s cubic-bezier(0.34, 1.4, 0.64, 1) forwards; }
 @keyframes note-drop { to { transform: translate(-50%, 0) rotate(-2deg) scale(1); opacity: 1; } }
 .fridge-stage.revealing .reveal-note { pointer-events: auto; }
+/* "Only what matters" zips away fast while the real posts land together */
+.fridge-stage.note-leaving .reveal-note { animation: note-away 0.28s ease-in forwards; pointer-events: none; }
+@keyframes note-away { to { transform: translate(-50%, -60vh) rotate(6deg) scale(0.9); opacity: 0; } }
+/* fridge starts empty: posts hidden (but still laying out the doors) */
+.fridge-stage.intro-empty .fridge-door .paper { opacity: 0; visibility: hidden; }
+/* all posts pin in at once while the note exits */
+.fridge-stage.posts-in .fridge-door .paper {
+  visibility: visible;
+  animation: post-pin 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes post-pin {
+  from { opacity: 0; transform: rotate(var(--r, 0deg)) scale(0.4) translateY(-18px); }
+  to { opacity: 1; transform: rotate(var(--r, 0deg)) scale(1) translateY(0); }
+}
 
 /* legacy noise toggle state (kept for the replay button wiring) */
 .noise-layer { display: none; }
 
-/* compare */
+/* buried — real moments lost in chat */
+.buried-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; margin-top: 2rem; }
+.buried-card {
+  background: #fff; border: 1px solid var(--border); border-radius: 16px;
+  padding: 1.4rem 1.3rem; box-shadow: 0 8px 20px var(--shadow);
+  transform: rotate(var(--br, 0deg));
+}
+.buried-card:nth-child(1) { --br: -0.8deg; }
+.buried-card:nth-child(2) { --br: 0.7deg; }
+.buried-card:nth-child(3) { --br: -0.5deg; }
+.buried-who { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent-deep); margin-bottom: 0.5rem; }
+.buried-text { font-size: 1.5rem; line-height: 1.25; margin-bottom: 0.6rem; }
+.buried-result { font-size: 0.92rem; color: var(--ink-soft); }
+
+/* compare — WhatsApp-style chat mock */
 .compare { display: grid; grid-template-columns: 1fr auto 1fr; gap: 2rem; align-items: center; margin-top: 2rem; }
 .chat-mock { background: #fff; border-radius: 18px; box-shadow: 0 12px 28px var(--shadow); overflow: hidden; }
-.chat-head { display: flex; justify-content: space-between; align-items: center; padding: 0.8rem 1rem; border-bottom: 1px solid var(--border); }
-.unread { background: #d9564a; color: #fff; font-size: 0.75rem; font-weight: 800; border-radius: 999px; padding: 0.1rem 0.55rem; }
-.chat-body { padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
-.msg p { background: #f4f1ea; border-radius: 10px; padding: 0.4rem 0.7rem; font-size: 0.9rem; max-width: 90%; }
-.msg small { font-size: 0.7rem; color: var(--ink-soft); display: block; margin-bottom: 0.1rem; }
-.msg.right { align-self: flex-end; }
-.msg.right .pill { background: #ddf3d5; }
-.msg.highlight p { border: 2px solid #f2b134; background: #fff8e6; }
+.chat-head { display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem 0.9rem; background: #075E54; color: #fff; }
+.chat-avatar { width: 34px; height: 34px; border-radius: 50%; background: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; }
+.chat-name { display: flex; flex-direction: column; line-height: 1.2; margin-right: auto; }
+.chat-name strong { font-size: 0.95rem; }
+.chat-name small { font-size: 0.7rem; opacity: 0.8; }
+.unread { background: #25D366; color: #075E54; font-size: 0.72rem; font-weight: 800; border-radius: 999px; padding: 0.1rem 0.5rem; }
+.chat-body {
+  padding: 0.9rem 0.8rem; display: flex; flex-direction: column; gap: 0.35rem;
+  background-color: #ECE5DD;
+  background-image: radial-gradient(rgba(7, 94, 84, 0.07) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+.chat-day { text-align: center; margin-bottom: 0.3rem; }
+.chat-day span { background: #D1E7DD; color: #54656F; font-size: 0.68rem; font-weight: 700; border-radius: 8px; padding: 0.15rem 0.6rem; box-shadow: 0 1px 1px rgba(0,0,0,.15); }
+.msg { display: flex; flex-direction: column; align-items: flex-start; }
+.msg p { background: #fff; border-radius: 0 10px 10px 10px; padding: 0.35rem 0.6rem 0.3rem; font-size: 0.86rem; max-width: 88%; box-shadow: 0 1px 1px rgba(0,0,0,.18); }
+.wmeta { display: inline-flex; align-items: baseline; gap: 0.25rem; float: right; margin: 0.55rem 0 0 0.6rem; }
+.wtime { font-size: 0.62rem; color: #8696A0; white-space: nowrap; }
+.wticks { font-size: 0.72rem; font-weight: 700; color: #53bdeb; letter-spacing: -2px; }
+.msg small { font-size: 0.68rem; font-weight: 800; color: #00A884; margin: 0 0 0.05rem 0.2rem; }
+.msg.right { align-self: flex-end; align-items: flex-end; }
+.msg.right p { background: #DCF8C6; border-radius: 10px 0 10px 10px; }
+.msg.highlight p { border: 2px solid #F2B134; background: #FFF8E6; }
 .chat-mock figcaption, .compare-note figcaption { padding: 0.8rem 1rem 1rem; color: var(--ink-soft); font-size: 0.9rem; }
 .compare-arrow { font-size: 2.5rem; color: var(--accent-deep); }
 .compare-note { text-align: center; }
@@ -354,18 +420,11 @@ body {
 .crossed { position: relative; color: var(--ink-soft); }
 .crossed::after { content: ''; position: absolute; left: -2%; right: -2%; top: 52%; height: 4px; background: var(--accent-deep); border-radius: 2px; transform: rotate(-2deg); }
 .kept { color: var(--ink); }
-.rules-card { padding: 2.4rem 2rem 1.2rem; max-width: 26rem; justify-self: center; width: 100%; }
-.rules-card h3 { font-size: 1.9rem; margin-bottom: 0.8rem; }
-.rules { list-style: none; counter-reset: r; display: flex; flex-direction: column; gap: 0.5rem; font-size: 1.3rem; }
-.rules li { counter-increment: r; }
-.rules li::before { content: counter(r) '.'; color: var(--brown); margin-right: 0.5rem; }
-
-/* kinds + tags — always one row of four */
-.kinds { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.2rem; margin-top: 2rem; }
-.kinds .paper { padding: 28px 18px 20px; min-width: 0; }
-.kinds h3 { font-size: 1.7rem; margin-bottom: 0.3rem; }
-.kinds .paper > p { font-size: 0.92rem; font-family: var(--ui); font-weight: 400; }
-
+.kept-noise {
+  background: linear-gradient(transparent 55%, #f3d9c8 55%);
+  padding: 0 0.12em;
+  font-size: 1.18em;
+}
 /* tidy */
 .tidy { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; }
 .expiry { margin: 1.5rem 0; display: flex; flex-direction: column; gap: 0.7rem; }
@@ -418,16 +477,61 @@ body {
 .footer a { color: inherit; text-decoration: none; }
 
 @media (max-width: 900px) {
+  .section { padding: 3rem 1.25rem; }
+  .nav { gap: 1rem; padding: 0.7rem 1rem; }
   .nav-links { display: none; }
-  .hero, .struck, .tidy { grid-template-columns: 1fr; }
+  .hero { grid-template-columns: 1fr; gap: 2rem; padding: 2rem 1.25rem 3rem; }
   .hero-board { min-height: 560px; }
+  .fridge-door { padding-left: 2.8rem; }
   .compare { grid-template-columns: 1fr; }
   .compare-arrow { transform: rotate(90deg); text-align: center; }
   .trio, .steps, .privacy-grid { grid-template-columns: 1fr 1fr; }
-  .kinds { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.8rem; overflow-x: auto; }
-  .kinds .paper { min-width: 200px; }
+  .buried-grid { grid-template-columns: 1fr 1fr; }
+  .struck { grid-template-columns: 1fr; }
+  .tidy { grid-template-columns: 1fr; gap: 2rem; }
+  .expiry div { grid-template-columns: 80px 1fr; gap: 0.75rem; }
 }
 @media (max-width: 600px) {
+  .section { padding: 2.5rem 1rem; }
+  .section-title { font-size: clamp(2rem, 9vw, 2.6rem); }
+  .nav .btn-small { padding: 0.45rem 0.9rem; font-size: 0.82rem; }
+  .brand-name { font-size: 1.25rem; }
+  .hero { padding: 1.5rem 1rem 2.5rem; gap: 1.5rem; }
+  .hero-struck { font-size: clamp(2rem, 10vw, 2.6rem); }
+  .store-row .store-btn { flex: 1 1 100%; justify-content: center; }
+  /* fridge stays 2-column and compact on phones instead of stacking tall */
+  .hero-board { min-height: 0; }
+  .fridge { flex: none; }
+  .fridge-door { padding: 2.6rem 0.6rem 0.6rem 2rem; }
+  .fridge-top { flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; min-height: 220px; align-content: center; }
+  .fridge-bottom { flex: none; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+  .handle { left: 10px; width: 12px; }
+  .fridge-top .handle { bottom: 16px; height: 80px; }
+  .fridge-bottom .handle { top: 16px; height: 120px; }
+  .fridge .paper { padding: 12px 8px 6px; }
+  .fridge .note-body { font-size: 17px; }
+  .fridge .note-hero { font-size: 19px; }
+  .fridge .list-title { font-size: 18px; line-height: 21px; }
+  .fridge .entry { font-size: 15px; line-height: 18px; padding: 3px 0 2px; }
+  .fridge .checkbox { width: 14px; height: 14px; }
+  .fridge .cal-day { font-size: 20px; line-height: 22px; }
+  .fridge .ticket-title { font-size: 15px; line-height: 18px; }
+  .fridge .ticket-time { font-size: 13px; line-height: 16px; }
+  .fridge .photo-cap { font-size: 13px; }
+  .fridge .photo-img { aspect-ratio: 1 / 1; }
+  .fridge .meta { font-size: 10px; }
+  .board-tag { top: 14px; right: 16px; }
+  .chat-pop { max-width: 70%; font-size: 0.72rem; }
+  .reveal-note { width: min(240px, 80%); }
   .trio, .steps, .privacy-grid { grid-template-columns: 1fr; }
-  .fridge-bottom { grid-template-columns: 1fr; }
+  .buried-grid { grid-template-columns: 1fr; }
+  .compare { gap: 1rem; }
+  .big-note { display: block; }
+  .mini-board { padding: 2rem 1.25rem; }
+  .tags { gap: 0.6rem; }
+  .tag { font-size: 1.15rem; }
+  .faq summary { font-size: 1rem; }
+  .cta { padding: 3.5rem 1rem 4rem; }
+  .footer { flex-direction: column; gap: 0.5rem; text-align: center; }
+  .footer nav { gap: 1rem; }
 }

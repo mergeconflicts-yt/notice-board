@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Notice Board — Just the information. None of the noise.</title>
-<meta name="description" content="The shopping list, the Wi-Fi password, Saturday's plan. Pinned where everyone can see them, not buried 200 messages up in the family chat." />
+<title>Notice Board — Just what everyone needs to know.</title>
+<meta name="description" content="No replies, no reactions, no read receipts, no buzz for every post. Just what everyone needs to know, pinned on the family board." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
@@ -15,6 +15,7 @@
 <header class="nav">
   <a class="brand" href="#top"><span class="brand-pin" aria-hidden="true"></span><span class="hand brand-name">Notice Board</span></a>
   <nav class="nav-links">
+    <a href="#buried">Lost it?</a>
     <a href="#no-noise">No noise</a>
     <a href="#how-it-works">How it works</a>
     <a href="#privacy">Privacy</a>
@@ -28,14 +29,16 @@
   <!-- 1 · HERO -->
   <section class="hero">
     <div class="hero-copy">
-      <p class="eyebrow">The fridge door, in everyone's pocket</p>
-      <h1 class="hand hero-title">Just the<br />information.<br /><span class="hl">None of the</span><br /><span class="hl">noise.</span></h1>
-      <p class="lede">The shopping list, the Wi-Fi password, Saturday's plan. Pinned where everyone can see them, not buried 200 messages up in the family chat.</p>
-      <ul class="no-list">
-        <li><span class="x" aria-hidden="true">✕</span> No chats or replies</li>
-        <li><span class="x" aria-hidden="true">✕</span> No pings for every post</li>
-        <li><span class="x" aria-hidden="true">✕</span> Nothing buried in scroll</li>
-      </ul>
+      <p class="eyebrow">Fridge door, in everyone's pocket</p>
+      <p class="hand struck-list hero-struck">
+        <span class="crossed">Replies</span><br />
+        <span class="crossed">Reactions</span><br />
+        <span class="crossed">Read receipts</span><br />
+        <span class="crossed">A buzz for every post</span><br />
+        <span class="kept">Just Notes.</span>
+        <span class="kept kept-noise">No Noise.</span>
+      </p>
+      <p class="lede">These aren't settings you have to find. The app simply doesn't have them, so the board can't turn into another chat.</p>
       <div class="store-row">
         <a class="store-btn" href="#get-the-app" aria-label="Download on the App Store">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="11" y="18" x2="13" y="18"/></svg>
@@ -84,7 +87,7 @@
           <div class="paper c-sky drag" style="--r:1deg; --px:48%"><span class="pin pin-yellow"></span>
             <div class="ticket">
               <div class="cal"><div class="cal-dow">SAT</div><div class="cal-day">26</div><div class="cal-mon">SEP</div></div>
-              <div><div class="day-label">SATURDAY</div><p class="ticket-title">Dentist</p><p class="ticket-time">10:30 AM</p></div>
+              <div><p class="ticket-title">Dentist</p><p class="ticket-time">10:30 AM</p></div>
             </div>
             <p class="meta">Mom · Yesterday</p>
           </div>
@@ -93,10 +96,10 @@
             <p class="note-body">Grandma visits Saturday ♥</p>
             <p class="meta">Riya · 3 h</p>
           </div>
-          <!-- photo: 4:3 image + centred caption -->
-          <div class="paper c-paper drag" style="--r:2deg; --px:44%"><span class="pin pin-pink"></span>
-            <div class="photo-img" aria-hidden="true"><span class="sun"></span></div>
-            <p class="photo-cap">Goa!</p>
+          <!-- photo: real image + heart caption -->
+          <div class="paper c-paper drag photo-card" style="--r:2deg; --px:44%"><span class="pin pin-pink"></span>
+            <div class="photo-img"><img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80&auto=format&fit=crop" alt="Beach at sunset" loading="lazy" /></div>
+            <p class="photo-cap">Goa! ♥</p>
             <p class="meta">Dad · 5 h</p>
           </div>
         </div>
@@ -116,25 +119,60 @@
         <p class="meta">Notice Board · pinned</p>
       </div>
       </div>
-      <button class="link-btn" id="noiseToggle" type="button"><span aria-hidden="true">↺</span> <span id="noiseLabel">Replay the intro</span></button>
-      <p class="hand scribble" aria-hidden="true">go on, move them <span class="scribble-arrow">⤵</span></p>
+      <p class="hand scribble" aria-hidden="true"><span class="scribble-arrow">⤴</span> go on, move them</p>
     </div>
   </section>
 
-  <!-- 2 · NO NOISE -->
-  <section class="section" id="no-noise">
-    <p class="eyebrow">Only information. No noise.</p>
+  <!-- 2 · BURIED -->
+  <div class="band band-cream">
+  <section class="section section-tight-bottom" id="buried">
+    <p class="eyebrow">Buried every day</p>
+    <h2 class="hand section-title">Lost it in the chat again?</h2>
+    <p class="lede">The things people actually needed — drowned under hundreds of messages, stickers and "seen by 12".</p>
+    <div class="buried-grid">
+      <div class="buried-card">
+        <p class="buried-who">Wife · 214 messages ago</p>
+        <p class="hand buried-text">"Pick up milk, eggs and bread on your way home."</p>
+        <p class="buried-result">You came home with… nothing. 🙈</p>
+      </div>
+      <div class="buried-card">
+        <p class="buried-who">Boyfriend · last year, 1,000+ messages ago</p>
+        <p class="hand buried-text">"My favourite colour is sage green."</p>
+        <p class="buried-result">His birthday gift? Blue. 💙</p>
+      </div>
+      <div class="buried-card">
+        <p class="buried-who">Mom · 300 messages ago</p>
+        <p class="hand buried-text">"Dentist moved to Saturday 10:30."</p>
+        <p class="buried-result">You showed up Friday. 🦷</p>
+      </div>
+    </div>
+  </section>
+  </div>
+
+  <div class="section-connector" aria-hidden="true">
+    <p class="hand">enough scrolling — here's the fix</p>
+    <span class="connector-arrow">↓</span>
+  </div>
+
+  <!-- 3 · NO NOISE -->
+  <section class="section section-tight-top" id="no-noise">
+    <p class="eyebrow">Keep what matters</p>
     <h2 class="hand section-title">Stop scrolling up for the Wi-Fi password.</h2>
     <div class="compare">
       <figure class="chat-mock">
-        <div class="chat-head"><strong>Family ❤️</strong><span class="unread">128</span></div>
+        <div class="chat-head">
+          <span class="chat-avatar" aria-hidden="true">❤️</span>
+          <span class="chat-name"><strong>Family</strong><small>Dad, Mom, Riya, +3</small></span>
+          <span class="unread">128</span>
+        </div>
         <div class="chat-body">
-          <div class="msg"><small>Dad</small><p>Who took my charger</p></div>
-          <div class="msg right"><p class="pill">not me</p></div>
-          <div class="msg"><small>Riya</small><p>😂😂😂</p></div>
-          <div class="msg"><small>Mom</small><p>Dinner at 8</p></div>
-          <div class="msg highlight"><small>Dad</small><p>New wifi pw is sunflower22</p></div>
-          <div class="msg"><small>Riya</small><p>[sticker]</p></div>
+          <p class="chat-day"><span>Today</span></p>
+          <div class="msg"><small>Dad</small><p>Who took my charger<span class="wmeta"><span class="wtime">10:02 AM</span><span class="wticks">✓✓</span></span></p></div>
+          <div class="msg right"><p>not me<span class="wmeta"><span class="wtime">10:03 AM</span><span class="wticks">✓✓</span></span></p></div>
+          <div class="msg"><small>Riya</small><p>😂😂😂<span class="wmeta"><span class="wtime">10:04 AM</span><span class="wticks">✓✓</span></span></p></div>
+          <div class="msg"><small>Mom</small><p>Dinner at 8<span class="wmeta"><span class="wtime">10:05 AM</span><span class="wticks">✓✓</span></span></p></div>
+          <div class="msg highlight"><small>Dad</small><p>New wifi pw is sunflower22<span class="wmeta"><span class="wtime">10:06 AM</span><span class="wticks">✓✓</span></span></p></div>
+          <div class="msg"><small>Riya</small><p>[sticker]<span class="wmeta"><span class="wtime">10:07 AM</span><span class="wticks">✓✓</span></span></p></div>
         </div>
         <figcaption>Found it? It scrolled away an hour ago.</figcaption>
       </figure>
@@ -144,7 +182,7 @@
           <p class="note-body note-hero">Wi-Fi: HomeNet<br />sunflower22</p>
           <p class="meta">Dad · pinned</p>
         </div>
-        <figcaption>One note. Always in the same place.</figcaption>
+        <figcaption>Keep what matters here. One note. Always in the same place.</figcaption>
       </figure>
     </div>
     <div class="trio">
@@ -154,69 +192,8 @@
     </div>
   </section>
 
-  <!-- 3 · NOT BOLTED ON -->
-  <section class="section struck">
-    <div class="struck-copy">
-      <p class="eyebrow">Built in, not bolted on</p>
-      <p class="hand struck-list">
-        <span class="crossed">Replies</span><br />
-        <span class="crossed">Reactions</span><br />
-        <span class="crossed">Read receipts</span><br />
-        <span class="crossed">A buzz for every post</span><br />
-        <span class="kept">Just what everyone needs to know.</span>
-      </p>
-      <p class="lede">These aren't settings you have to find. The app simply doesn't have them, so the board can't turn into another chat.</p>
-    </div>
-    <div class="paper c-paper rules-card" style="--r:1deg; --px:52%">
-      <span class="pin pin-teal"></span>
-      <h3 class="hand">House rules for this board</h3>
-      <ol class="hand rules">
-        <li>Only things everyone needs to see.</li>
-        <li>No replies, so nothing turns into a thread.</li>
-        <li>No pings. Look when you need it.</li>
-        <li>Things leave once they're done.</li>
-      </ol>
-      <p class="meta">Pinned on every new board</p>
-    </div>
-  </section>
-
-  <!-- 4 · FOUR KINDS -->
-  <section class="section">
-    <p class="eyebrow">Four kinds of paper</p>
-    <h2 class="hand section-title">Everything a fridge door holds.</h2>
-    <div class="kinds">
-      <!-- note -->
-      <div class="paper c-butter" style="--r:-1.5deg; --px:40%"><span class="pin pin-red"></span>
-        <h3 class="hand">Notes</h3>
-        <p class="note-body" style="font-size:20px">"Dinner's in the oven." "Back by 9." The little messages that keep a house running.</p>
-      </div>
-      <!-- list -->
-      <div class="paper c-paper" style="--r:1deg; --px:57%"><span class="pin pin-blue"></span>
-        <h3 class="hand">Lists</h3>
-        <p class="list-title" style="font-size:22px">Saturday shop</p>
-        <ul class="entries" style="font-size:18px">
-          <li class="entry" style="font-size:18px"><span class="checkbox"></span><span class="entry-text">Eggs</span></li>
-          <li class="entry done" style="font-size:18px"><span class="checkbox"><span class="checkmark">✓</span></span><span class="entry-text">Milk</span></li>
-        </ul>
-      </div>
-      <!-- date ticket -->
-      <div class="paper c-sky" style="--r:-1deg; --px:46%"><span class="pin pin-yellow"></span>
-        <h3 class="hand">Dates</h3>
-        <div class="ticket">
-          <div class="cal"><div class="cal-dow">SUN</div><div class="cal-day">27</div><div class="cal-mon">SEP</div></div>
-          <div><div class="day-label">TOMORROW</div><p class="ticket-title" style="font-size:18px">School play</p></div>
-        </div>
-      </div>
-      <!-- photo -->
-      <div class="paper c-paper" style="--r:1.5deg; --px:61%"><span class="pin pin-pink"></span>
-        <h3 class="hand">Photos</h3>
-        <div class="photo-img" aria-hidden="true"><span class="sun"></span></div>
-        <p class="photo-cap" style="font-size:16px">Parking spot B2</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- 5 · TIDIES ITSELF -->
+  <!-- 4 · TIDIES ITSELF -->
+  <div class="band band-sage">
   <section class="section tidy">
     <div class="tidy-copy">
       <p class="eyebrow">The board tidies itself</p>
@@ -248,6 +225,7 @@
       <p class="hand scribble">tick them all ↑</p>
     </div>
   </section>
+  </div>
 
   <!-- 6 · HOW IT WORKS -->
   <section class="section" id="how-it-works">
@@ -261,6 +239,7 @@
   </section>
 
   <!-- 7 · MADE FOR -->
+  <div class="band band-cream">
   <section class="section">
     <p class="eyebrow">Made for</p>
     <h2 class="hand section-title">Anyone who shares a fridge. Or doesn't.</h2>
@@ -274,6 +253,7 @@
     </div>
     <p class="lede">Keep one board per group, like "Home", "Flat 4B" and "Badminton Sundays", and switch between them from the board name.</p>
   </section>
+  </div>
 
   <!-- 8 · PRIVACY -->
   <section class="section" id="privacy">
@@ -288,6 +268,7 @@
   </section>
 
   <!-- 9 · QUESTIONS -->
+  <div class="band band-white">
   <section class="section" id="questions">
     <p class="eyebrow">Questions</p>
     <h2 class="hand section-title">Good questions.</h2>
@@ -322,6 +303,7 @@
       </details>
     </div>
   </section>
+  </div>
 
   <!-- CTA -->
   <section class="cta" id="get-the-app">

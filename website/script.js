@@ -6,7 +6,9 @@ document.querySelectorAll('#faq details').forEach((d) => {
   paint();
 });
 
-// Hero fridge: tick list entries in place (like the app), drag the rest
+// Hero fridge: tick list entries in place (like the app); drag notes to pin
+// them anywhere on the fridge. A drag lifts the note into the fridge layer
+// (leaving a placeholder so the doors never resize) and drops it where let go.
 (() => {
   const fridge = document.getElementById('fridge');
   if (!fridge) return;
@@ -19,51 +21,72 @@ document.querySelectorAll('#faq details').forEach((d) => {
       b.closest('li').classList.toggle('done', !on);
     });
   });
-  let active = null, dx = 0, dy = 0;
 
-  fridge.querySelectorAll('.drag').forEach((el) => {
+  fridge.querySelectorAll('.paper.drag').forEach((el) => {
     el.addEventListener('pointerdown', (e) => {
-      active = el;
-      const r = el.getBoundingClientRect();
-      dx = e.clientX - r.left;
-      dy = e.clientY - r.top;
-      el.classList.add('dragging');
-      el.setPointerCapture(e.pointerId);
-      el.style.position = 'relative';
-      el.style.zIndex = '20';
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      e.preventDefault();
+      const startX = e.clientX, startY = e.clientY;
+      let lifted = false, grabDX = 0, grabDY = 0, w = 0, h = 0;
+
+      const lift = () => {
+        const r = el.getBoundingClientRect();
+        grabDX = startX - r.left;
+        grabDY = startY - r.top;
+        w = r.width;
+        h = r.height;
+        if (!el.classList.contains('free')) {
+          const ph = document.createElement('div');
+          ph.className = 'drag-placeholder';
+          ph.style.width = w + 'px';
+          ph.style.height = h + 'px';
+          el.parentNode.insertBefore(ph, el);
+          fridge.appendChild(el);
+          el.classList.add('free');
+        }
+        el.style.width = w + 'px';
+        el.style.height = h + 'px';
+        el.classList.add('dragging');
+        lifted = true;
+      };
+
+      const move = (ev) => {
+        if (!lifted) {
+          if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 5) return;
+          lift();
+        }
+        const f = fridge.getBoundingClientRect();
+        const x = Math.max(-24, Math.min(ev.clientX - f.left - grabDX, f.width - w + 24));
+        const y = Math.max(-24, Math.min(ev.clientY - f.top - grabDY, f.height - h + 24));
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+      };
+
+      const up = () => {
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);
+        el.classList.remove('dragging');
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
     });
-    el.addEventListener('pointermove', (e) => {
-      if (active !== el) return;
-      const f = fridge.getBoundingClientRect();
-      let x = e.clientX - f.left - dx;
-      let y = e.clientY - f.top - dy;
-      x = Math.max(-20, Math.min(x, f.width - 60));
-      y = Math.max(-20, Math.min(y, f.height - 40));
-      el.style.left = x + 'px';
-      el.style.top = y + 'px';
-      el.style.position = 'absolute';
-      el.style.margin = '0';
-    });
-    const drop = () => {
-      if (active !== el) return;
-      active = null;
-      el.classList.remove('dragging');
-      el.style.zIndex = '';
-    };
-    el.addEventListener('pointerup', drop);
-    el.addEventListener('pointercancel', drop);
   });
 })();
 
-// Hero intro: chats pop one by one -> struck off -> "Only what matters"
-// note drops in -> chaos fades, clean fridge revealed. Plays on scroll into
-// view, once; the link below replays it.
+// Hero intro: fridge starts empty -> chats pop -> struck off ->
+// "Only what matters" drops in, zips away as all posts pin in together.
+// Plays on scroll into view, once; skipped for reduced motion.
 (() => {
   const fridge = document.getElementById('fridge');
   const stage = document.getElementById('fridgeStage');
   if (!fridge || !stage) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const pops = [...stage.querySelectorAll('.chat-pop')];
+  const posts = [...fridge.querySelectorAll('.fridge-door .paper')];
   const POP_GAP = 130, HOLD = 450, STRIKE_SHOW = 350, NOTE_HOLD = 900;
+  const POST_ANIM = 450;
 
   pops.forEach((p, i) => {
     p.style.setProperty('--d', `${i * POP_GAP}ms`);
@@ -75,9 +98,9 @@ document.querySelectorAll('#faq details').forEach((d) => {
   function play() {
     timers.forEach(clearTimeout);
     timers = [];
-    stage.classList.remove('playing', 'striking', 'clearing', 'revealing');
+    stage.classList.remove('playing', 'striking', 'clearing', 'revealing', 'note-leaving', 'posts-in', 'intro-empty');
     void stage.offsetWidth; // restart CSS animations
-    stage.classList.add('playing');
+    stage.classList.add('intro-empty', 'playing');
     const chaosMs = pops.length * POP_GAP + HOLD;
     later(() => stage.classList.add('striking'), chaosMs);
     const strikeMs = chaosMs + STRIKE_SHOW;
@@ -86,9 +109,16 @@ document.querySelectorAll('#faq details').forEach((d) => {
       const note = document.getElementById('revealNote');
       if (note) note.setAttribute('aria-hidden', 'false');
     }, strikeMs);
+    const finaleMs = strikeMs + NOTE_HOLD;
     later(() => {
-      stage.classList.remove('playing', 'striking', 'clearing', 'revealing');
-    }, strikeMs + NOTE_HOLD);
+      stage.classList.remove('revealing');
+      stage.classList.add('note-leaving');
+      stage.classList.remove('intro-empty');
+      stage.classList.add('posts-in');
+    }, finaleMs);
+    later(() => {
+      stage.classList.remove('playing', 'striking', 'clearing', 'note-leaving', 'posts-in');
+    }, finaleMs + POST_ANIM + 200);
   }
 
   const seen = new IntersectionObserver((entries) => {
@@ -99,13 +129,6 @@ document.querySelectorAll('#faq details').forEach((d) => {
     }
   }, { threshold: 0.35 });
   seen.observe(stage);
-
-  const replay = document.getElementById('noiseToggle');
-  const replayLabel = document.getElementById('noiseLabel');
-  if (replay) {
-    if (replayLabel) replayLabel.textContent = 'Replay the intro';
-    replay.addEventListener('click', play);
-  }
 })();
 
 // Tidy demo: tick the shopping list (app marks .done on the row)

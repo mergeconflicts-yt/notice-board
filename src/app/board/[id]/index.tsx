@@ -410,6 +410,8 @@ export default function BoardScreen() {
             />
           </View>
 
+          <View style={styles.divider} />
+
           <View style={styles.restSection}>
             <BoardSection
               items={restItems}
@@ -515,7 +517,12 @@ const styles = StyleSheet.create({
   },
   sections: { flex: 1 },
   pinnedSection: { flex: PINNED_FLEX },
-  restSection: { flex: REST_FLEX },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginHorizontal: 16,
+  },
+  restSection: { flex: REST_FLEX, overflow: 'hidden' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, paddingBottom: 60 },
   emptyHand: { fontSize: 40, marginBottom: 12 },
   emptyTitle: { fontFamily: fonts.hand.bold, fontSize: 32, color: colors.ink, marginBottom: 6 },

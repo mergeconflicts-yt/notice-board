@@ -1,0 +1,1 @@
+- Prefers website/marketing copy that leads with concrete, relatable real-life pain points to create emotional resonance before presenting the solution. Confidence: 0.75

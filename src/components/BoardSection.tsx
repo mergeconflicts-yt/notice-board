@@ -68,6 +68,9 @@ export function BoardSection({
 
   const handleMove = (item: ItemWithAuthor, left: number, top: number) => {
     if (boardW <= 0) return;
+    // Belt and braces with BoardNote's live clamp: a fast drop must not
+    // persist above the section's top edge (under the pinned strip).
+    top = Math.max(0, top);
     const placement = layout.get(item.id);
     if (!placement) return;
     const refScale = boardW / REF_W;
