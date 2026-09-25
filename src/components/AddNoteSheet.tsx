@@ -270,7 +270,10 @@ export function AddNoteSheet({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        // iOS shifts the sheet above the keyboard; Android must shrink it
+        // instead (a Modal window doesn't resize), or the lower fields sit
+        // behind the keyboard with nowhere to scroll.
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.backdrop}
       >
         <Pressable style={styles.scrim} onPress={onClose} />
@@ -573,7 +576,10 @@ const styles = StyleSheet.create({
   tabActive: { backgroundColor: colors.selected },
   tabLabel: { fontFamily: fonts.ui.semibold, fontSize: 13, color: colors.inkFaint },
   tabLabelActive: { color: colors.ink },
-  scroll: { flexGrow: 0, flexShrink: 1 },
+  // Takes the space left by the header/tabs/dots/actions inside the
+  // maxHeight-capped sheet and scrolls, so no field can end up underneath the
+  // colour row or keyboard.
+  scroll: { flex: 1 },
   scrollContent: { paddingBottom: 4 },
   sticky: { borderRadius: 8, padding: 16, minHeight: 170 },
   stickyInput: {

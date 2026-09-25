@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
-import { colors, fonts } from '../theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, fonts, noteColors } from '../theme';
 import { NotePaper } from './NotePaper';
 import { ItemWithAuthor, ListEntry } from '../types';
 
@@ -60,6 +61,17 @@ export function PinnedStrip({ items, entries, photoUrls, onOpen }: Props) {
                     maxEntries={maxEntries}
                     entries={entries.filter((e) => e.itemId === item.id)}
                   />
+                  {/* Cards taller than the strip are clipped; fade the cut
+                      edge so it reads as intentional, in the card's own paper
+                      colour. Photo cards letterbox and never clip. */}
+                  <LinearGradient
+                    colors={[
+                      'transparent',
+                      item.color === 'paper' ? colors.paper : noteColors[item.color].bg,
+                    ]}
+                    style={styles.fade}
+                    pointerEvents="none"
+                  />
                 </View>
               )}
             </Pressable>
@@ -105,6 +117,13 @@ const styles = StyleSheet.create({
   },
   card: { width: CARD_W },
   clip: { flex: 1, overflow: 'hidden', borderRadius: 4 },
+  fade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 28,
+  },
   hint: {
     paddingHorizontal: 16,
     paddingTop: 12,

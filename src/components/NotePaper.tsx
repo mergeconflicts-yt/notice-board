@@ -183,7 +183,9 @@ export function NotePaper({
             </Text>
           ) : null}
           {expiry ? (
-            <Text style={[styles.expiryInline, { color: palette.ink }]}>· ⏳ {expiry}</Text>
+            <Text style={[styles.expiryInline, { color: palette.ink }]}>
+              {authorName ? '· ' : ''}⏳ {expiry}
+            </Text>
           ) : null}
         </View>
       ) : null}
@@ -333,12 +335,11 @@ const styles = StyleSheet.create({
   listText: { flex: 1, fontFamily: fonts.hand.regular, fontSize: 22, lineHeight: 24 },
   listMore: { fontFamily: fonts.ui.semibold, fontSize: 12, opacity: 0.6, marginTop: 8 },
   attribution: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'flex-end',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
     marginTop: 12,
-    gap: 6,
+    gap: 2,
   },
-  signature: { flexShrink: 1, fontFamily: fonts.hand.semibold, opacity: 0.85 },
+  signature: { fontFamily: fonts.hand.semibold, opacity: 0.85, textAlign: 'right' },
   expiryInline: { fontFamily: fonts.ui.semibold, fontSize: 12, opacity: 0.65 },
 });

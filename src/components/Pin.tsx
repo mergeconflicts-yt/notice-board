@@ -224,7 +224,9 @@ const styles = StyleSheet.create({
   },
   tape: {
     position: 'absolute',
-    top: -10,
+    // Straddle the paper's top edge like real tape; any lower and the strip
+    // hangs over the title below it.
+    top: -16,
     alignSelf: 'center',
     height: 22,
     borderRadius: 2,
