@@ -90,12 +90,12 @@ export const memberColors = [
   '#4FA3A3',
 ] as const;
 
-/** Board cover tints. */
+/** Board cover tints. Cream is plain white paper. */
 export const boardColors: Record<BoardColor, string> = {
   sage: '#C9DCC0',
   blue: '#BCD2E8',
   clay: '#E5C3AE',
-  cream: '#F1E4C3',
+  cream: '#FFFDF7',
   charcoal: '#B9B4AD',
 };
 

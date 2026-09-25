@@ -10,7 +10,7 @@ import { BoardColor } from '../types';
 
 export default function CreateBoardScreen() {
   const [name, setName] = useState('');
-  const [color, setColor] = useState<BoardColor>('sage');
+  const [color, setColor] = useState<BoardColor>('cream');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
