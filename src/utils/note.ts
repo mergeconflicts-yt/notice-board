@@ -120,7 +120,7 @@ export function ticketDay(iso: string): { dow: string; day: string; mon: string;
   };
 }
 
-/** "Leaves the board Thu 1 Oct" style copy, straight from the server's keep_until. */
+/** "Leaves the fridge Thu 1 Oct" style copy, straight from the server's keep_until. */
 export function keepUntilLabel(keepUntil: string | null): string | null {
   if (!keepUntil) return null;
   const d = new Date(keepUntil);

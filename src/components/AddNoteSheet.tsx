@@ -326,7 +326,7 @@ export function AddNoteSheet({
             <Pressable hitSlop={12} onPress={onClose} style={styles.cancelBtn}>
               <Text style={styles.cancelText}>Cancel</Text>
             </Pressable>
-            <Text style={styles.title}>{editing ? 'Edit' : 'Add to board'}</Text>
+            <Text style={styles.title}>{editing ? 'Edit' : 'Add to fridge'}</Text>
             <View style={styles.headerSpacer} />
           </View>
 

@@ -42,7 +42,7 @@ export function IdentitySheet({ visible, onDone, submitting = false, error = nul
         <View style={styles.sheet}>
           <View style={styles.handle} />
           <Text style={styles.title}>Who are you?</Text>
-          <Text style={styles.subtitle}>Your notes will show this name on the board.</Text>
+          <Text style={styles.subtitle}>Your notes will show this name on the fridge.</Text>
 
           <TextInput
             style={styles.input}

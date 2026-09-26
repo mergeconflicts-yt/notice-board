@@ -102,7 +102,7 @@ export default function StartScreen() {
     try {
       await setDisplayName(name);
     } catch {
-      setIdentityError('Couldn’t reach the board server. Check your connection and try again.');
+      setIdentityError('Couldn’t reach the fridge server. Check your connection and try again.');
       setIdentitySaving(false);
       return;
     }
@@ -137,8 +137,8 @@ export default function StartScreen() {
           ))}
 
           <View style={styles.heroTextWrap}>
-            <Text style={styles.kicker}>Notice Board</Text>
-            <Text style={styles.headline}>A board for{'\n'}your people.</Text>
+            <Text style={styles.kicker}>Notice Fridge</Text>
+            <Text style={styles.headline}>A fridge for{'\n'}your people.</Text>
             <Text style={styles.subhead}>Just notes. No noise.</Text>
           </View>
         </View>
@@ -146,7 +146,7 @@ export default function StartScreen() {
         <View style={styles.footer}>
           {showSavePrompt && user?.isAnonymous ? (
             <View style={styles.prompt}>
-              <Text style={styles.promptText}>Save your account so you don’t lose your boards.</Text>
+              <Text style={styles.promptText}>Save your account so you don’t lose your fridges.</Text>
               <View style={styles.promptActions}>
                 <Pressable onPress={dismissSavePrompt} hitSlop={8}>
                   <Text style={styles.promptDismiss}>Not now</Text>
@@ -166,7 +166,7 @@ export default function StartScreen() {
           {boardsError ? <Text style={styles.boardsError}>{boardsError}</Text> : null}
           {boards.length > 0 ? (
             <View style={styles.boardsBlock}>
-              <Text style={styles.boardsLabel}>Your boards</Text>
+              <Text style={styles.boardsLabel}>Your fridges</Text>
               {boards.map((b) => (
                 <Pressable
                   key={b.id}
@@ -181,8 +181,8 @@ export default function StartScreen() {
               ))}
             </View>
           ) : null}
-          <Button label="Create a board" onPress={startCreate} />
-          <Button label="Join a board" variant="soft" onPress={startJoin} />
+          <Button label="Create a fridge" onPress={startCreate} />
+          <Button label="Join a fridge" variant="soft" onPress={startJoin} />
           <Pressable onPress={() => router.push('/profile')} style={styles.you} hitSlop={8}>
             <Text style={styles.youText}>You · {user?.displayName ?? 'Someone'}</Text>
           </Pressable>

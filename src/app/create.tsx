@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { boardColorKeys, boardColors, colors, fonts } from '../theme';
@@ -35,9 +35,9 @@ export default function CreateBoardScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}
       >
-        <ScreenHeader title="Create a board" />
+        <ScreenHeader title="Create a fridge" />
         <View style={styles.body}>
-          <Text style={styles.label}>Board name</Text>
+          <Text style={styles.label}>Fridge name</Text>
           <TextInput
             style={styles.input}
             placeholder="Kranti Family"
@@ -48,7 +48,11 @@ export default function CreateBoardScreen() {
             autoFocus
           />
           <Text style={[styles.label, styles.colorLabel]}>Colour</Text>
-          <View style={styles.swatches}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.swatches}
+          >
             {boardColorKeys.map((k) => (
               <Pressable
                 key={k}
@@ -62,7 +66,7 @@ export default function CreateBoardScreen() {
                 ]}
               />
             ))}
-          </View>
+          </ScrollView>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <Button
             label="Create"

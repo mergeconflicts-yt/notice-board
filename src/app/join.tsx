@@ -27,7 +27,7 @@ export default function JoinBoardScreen() {
     try {
       const info = await previewInvite(invite);
       setBoardName(info?.boardName ?? null);
-      if (!info) setError('Hmm, that code doesn’t match any board.');
+      if (!info) setError('Hmm, that code doesn’t match any fridge.');
     } catch (e) {
       setError(friendlyMessage(e));
     }
@@ -57,7 +57,7 @@ export default function JoinBoardScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}
       >
-        <ScreenHeader title="Join a board" />
+        <ScreenHeader title="Join a fridge" />
         <View style={styles.body}>
           <Text style={styles.label}>Invite code</Text>
           <TextInput
@@ -77,7 +77,7 @@ export default function JoinBoardScreen() {
           />
           {boardName ? <Text style={styles.board}>Join “{boardName}”</Text> : null}
           {error ? <Text style={styles.error}>{error}</Text> : null}
-          <Text style={styles.hint}>Ask someone on the board for their invite code.</Text>
+          <Text style={styles.hint}>Ask someone on the fridge for their invite code.</Text>
           <Button
             label="Join"
             onPress={join}

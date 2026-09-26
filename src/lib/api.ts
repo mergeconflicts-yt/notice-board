@@ -91,7 +91,7 @@ export function friendlyMessage(error: unknown): string {
     case 'not_found':
       return 'This is no longer available.';
     case 'not_owner':
-      return 'Only the board owner can do that.';
+      return 'Only the fridge owner can do that.';
     case 'not_author':
       return 'Only the person who wrote it can change the text.';
     case 'invalid_input':
@@ -103,7 +103,7 @@ export function friendlyMessage(error: unknown): string {
     case 'invite_invalid':
       return 'That invite isn\'t working. Ask for a fresh link.';
     case 'network':
-      return 'Can\'t reach the board. Check your connection.';
+      return 'Can\'t reach the fridge. Check your connection.';
     default:
       return 'Something went wrong. Please try again.';
   }

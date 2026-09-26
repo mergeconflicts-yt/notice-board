@@ -54,7 +54,7 @@ export default function ItemDetailScreen() {
         <Text style={styles.goneTitle}>This post is gone</Text>
         <Text style={styles.goneSub}>It may have expired or been removed.</Text>
         <View style={styles.goneBtn}>
-          <Text style={styles.goneBtnText}>Back to board</Text>
+          <Text style={styles.goneBtnText}>Back to fridge</Text>
         </View>
       </Pressable>
     );

@@ -33,7 +33,7 @@ const DECOS: { text: string; color: keyof typeof noteColors; top: number; left: 
 ];
 
 const GUEST_WARNING =
-  'Your boards are tied to this phone. If you delete the app or lose the phone, they’re gone. You can save your account any time.';
+  'Your fridges are tied to this phone. If you delete the app or lose the phone, they’re gone. You can save your account any time.';
 
 export function Welcome({ mode, inviteToken }: Props) {
   const continueAsGuest = useSession((s) => s.continueAsGuest);
@@ -124,7 +124,7 @@ export function Welcome({ mode, inviteToken }: Props) {
           ) : (
             <>
               <Text style={styles.title}>You’re invited</Text>
-              <Text style={styles.subtitle}>Join the board to see what’s on it.</Text>
+              <Text style={styles.subtitle}>Join the fridge to see what’s on it.</Text>
             </>
           )}
         </View>
@@ -152,11 +152,11 @@ export function Welcome({ mode, inviteToken }: Props) {
               </View>
             ))}
           </View>
-          <Text style={styles.title}>Notice board</Text>
+          <Text style={styles.title}>Notice fridge</Text>
           <Text style={styles.subtitle}>
             {mode === 'resume'
               ? 'Welcome back — pick how you’d like to continue.'
-              : 'One board for the people you live with.'}
+              : 'One fridge for the people you live with.'}
           </Text>
         </>
       )}
@@ -244,7 +244,7 @@ export function Welcome({ mode, inviteToken }: Props) {
           ) : null}
           <Text style={styles.or}>or join with an account</Text>
           {roundAccounts}
-          <Text style={styles.helper}>You’ll see the board after you join.</Text>
+          <Text style={styles.helper}>You’ll see the fridge after you join.</Text>
           {busy ? <ActivityIndicator color={colors.accent} style={styles.spinner} /> : null}
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {joinError ? (

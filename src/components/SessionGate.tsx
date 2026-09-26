@@ -36,8 +36,8 @@ export function SessionGate() {
     Alert.alert(
       'Sign out?',
       anonymous
-        ? 'You’ll lose this account and every board you’re on. This can’t be undone.'
-        : 'You’ll be signed out. Sign back in to get your boards again.',
+        ? 'You’ll lose this account and every fridge you’re on. This can’t be undone.'
+        : 'You’ll be signed out. Sign back in to get your fridges again.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -73,7 +73,7 @@ export function SessionGate() {
   if (status === 'offline') {
     return (
       <SafeAreaView style={[styles.overlay, styles.center]}>
-        <Text style={styles.title}>Can’t reach the board</Text>
+        <Text style={styles.title}>Can’t reach the fridge</Text>
         <Text style={styles.sub}>{error ?? 'Check your connection and try again.'}</Text>
         <Button label="Retry" onPress={() => void init(undefined, true)} style={styles.btn} />
         <Button label="Sign in" variant="soft" onPress={() => router.push('/sign-in')} style={styles.btn} />

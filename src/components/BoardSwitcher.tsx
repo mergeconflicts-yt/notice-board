@@ -13,9 +13,9 @@ type Props = {
 };
 
 /**
- * Board switcher bottom sheet (opened from the board title chevron): the
- * caller's boards with member counts, New board, Join with an invite, and
- * Board settings.
+ * Fridge switcher bottom sheet (opened from the fridge title chevron): the
+ * caller's fridges with member counts, New fridge, Join with an invite, and
+ * Fridge settings.
  */
 export function boardAcronym(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
@@ -67,7 +67,7 @@ export function BoardSwitcher({ visible, currentBoardId, onClose }: Props) {
       <View style={styles.backdrop}>
         <Pressable style={styles.scrim} onPress={onClose} />
         <View style={styles.sheet}>
-          <Text style={styles.label}>Your boards</Text>
+          <Text style={styles.label}>Your fridges</Text>
           <View style={styles.group}>
           {boards.map((b) => {
             const count = counts[b.id];
@@ -108,10 +108,10 @@ export function BoardSwitcher({ visible, currentBoardId, onClose }: Props) {
               router.push('/create');
             }}
             accessibilityRole="button"
-            accessibilityLabel="New board"
+            accessibilityLabel="New fridge"
           >
             <MaterialCommunityIcons name="plus" size={22} color={colors.ink} />
-            <Text style={styles.actionLabel}>New board</Text>
+            <Text style={styles.actionLabel}>New fridge</Text>
           </Pressable>
           <Pressable
             style={styles.row}
@@ -135,10 +135,10 @@ export function BoardSwitcher({ visible, currentBoardId, onClose }: Props) {
               router.push(`/board/${currentBoardId}/settings`);
             }}
             accessibilityRole="button"
-            accessibilityLabel="Board settings"
+            accessibilityLabel="Fridge settings"
           >
             <MaterialCommunityIcons name="cog-outline" size={22} color={colors.ink} />
-            <Text style={[styles.actionLabel, styles.settingsLabel]}>Board settings</Text>
+            <Text style={[styles.actionLabel, styles.settingsLabel]}>Fridge settings</Text>
             <MaterialCommunityIcons name="chevron-right" size={22} color={colors.inkFaint} />
           </Pressable>
           </View>

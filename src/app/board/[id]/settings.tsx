@@ -85,7 +85,7 @@ export default function BoardSettingsScreen() {
   };
 
   const confirmLeave = () => {
-    Alert.alert('Leave this board?', 'You can rejoin with an invite link.', [
+    Alert.alert('Leave this fridge?', 'You can rejoin with an invite link.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Leave',
@@ -103,10 +103,10 @@ export default function BoardSettingsScreen() {
   };
 
   const confirmDelete = () => {
-    Alert.alert('Delete this board?', 'The board and all its posts will be removed for everyone.', [
+    Alert.alert('Delete this fridge?', 'The fridge and all its posts will be removed for everyone.', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Delete board',
+        text: 'Delete fridge',
         style: 'destructive',
         onPress: async () => {
           try {
@@ -122,7 +122,7 @@ export default function BoardSettingsScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScreenHeader title="Board settings" />
+      <ScreenHeader title="Fridge settings" />
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         <View style={[styles.idCard, { backgroundColor: boardColors[board?.color ?? 'sage'] }]}>
           <View style={styles.idTop}>
@@ -153,7 +153,7 @@ export default function BoardSettingsScreen() {
               style={styles.editorInput}
               value={name}
               onChangeText={setDraftName}
-              placeholder="Board name"
+              placeholder="Fridge name"
               placeholderTextColor={colors.inkFaint}
               maxLength={60}
               autoFocus
@@ -171,8 +171,12 @@ export default function BoardSettingsScreen() {
 
         {isOwner ? (
           <>
-            <Text style={styles.sectionLabel}>Board colour</Text>
-            <View style={styles.swatches}>
+            <Text style={styles.sectionLabel}>Fridge colour</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.swatches}
+            >
               {boardColorKeys.map((k) => (
                 <Pressable
                   key={k}
@@ -185,11 +189,11 @@ export default function BoardSettingsScreen() {
                   ]}
                 />
               ))}
-            </View>
+            </ScrollView>
           </>
         ) : null}
 
-        <Text style={styles.sectionLabel}>Board</Text>
+        <Text style={styles.sectionLabel}>Fridge</Text>
         <View style={styles.group}>
           <Pressable style={styles.row} onPress={() => router.push(`/board/${boardId}/people`)}>
             <Text style={styles.rowLabel}>People</Text>
@@ -226,18 +230,18 @@ export default function BoardSettingsScreen() {
           </View>
         ) : null}
 
-        <Text style={styles.sectionLabel}>Board access</Text>
+        <Text style={styles.sectionLabel}>Fridge access</Text>
         <View style={styles.group}>
           {memberCount > 1 ? (
             <Pressable style={styles.row} onPress={confirmLeave}>
-              <Text style={[styles.rowLabel, styles.dangerText]}>Leave board</Text>
+              <Text style={[styles.rowLabel, styles.dangerText]}>Leave fridge</Text>
             </Pressable>
           ) : null}
           {isOwner ? (
             <>
               {memberCount > 1 ? <View style={styles.divider} /> : null}
               <Pressable style={styles.row} onPress={confirmDelete}>
-                <Text style={[styles.rowLabel, styles.dangerText]}>Delete board</Text>
+                <Text style={[styles.rowLabel, styles.dangerText]}>Delete fridge</Text>
               </Pressable>
             </>
           ) : null}

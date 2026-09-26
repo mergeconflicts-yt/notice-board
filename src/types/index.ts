@@ -8,7 +8,16 @@ export type ItemColor =
   | 'lavender'
   | 'peach'
   | 'paper';
-export type BoardColor = 'sage' | 'blue' | 'clay' | 'cream' | 'charcoal';
+export type BoardColor =
+  | 'sage'
+  | 'blue'
+  | 'clay'
+  | 'cream'
+  | 'charcoal'
+  | 'mint'
+  | 'butter'
+  | 'blush'
+  | 'powder';
 
 export type User = {
   id: string;

@@ -97,7 +97,7 @@ export default function JoinByLinkScreen() {
                 : ''}
             </Text>
             <Button
-              label={joining ? 'Joining…' : 'Join board'}
+              label={joining ? 'Joining…' : 'Join fridge'}
               onPress={join}
               disabled={joining || needsName}
               style={styles.join}

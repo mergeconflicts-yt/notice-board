@@ -326,7 +326,7 @@ export default function BoardScreen() {
       return (
         <View style={[styles.safe, { backgroundColor: colors.background }]}>
           <View style={styles.center}>
-            <Text style={styles.missingTitle}>Can’t open this board</Text>
+            <Text style={styles.missingTitle}>Can’t open this fridge</Text>
             <Text style={styles.missingSub}>{error}</Text>
             <Pressable onPress={() => void reload()} style={styles.missingBtn}>
               <Text style={styles.missingBtnText}>Retry</Text>
@@ -341,7 +341,7 @@ export default function BoardScreen() {
     return (
       <View style={[styles.safe, { backgroundColor: colors.background }]}>
         <View style={styles.center}>
-          <Text style={styles.missingTitle}>This board is gone</Text>
+          <Text style={styles.missingTitle}>This fridge is gone</Text>
           <Text style={styles.missingSub}>It may have been deleted by its owner.</Text>
           <Pressable onPress={() => router.replace('/')} style={styles.missingBtn}>
             <Text style={styles.missingBtnText}>Back to start</Text>
@@ -365,7 +365,7 @@ export default function BoardScreen() {
                 onPress={() => setSwitcherOpen(true)}
                 style={[styles.nameplate, { backgroundColor: plate.bg, borderColor: plate.edge }]}
                 accessibilityRole="button"
-                accessibilityLabel="Switch boards"
+                accessibilityLabel="Switch fridges"
               >
                 <View style={[styles.screw, { backgroundColor: plate.screw, borderColor: plate.screwEdge }]} />
                 <Text style={styles.boardName} numberOfLines={1}>{board.name}</Text>
@@ -450,7 +450,7 @@ export default function BoardScreen() {
         <Pressable
           onPress={() => setSheetOpen(true)}
           accessibilityRole="button"
-          accessibilityLabel="Add to board"
+          accessibilityLabel="Add to fridge"
           style={({ pressed }) => [
             styles.composerBtn,
             { bottom: insets.bottom + 20 },
@@ -458,7 +458,7 @@ export default function BoardScreen() {
           ]}
         >
           <Text style={styles.composerGlyph}>+</Text>
-          <Text style={styles.composerText}>Add to board</Text>
+          <Text style={styles.composerText}>Add to fridge</Text>
         </Pressable>
       ) : null}
 

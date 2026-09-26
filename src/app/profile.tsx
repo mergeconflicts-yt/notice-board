@@ -66,7 +66,7 @@ export default function ProfileScreen() {
   const confirmConflict = () => {
     Alert.alert(
       'That account already exists',
-      'Sign in to it instead? Boards you made as a guest on this phone won’t come with you.',
+      'Sign in to it instead? Fridges you made as a guest on this phone won’t come with you.',
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Sign in', onPress: () => router.push('/welcome') },
@@ -105,8 +105,8 @@ export default function ProfileScreen() {
     Alert.alert(
       'Sign out?',
       isGuest
-        ? 'You’ll lose this account and every board you’re on. This can’t be undone. Save your account first to keep them.'
-        : 'You’ll be signed out. Sign back in to get your boards again.',
+        ? 'You’ll lose this account and every fridge you’re on. This can’t be undone. Save your account first to keep them.'
+        : 'You’ll be signed out. Sign back in to get your fridges again.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -121,7 +121,7 @@ export default function ProfileScreen() {
   const confirmDelete = () => {
     Alert.alert(
       'Delete your account?',
-      'Your posts stay on shared boards, shown as “Former member”. Boards where you are the only person are removed.',
+      'Your posts stay on shared fridges, shown as “Former member”. Fridges where you are the only person are removed.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -178,8 +178,8 @@ export default function ProfileScreen() {
             <Text style={styles.cardTitle}>Save your account</Text>
             <Text style={styles.cardHint}>
               {boards.length > 0
-                ? `Keep your ${boards.length} ${boards.length === 1 ? 'board' : 'boards'} if you change phones.`
-                : 'Keep your boards if you change phones.'}
+                ? `Keep your ${boards.length} ${boards.length === 1 ? 'fridge' : 'fridges'} if you change phones.`
+                : 'Keep your fridges if you change phones.'}
             </Text>
             {Platform.OS === 'ios' ? (
               <Pressable style={[styles.saveBtnRow, styles.darkRow]} onPress={() => void link('apple')}>

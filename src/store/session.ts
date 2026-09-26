@@ -174,7 +174,7 @@ async function runInit(
       const marker = await readMarker();
       if (stored || marker) {
         if (stored && isRetryable(userError)) {
-          set({ status: 'offline', error: 'Can\'t reach the board. Check your connection.' });
+          set({ status: 'offline', error: 'Can\'t reach the fridge. Check your connection.' });
           scheduleRetry();
           return;
         }
@@ -182,7 +182,7 @@ async function runInit(
         // rather than silently creating a new user.
         set({
           status: 'signedout',
-          error: 'Sign in to restore your boards.',
+          error: 'Sign in to restore your fridges.',
           markerAnon: marker?.isAnonymous ?? null,
         });
         return;
@@ -220,7 +220,7 @@ async function runInit(
     });
   } catch (e) {
     if (isRetryable(e)) {
-      set({ status: 'offline', error: 'Can\'t reach the board. Check your connection.' });
+      set({ status: 'offline', error: 'Can\'t reach the fridge. Check your connection.' });
       scheduleRetry();
     } else {
       set({ status: 'offline', error: friendlyMessage(e) });
@@ -392,7 +392,7 @@ supabase.auth.onAuthStateChange((event, session) => {
         useSession.setState({
           user: null,
           status: 'signedout',
-          error: 'Sign in to restore your boards.',
+          error: 'Sign in to restore your fridges.',
           markerAnon: marker.isAnonymous,
         });
       }
