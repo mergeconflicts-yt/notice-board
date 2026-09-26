@@ -771,7 +771,6 @@ export type Database = {
           place: string | null
           reasons: string[]
           report_count: number
-          reporter_names: (string | null)[]
           title: string | null
           type: Database["public"]["Enums"]["item_type"]
           updated_at: string
@@ -853,6 +852,7 @@ export type Database = {
         Returns: undefined
       }
       remove_entry: { Args: { p_id: string }; Returns: undefined }
+      remove_and_block: { Args: { p_item_id: string }; Returns: undefined }
       remove_item: { Args: { p_id: string }; Returns: undefined }
       remove_member: {
         Args: { p_board_id: string; p_user_id: string }

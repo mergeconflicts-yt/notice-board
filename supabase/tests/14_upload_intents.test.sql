@@ -4,7 +4,7 @@
 -- storage policy admits no client uploads. Quotas: 20 intents/hour/account,
 -- 20 pending per user, 500 live photos per board, 1 GB per account.
 begin;
-select plan(19);
+select plan(20);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000081', 'authenticated', 'authenticated'),
@@ -81,11 +81,12 @@ select throws_ok(
   '42501', null, 'anon cannot start an upload');
 reset role;
 
--- Expired unused intents never link, and the hourly sweep clears them.
+-- Expired unused intents never link. The sweep only clears unreferenced rows
+-- past the orphan horizon (25h): accounting must outlive the bytes.
 insert into public.photo_upload_intents (path, board_id, item_id, user_id, expires_at) values
   ('b0000000-0000-0000-0000-000000000081/c0000000-0000-0000-0000-000000000086/stale.jpg',
    'b0000000-0000-0000-0000-000000000081', 'c0000000-0000-0000-0000-000000000086',
-   'a0000000-0000-0000-0000-000000000081', now() - interval '2 hours');
+   'a0000000-0000-0000-0000-000000000081', now() - interval '26 hours');
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000081', true);
 set role authenticated;
 select throws_ok(
@@ -95,10 +96,20 @@ select throws_ok(
     false, null)$$,
   'P0001', 'invalid_input', 'expired intent cannot link a photo');
 reset role;
-select is(public.purge_stale_upload_intents(), 1, 'sweep removes the expired intent');
+-- A recently-expired unreferenced row survives: its bytes may still exist
+-- (orphan sweeper horizon is 24h), so the quota must keep counting it.
+insert into public.photo_upload_intents (path, board_id, item_id, user_id, expires_at) values
+  ('b0000000-0000-0000-0000-000000000081/c0000000-0000-0000-0000-000000000087/fresh.jpg',
+   'b0000000-0000-0000-0000-000000000081', 'c0000000-0000-0000-0000-000000000087',
+   'a0000000-0000-0000-0000-000000000081', now() - interval '2 hours');
+select is(public.purge_stale_upload_intents(), 1, 'sweep removes only the oldest expired intent');
 select is(
   (select count(*)::integer from public.photo_upload_intents
-   where user_id = 'a0000000-0000-0000-0000-000000000081'),
+   where path = 'b0000000-0000-0000-0000-000000000081/c0000000-0000-0000-0000-000000000087/fresh.jpg'),
+  1, 'recently-expired accounting survives the sweep');
+select is(
+  (select count(*)::integer from public.photo_upload_intents
+   where path = (select path from t_intent)),
   1, 'the consumed live intent survives the sweep');
 select is(
   (select count(*)::integer from cron.job where jobname = 'cleanup-upload-intents'),

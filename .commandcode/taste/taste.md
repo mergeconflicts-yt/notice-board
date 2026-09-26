@@ -3,3 +3,6 @@
 - Prefers state-changing actions to give immediate visible confirmation via in-place highlight/animation of the existing indicator rather than adding extra toast/pill, so the change is unmissable without redundant UI. Confidence: 0.85
 - Prefers consolidating database migrations into a clean baseline schema recreated from scratch for pre-release greenfield projects rather than maintaining incremental migration history until first release. Confidence: 0.8
 - Prefers validating targeted dependency overrides for compatibility over blindly applying audit-tool suggested downgrades. Confidence: 0.85
+- Prefers multi-step mutations to be one atomic transactional database RPC so either everything succeeds or nothing changes, rather than sequential client calls that can partially fail. Confidence: 0.85
+- Prefers privacy-preserving moderation APIs that never expose reporter identities to clients (including owners), showing only aggregate counts and reasons. Confidence: 0.85
+- Prefers deployment/health checks to fail closed on missing data, treating NULL as failure (e.g. `where not coalesce(ok, false)`) rather than silently passing. Confidence: 0.8

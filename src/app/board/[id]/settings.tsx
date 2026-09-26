@@ -20,6 +20,7 @@ import {
   getInviteLink,
   getReportedItems as apiGetReportedItems,
   leaveBoard as apiLeaveBoard,
+  removeAndBlock as apiRemoveAndBlock,
   removeItem as apiRemoveItem,
   renameBoard as apiRenameBoard,
   restoreItem as apiRestoreItem,
@@ -141,11 +142,12 @@ export default function BoardSettingsScreen() {
     }
   };
 
-  // Remove the post AND block its author in one owner action. Dismisses the
-  // reports for the removed post either way.
+  // Remove the post AND block its author in one atomic server call
+  // (remove_and_block): either everything succeeds or nothing changes — the
+  // post can never end up removed while the block failed, or vice versa.
   const removeAndBlockReported = async (item: ReportedItem) => {
     const authorId = item.createdBy;
-    const authorLabel = item.author?.displayName ?? 'the author';
+    const authorLabel = item.authorName ?? 'the author';
     if (!authorId || authorId === user?.id) {
       // No author to block (already left, or the owner's own post): just
       // remove the post.
@@ -162,9 +164,7 @@ export default function BoardSettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await apiRemoveItem(item.id);
-              await apiDismissReports(item.id);
-              await apiBlockMember(boardId, authorId);
+              await apiRemoveAndBlock(item.id);
               setReported((prev) => (prev ? prev.filter((i) => i.id !== item.id) : prev));
               await reload();
               setBlocked(await apiGetBlocked(boardId));
@@ -392,10 +392,8 @@ export default function BoardSettingsScreen() {
                   reported.map((item) => {
                     const photoUrl = reportedPhotos[item.id] ?? null;
                     const subtitle = [
-                      item.author?.displayName ?? 'Former member',
-                      `${item.reportCount} ${item.reportCount === 1 ? 'report' : 'reports'}${
-                        item.reporterNames.length > 0 ? ` · by ${item.reporterNames.join(', ')}` : ''
-                      }`,
+                      item.authorName ?? 'Former member',
+                      `${item.reportCount} ${item.reportCount === 1 ? 'report' : 'reports'}`,
                     ].join(' · ');
                     return (
                       <View key={item.id} style={styles.reportCard}>

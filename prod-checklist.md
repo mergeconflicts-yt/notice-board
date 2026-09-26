@@ -6,14 +6,19 @@
 - `npm ci --legacy-peer-deps && npm run typecheck && npm run lint && node scripts/run-unit-tests.cjs` (plain `npm ci` fails on Expo 57 peer conflicts)
 - `npm audit --omit=dev`: no high/critical. The `uuid` advisory is fixed via
   the `overrides` pin in `package.json` (`^11.1.1`; only `v4()` is used, and
-  it is verified working). Remaining: 3 moderate, one chain —
-  `decode-uri-component` (CVE-2026-45822, malformed-URI CPU DoS) via
-  `query-string@7.1.3` via `expo-router@57`. The only patched release
-  (`0.5.0`) is ESM-only, which the CJS `query-string@7` cannot consume, and
-  no Expo SDK 57-compatible upgrade exists — do NOT apply audit's suggested
-  expo-router@5 / expo@46 downgrades. Exposure here is narrow (only a tapped
+  it is verified working). The `decode-uri-component` chain (CVE-2026-45822,
+  malformed-URI CPU DoS via `query-string@7.1.3` via `expo-router@57`) is
+  neutralised by `patches/decode-uri-component+0.2.2.patch` — a backport of
+  the upstream single-pass decoder (v0.5.0) in CJS form, applied on every
+  install via the `postinstall` hook; verified for output parity (16 cases)
+  and O(n) behaviour on malformed input. A forced `npm audit fix` would NOT
+  fix it (it proposes breaking expo-router@5 / expo@46 downgrades) and the
+  only patched release (`0.5.0`) is ESM-only, which CJS `query-string@7`
+  cannot consume — so audit still flags the version number even though the
+  vulnerable code path is gone. Exposure was narrow regardless (only a tapped
   malicious deep link reaches the decoder; availability-only, no data impact).
-  Re-check on every Expo SDK upgrade and drop the note once audit is clean.
+  Re-check on every Expo SDK upgrade: drop the patch once `query-string`
+  ships the fix in a CJS-compatible release.
 
 ## 2. Device tests on a production build, not Expo Go:
 - Apple and Google linking, and signing in on a second phone

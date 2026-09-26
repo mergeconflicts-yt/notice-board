@@ -486,7 +486,7 @@ returns table (
   body text, title text, event_at timestamptz, place text, photo_path text,
   pinned boolean, keep_until timestamptz, created_by uuid, version integer,
   created_at timestamptz, updated_at timestamptz, report_count integer,
-  reasons text[], reporter_names text[], author_name text
+  reasons text[], author_name text
 )
 language plpgsql
 security definer
@@ -511,16 +511,17 @@ begin
   if v_role is distinct from 'owner' then
     raise exception 'not_owner';
   end if;
+  -- Reporter identities never leave the database: only the count and the
+  -- distinct reasons are exposed (even an owner whose own post was reported
+  -- learns nothing about who reported it).
   return query
   select i.id, i.board_id, i.type, i.color, i.body, i.title, i.event_at,
     i.place, i.photo_path, i.pinned, i.keep_until, i.created_by, i.version,
     i.created_at, i.updated_at, count(r.id)::integer,
     array_remove(array_agg(distinct nullif(btrim(r.reason), '')) filter (where r.reason is not null), null),
-    array_agg(distinct p.display_name),
     a.display_name
   from public.items i
   join public.post_reports r on r.item_id = i.id
-  left join public.profiles p on p.id = r.reporter_id
   left join public.profiles a on a.id = i.created_by
   where i.board_id = p_board_id and i.deleted_at is null
   group by i.id, a.display_name
@@ -652,6 +653,82 @@ begin
   end if;
   -- Unblocking does not re-add the membership: the person rejoins with a
   -- fresh invite link, like any new member.
+end;
+$$;
+
+-- Owner moderation in one transaction: soft-delete the reported post, clear
+-- its reports, and block its author — all or nothing (plpgsql functions run
+-- in the caller's transaction, so any raise rolls everything back). When the
+-- post has no blockable author (already left, or the owner's own post) only
+-- the remove + dismiss happen.
+create function public.remove_and_block(p_item_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = '' as $$
+declare
+  v_row public.items%rowtype;
+  v_caller_role public.member_role;
+  v_remaining integer;
+begin
+  if auth.uid() is null then
+    raise exception 'not_authenticated';
+  end if;
+  if p_item_id is null then
+    raise exception 'invalid_input';
+  end if;
+  select * into v_row from public.items where id = p_item_id for update;
+  if v_row.id is null then
+    raise exception 'not_found';
+  end if;
+  -- Same lock-then-check order as remove_member (board -> member rows).
+  perform 1 from public.boards where id = v_row.board_id for update;
+  if not exists (
+    select 1 from public.boards where id = v_row.board_id and deleted_at is null
+  ) then
+    raise exception 'not_member';
+  end if;
+  select role into v_caller_role
+  from public.board_members
+  where board_id = v_row.board_id and user_id = auth.uid();
+  if v_caller_role is null then
+    raise exception 'not_member';
+  end if;
+  if v_caller_role is distinct from 'owner' then
+    raise exception 'not_owner';
+  end if;
+  perform public.hit_rate_limit('item_write', 600, interval '1 hour');
+  if v_row.deleted_at is null then
+    update public.items
+    set deleted_at = now(),
+        deleted_by = auth.uid(),
+        updated_by = auth.uid(),
+        updated_at = now(),
+        version = v_row.version + 1
+    where id = p_item_id and version = v_row.version;
+  end if;
+  delete from public.post_reports where item_id = p_item_id;
+  if v_row.created_by is null or v_row.created_by = auth.uid() then
+    return;
+  end if;
+  delete from public.board_members
+  where board_id = v_row.board_id and user_id = v_row.created_by;
+  insert into public.board_blocks (board_id, user_id, blocked_by)
+  values (v_row.board_id, v_row.created_by, auth.uid())
+  on conflict (board_id, user_id) do nothing;
+  select count(*)::integer into v_remaining
+  from public.board_members
+  where board_id = v_row.board_id;
+  if v_remaining = 0 then
+    update public.boards
+    set deleted_at = now(), updated_at = now()
+    where id = v_row.board_id and deleted_at is null;
+  else
+    perform public.promote_longest_member(v_row.board_id);
+  end if;
+  update public.invites
+  set revoked_at = now()
+  where board_id = v_row.board_id and revoked_at is null;
 end;
 $$;
 
@@ -1630,6 +1707,8 @@ revoke all on function public.block_member(uuid, uuid) from public, anon;
 grant execute on function public.block_member(uuid, uuid) to authenticated;
 revoke all on function public.unblock_member(uuid, uuid) from public, anon;
 grant execute on function public.unblock_member(uuid, uuid) to authenticated;
+revoke all on function public.remove_and_block(uuid) from public, anon;
+grant execute on function public.remove_and_block(uuid) to authenticated;
 revoke all on function public.list_blocked(uuid) from public, anon;
 grant execute on function public.list_blocked(uuid) to authenticated;
 

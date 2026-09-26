@@ -116,7 +116,7 @@ jobs:
                 ('cron_cleanup-upload-intents',
                   (select count(*) = 1 from cron.job where jobname = 'cleanup-upload-intents'))
             )
-            select string_agg(name, ',') from checks where not ok")
+            select string_agg(name, ',') from checks where not coalesce(ok, false)")
           if [ -n "$missing_db" ]; then echo "db security check failed: $missing_db"; exit 1; fi
           curl -sf -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config/auth" \
