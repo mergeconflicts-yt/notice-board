@@ -377,7 +377,22 @@ function createBoardStore(boardId: string) {
           apiSetDone(item.id, done),
         ),
 
-      keepLonger: (item) => patchItem(item.id, {}, () => apiKeepLonger(item.id)),
+      keepLonger: async (item) => {
+        // Optimistic +7d (capped at now + 30d, never shortening), mirroring
+        // the server's keep_longer math, so the new date shows instantly.
+        // A reload after reconciles the exact server timestamp.
+        const nowMs = Date.now();
+        const curMs = item.keepUntil ? new Date(item.keepUntil).getTime() : NaN;
+        const base = Number.isNaN(curMs) ? nowMs : Math.max(curMs, nowMs);
+        const extendedMs = Math.min(base + 7 * 86400000, nowMs + 30 * 86400000);
+        const optimisticMs = Number.isNaN(curMs) ? extendedMs : Math.max(curMs, extendedMs);
+        await patchItem(
+          item.id,
+          { keepUntil: new Date(optimisticMs).toISOString() },
+          () => apiKeepLonger(item.id),
+        );
+        await get().reload();
+      },
 
       moveItem: (item, x, y) =>
         patchItem(item.id, { layout: { x, y, manual: true } }, () =>

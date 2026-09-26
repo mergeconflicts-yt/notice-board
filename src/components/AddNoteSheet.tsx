@@ -540,17 +540,27 @@ export function AddNoteSheet({
                   onPress={cycleKeep}
                   disabled={pinned}
                   hitSlop={8}
-                  style={styles.keepBtn}
+                  style={[
+                    styles.keepBtn,
+                    keepExtra > 0 && !pinned && styles.keepBtnActive,
+                  ]}
                   accessibilityRole="button"
                   accessibilityLabel="Keep for longer"
+                  accessibilityState={{ selected: keepExtra > 0 }}
                 >
                   <MaterialCommunityIcons
-                    name="clock-outline"
+                    name={keepExtra > 0 ? 'clock-plus' : 'clock-outline'}
                     size={20}
-                    color={pinned ? colors.inkFaint : colors.ink}
+                    color={pinned ? colors.inkFaint : keepExtra > 0 ? colors.accentDeep : colors.ink}
                   />
-                  <Text style={[styles.keepText, pinned && styles.keepTextDisabled]}>
-                    Keep{keepExtra > 0 ? ` +${keepExtra * 7}d` : ''}
+                  <Text
+                    style={[
+                      styles.keepText,
+                      pinned && styles.keepTextDisabled,
+                      keepExtra > 0 && !pinned && styles.keepTextActive,
+                    ]}
+                  >
+                    {keepExtra > 0 ? `Keep +${keepExtra * 7}d` : 'Keep'}
                   </Text>
                 </Pressable>
               ) : null}
@@ -792,7 +802,18 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
   createRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 10 },
   keepBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  keepBtnActive: {
+    backgroundColor: colors.highlight,
+    borderWidth: 1,
+    borderColor: colors.accentDeep,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginHorizontal: -10,
+    marginVertical: -5,
+  },
   keepText: { fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.ink },
+  keepTextActive: { color: colors.accentDeep, fontFamily: fonts.ui.bold },
   keepTextDisabled: { color: colors.inkFaint },
   createSpacer: { flex: 1 },
   postBtn: { backgroundColor: colors.ink, borderRadius: 999, paddingHorizontal: 22, paddingVertical: 9 },

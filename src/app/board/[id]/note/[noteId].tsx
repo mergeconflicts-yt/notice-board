@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ActivityIndicator, useWindowDimensions } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator, Animated, useWindowDimensions } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, fonts } from '../../../../theme';
 import { NotePaper } from '../../../../components/NotePaper';
 import { AddNoteSheet, NoteDraft } from '../../../../components/AddNoteSheet';
@@ -29,12 +30,40 @@ export default function ItemDetailScreen() {
   // repeating work.
   const [editSnapshot, setEditSnapshot] = useState<{ id: string; text: string }[] | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [keeping, setKeeping] = useState(false);
+  const [expiryFlash, setExpiryFlash] = useState(false);
+  const [expiryPulse] = useState(() => new Animated.Value(0));
+  const prevExpiryRef = useRef<string | null>(null);
   const { width: screenW, height: screenH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [noteH, setNoteH] = useState(0);
 
   const item = items.find((i) => i.id === noteId) ?? null;
   const itemEntries = entries.filter((e) => e.itemId === noteId);
+
+  const isCreator = !!me && me.id === item?.createdBy;
+  const done = Boolean(item?.doneAt);
+  const completedBy = item?.doneBy
+    ? (members.find((m) => m.userId === item?.doneBy)?.user.displayName ?? null)
+    : null;
+  const expiry = keepUntilLabel(item?.keepUntil ?? null);
+
+  // Pop the Leaves chip whenever the date actually moves (e.g. after Keep),
+  // so the subtle text change is impossible to miss.
+  useEffect(() => {
+    const prev = prevExpiryRef.current;
+    prevExpiryRef.current = expiry;
+    if (prev !== null && expiry !== null && prev !== expiry) {
+      setExpiryFlash(true);
+      expiryPulse.setValue(0);
+      Animated.sequence([
+        Animated.spring(expiryPulse, { toValue: 1, friction: 5, tension: 140, useNativeDriver: true }),
+        Animated.timing(expiryPulse, { toValue: 0, duration: 350, useNativeDriver: true }),
+      ]).start();
+      const t = setTimeout(() => setExpiryFlash(false), 1800);
+      return () => clearTimeout(t);
+    }
+  }, [expiry, expiryPulse]);
 
   useEffect(() => {
     if (item?.photoPath) void signedPhotoUrl(item.photoPath).then(setPhotoUrl).catch(noop);
@@ -60,13 +89,8 @@ export default function ItemDetailScreen() {
     );
   }
 
-  const isCreator = !!me && me.id === item.createdBy;
-  const done = Boolean(item.doneAt);
-  const completedBy = item.doneBy
-    ? (members.find((m) => m.userId === item.doneBy)?.user.displayName ?? null)
-    : null;
-  const expiry = keepUntilLabel(item.keepUntil);
   const canMarkDone = item.type === 'note' || item.type === 'date';
+  const canKeepLonger = !item.pinned && item.type !== 'list';
 
   const naturalW = Math.min(screenW - 48, 340);
   const maxH = screenH - insets.top - insets.bottom - 140;
@@ -147,28 +171,78 @@ export default function ItemDetailScreen() {
           </View>
         </Pressable>
 
-        <View style={[styles.actions, { marginTop: belowTop }]}>
-          {done ? (
-            <Text style={styles.doneText}>
-              ✓ {completedBy ? `Completed by ${completedBy}` : 'Completed'}
-            </Text>
-          ) : null}
-          {expiry ? <Text style={styles.expiry}>{expiry}</Text> : null}
-        </View>
+        {done || expiry ? (
+          <View style={[styles.metaRow, { marginTop: belowTop }]}>
+            {done ? (
+              <View style={[styles.chip, styles.doneChip]}>
+                <MaterialCommunityIcons name="check-circle" size={14} color={colors.accentDeep} />
+                <Text style={styles.doneChipText}>
+                  {completedBy ? `Done · ${completedBy}` : 'Done'}
+                </Text>
+              </View>
+            ) : null}
+            {expiry ? (
+              <Animated.View
+                style={[
+                  styles.chip,
+                  expiryFlash && styles.chipFlash,
+                  {
+                    transform: [
+                      {
+                        scale: expiryPulse.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [1, 1.12],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name="clock-outline"
+                  size={14}
+                  color={expiryFlash ? colors.accentDeep : colors.inkSoft}
+                />
+                <Text style={[styles.chipText, expiryFlash && styles.chipTextFlash]}>{expiry}</Text>
+              </Animated.View>
+            ) : null}
+          </View>
+        ) : (
+          <View style={{ height: belowTop }} />
+        )}
 
-        <View style={styles.buttonRow}>
+        <View style={styles.actionBar}>
           {canMarkDone ? (
-            <Action label={done ? 'Reopen' : 'Mark done'} onPress={() => setDone(item, !done).catch(noop)} />
+            <ActionButton
+              icon={done ? 'undo' : 'check-circle-outline'}
+              label={done ? 'Reopen' : 'Done'}
+              active={done}
+              onPress={() => setDone(item, !done).catch(noop)}
+            />
           ) : null}
-          <Action
+          <ActionButton
+            icon={item.pinned ? 'pin-off-outline' : 'pin-outline'}
             label={item.pinned ? 'Unpin' : 'Pin'}
+            active={item.pinned}
             onPress={() => setPinned(item, !item.pinned).catch(noop)}
           />
-          {!item.pinned && item.type !== 'list' ? (
-            <Action label="Keep longer" onPress={() => keepLonger(item).catch(noop)} />
+          {canKeepLonger ? (
+            <ActionButton
+              icon="clock-plus-outline"
+              label={keeping ? 'Keeping…' : 'Keep'}
+              busy={keeping}
+              onPress={() => {
+                if (keeping) return;
+                setKeeping(true);
+                keepLonger(item)
+                  .catch(noop)
+                  .finally(() => setKeeping(false));
+              }}
+            />
           ) : null}
           {isCreator ? (
-            <Action
+            <ActionButton
+              icon="pencil-outline"
               label="Edit"
               onPress={() => {
                 setEditSnapshot(itemEntries);
@@ -176,7 +250,12 @@ export default function ItemDetailScreen() {
               }}
             />
           ) : null}
-          <Action label="Remove" destructive onPress={handleRemove} />
+          <ActionButton
+            icon="trash-can-outline"
+            label="Remove"
+            destructive
+            onPress={handleRemove}
+          />
         </View>
       </View>
 
@@ -197,18 +276,35 @@ export default function ItemDetailScreen() {
   );
 }
 
-function Action({
+function ActionButton({
+  icon,
   label,
   onPress,
   destructive = false,
+  active = false,
+  busy = false,
 }: {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
   label: string;
   onPress: () => void;
   destructive?: boolean;
+  active?: boolean;
+  busy?: boolean;
 }) {
+  const tint = destructive ? colors.danger : active ? colors.accentDeep : colors.ink;
   return (
-    <Pressable onPress={onPress} hitSlop={10} style={styles.actionPill} accessibilityRole="button">
-      <Text style={[styles.actionText, destructive && styles.actionDanger]}>{label}</Text>
+    <Pressable
+      onPress={onPress}
+      hitSlop={8}
+      disabled={busy}
+      style={[styles.actionBtn, busy && styles.actionBtnBusy]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <View style={[styles.actionIconWrap, active && styles.actionIconActive]}>
+        <MaterialCommunityIcons name={icon} size={22} color={tint} />
+      </View>
+      <Text style={[styles.actionLabel, { color: tint }]}>{label}</Text>
     </Pressable>
   );
 }
@@ -221,18 +317,43 @@ const styles = StyleSheet.create({
     backgroundColor: colors.backdrop,
   },
   center: { alignItems: 'center', justifyContent: 'center' },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  doneText: { fontFamily: fonts.ui.semibold, fontSize: 13, color: colors.inkSoft, opacity: 0.85 },
-  expiry: { fontFamily: fonts.ui.semibold, fontSize: 12, color: colors.inkSoft, opacity: 0.75 },
-  buttonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 16, justifyContent: 'center' },
-  actionPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 9,
+  metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap', paddingHorizontal: 24 },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 999,
     backgroundColor: colors.overlay,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  actionText: { fontFamily: fonts.ui.bold, fontSize: 14, color: colors.ink },
-  actionDanger: { color: colors.danger },
+  chipText: { fontFamily: fonts.ui.semibold, fontSize: 12, color: colors.inkSoft },
+  chipFlash: { backgroundColor: colors.highlight, borderColor: colors.accentDeep, borderWidth: 1.5 },
+  chipTextFlash: { color: colors.accentDeep, fontFamily: fonts.ui.bold },
+  doneChip: { backgroundColor: colors.highlight, borderColor: colors.border },
+  doneChipText: { fontFamily: fonts.ui.bold, fontSize: 12, color: colors.accentDeep },
+  actionBar: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    justifyContent: 'center',
+    gap: 2,
+    marginTop: 12,
+    marginHorizontal: 24,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: colors.overlay,
+    borderWidth: 1,
+    borderColor: colors.border,
+    boxShadow: '0 8px 20px -8px rgba(20,30,25,0.35)',
+  },
+  actionBtn: { alignItems: 'center', justifyContent: 'center', gap: 3, minWidth: 62, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 14 },
+  actionIconWrap: { alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 20, backgroundColor: colors.accentWash },
+  actionIconActive: { backgroundColor: colors.selected },
+  actionLabel: { fontFamily: fonts.ui.bold, fontSize: 11 },
+  actionBtnBusy: { opacity: 0.6 },
   goneTitle: { fontFamily: fonts.hand.bold, fontSize: 30, color: colors.ink },
   goneSub: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.inkSoft, marginTop: 6 },
   goneBtn: {
