@@ -485,7 +485,8 @@ returns table (
   id uuid, board_id uuid, type public.item_type, color public.item_color,
   body text, title text, event_at timestamptz, place text, photo_path text,
   pinned boolean, keep_until timestamptz, created_by uuid, version integer,
-  created_at timestamptz, updated_at timestamptz, report_count integer
+  created_at timestamptz, updated_at timestamptz, report_count integer,
+  reasons text[], reporter_names text[], author_name text
 )
 language plpgsql
 security definer
@@ -513,11 +514,16 @@ begin
   return query
   select i.id, i.board_id, i.type, i.color, i.body, i.title, i.event_at,
     i.place, i.photo_path, i.pinned, i.keep_until, i.created_by, i.version,
-    i.created_at, i.updated_at, count(r.id)::integer
+    i.created_at, i.updated_at, count(r.id)::integer,
+    array_remove(array_agg(distinct nullif(btrim(r.reason), '')) filter (where r.reason is not null), null),
+    array_agg(distinct p.display_name),
+    a.display_name
   from public.items i
   join public.post_reports r on r.item_id = i.id
+  left join public.profiles p on p.id = r.reporter_id
+  left join public.profiles a on a.id = i.created_by
   where i.board_id = p_board_id and i.deleted_at is null
-  group by i.id
+  group by i.id, a.display_name
   order by max(r.created_at) desc;
 end;
 $$;

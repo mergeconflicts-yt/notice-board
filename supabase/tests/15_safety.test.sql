@@ -1,7 +1,7 @@
 -- Safety surfaces: report flow, owner queue, block list (store guideline 1.2).
 -- O owns a board; M is a member; S is a stranger.
 begin;
-select plan(29);
+select plan(32);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000091', 'authenticated', 'authenticated'),
@@ -9,6 +9,8 @@ insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000093', 'authenticated', 'authenticated');
 insert into public.boards (id, name, created_by)
 values ('b0000000-0000-0000-0000-000000000091', 'Safety', 'a0000000-0000-0000-0000-000000000091');
+update public.profiles set display_name = 'Olive' where id = 'a0000000-0000-0000-0000-000000000091';
+update public.profiles set display_name = 'Moss' where id = 'a0000000-0000-0000-0000-000000000092';
 insert into public.board_members (board_id, user_id, role) values
   ('b0000000-0000-0000-0000-000000000091', 'a0000000-0000-0000-0000-000000000091', 'owner'),
   ('b0000000-0000-0000-0000-000000000091', 'a0000000-0000-0000-0000-000000000092', 'member');
@@ -44,6 +46,17 @@ select is(
 select is(
   (select report_count from public.list_reported_items('b0000000-0000-0000-0000-000000000091')),
   2, 'queue counts both reports');
+select is(
+  (select reasons from public.list_reported_items('b0000000-0000-0000-0000-000000000091')),
+  array['rude'], 'queue carries the distinct non-empty reasons');
+select is(
+  (select author_name from public.list_reported_items('b0000000-0000-0000-0000-000000000091')),
+  'Olive', 'queue carries the author display name');
+select ok(
+  (select reporter_names @> array['Moss', 'Olive']
+     and array_length(reporter_names, 1) = 2
+   from public.list_reported_items('b0000000-0000-0000-0000-000000000091')),
+  'queue names both reporters');
 reset role;
 
 -- M (not owner) cannot see the queue or dismiss.

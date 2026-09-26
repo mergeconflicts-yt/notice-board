@@ -1,6 +1,6 @@
 -- The Edge-Function jobs run as service_role; pin the access they need.
 begin;
-select plan(15);
+select plan(17);
 
 select ok(has_schema_privilege('service_role', 'public', 'usage'),
   'service_role can use schema public');
@@ -24,6 +24,10 @@ select ok(has_table_privilege('service_role', 'public.boards', 'delete'),
   'service_role can delete boards');
 select ok(has_table_privilege('service_role', 'public.profiles', 'select'),
   'service_role can read profiles');
+select ok(has_table_privilege('service_role', 'public.photo_upload_intents', 'select'),
+  'service_role can read upload intents');
+select ok(has_table_privilege('service_role', 'public.photo_upload_intents', 'update'),
+  'service_role can record intent byte sizes');
 select ok(has_function_privilege('service_role', 'public.inactive_anonymous_user_ids(integer)', 'execute'),
   'service_role can list inactive anonymous users');
 select ok(has_function_privilege('service_role', 'public.is_inactive_anonymous_user(uuid)', 'execute'),

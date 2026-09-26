@@ -392,10 +392,35 @@ export async function reportPost(itemId: string, reason?: string | null): Promis
   if (error) raise(error);
 }
 
-export async function getReportedItems(boardId: string): Promise<ItemWithAuthor[]> {
+export type ReportedItem = ItemWithAuthor & {
+  reportCount: number;
+  reasons: string[];
+  reporterNames: string[];
+};
+
+function mapReported(row: any): ReportedItem {
+  const base = mapItem(row);
+  // list_reported_items returns a flat author_name (no profile embed), so
+  // patch the display name onto whatever author mapItem resolved (which may
+  // be null when the author left — the UI then shows "Former member").
+  const authorName =
+    typeof row.author_name === 'string' && row.author_name ? row.author_name : null;
+  return {
+    ...base,
+    author:
+      authorName && base.author ? { ...base.author, displayName: authorName } : base.author,
+    reportCount: row.report_count ?? 0,
+    reasons: Array.isArray(row.reasons) ? row.reasons.filter((r: unknown) => typeof r === 'string') : [],
+    reporterNames: Array.isArray(row.reporter_names)
+      ? row.reporter_names.filter((n: unknown) => typeof n === 'string')
+      : [],
+  };
+}
+
+export async function getReportedItems(boardId: string): Promise<ReportedItem[]> {
   const { data, error } = await supabase.rpc('list_reported_items', { p_board_id: boardId });
   if (error) raise(error);
-  return (data ?? []).map(mapItem);
+  return (data ?? []).map(mapReported);
 }
 
 export async function dismissReports(itemId: string): Promise<void> {

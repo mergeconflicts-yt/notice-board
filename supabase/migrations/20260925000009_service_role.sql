@@ -17,3 +17,6 @@ grant select, delete on public.board_members to service_role;
 -- purge also hard-deletes long-dead boards and sweeps avatars of gone users.
 grant select, delete on public.boards to service_role;
 grant select on public.profiles to service_role;
+-- upload-photo reads the intent (ownership/expiry/member checks), records
+-- byte_size, and writes the re-encoded bytes via the storage API.
+grant select, update on public.photo_upload_intents to service_role;

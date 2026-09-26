@@ -757,6 +757,7 @@ export type Database = {
       list_reported_items: {
         Args: { p_board_id: string }
         Returns: {
+          author_name: string | null
           board_id: string
           body: string | null
           color: Database["public"]["Enums"]["item_color"]
@@ -768,7 +769,9 @@ export type Database = {
           photo_path: string | null
           pinned: boolean
           place: string | null
+          reasons: string[]
           report_count: number
+          reporter_names: (string | null)[]
           title: string | null
           type: Database["public"]["Enums"]["item_type"]
           updated_at: string

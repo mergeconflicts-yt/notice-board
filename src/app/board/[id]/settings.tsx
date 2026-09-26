@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, ScrollView, Pressable, StyleSheet, Alert, Share } from 'react-native';
+import { View, Text, TextInput, ScrollView, Pressable, StyleSheet, Alert, Share, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -11,6 +11,7 @@ import { useSession } from '../../../store/session';
 import { useToast } from '../../../store/toast';
 import {
   BlockedMember,
+  ReportedItem,
   blockMember as apiBlockMember,
   deleteBoard as apiDeleteBoard,
   dismissReports as apiDismissReports,
@@ -22,6 +23,7 @@ import {
   removeItem as apiRemoveItem,
   renameBoard as apiRenameBoard,
   restoreItem as apiRestoreItem,
+  signedPhotoUrl,
   unblockMember as apiUnblockMember,
 } from '../../../lib/api';
 import { inviteMessage } from '../../../lib/inviteLinks';
@@ -35,7 +37,8 @@ export default function BoardSettingsScreen() {
   const [draftName, setDraftName] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [removed, setRemoved] = useState<ItemWithAuthor[] | null>(null);
-  const [reported, setReported] = useState<ItemWithAuthor[] | null>(null);
+  const [reported, setReported] = useState<ReportedItem[] | null>(null);
+  const [reportedPhotos, setReportedPhotos] = useState<Record<string, string>>({});
   const [blocked, setBlocked] = useState<BlockedMember[] | null>(null);
 
   const name = draftName ?? board?.name ?? '';
@@ -97,7 +100,22 @@ export default function BoardSettingsScreen() {
   // block list. Non-owners never see these rows (see the render below).
   const openReported = async () => {
     try {
-      setReported(await apiGetReportedItems(boardId));
+      const items = await apiGetReportedItems(boardId);
+      setReported(items);
+      // Sign photo URLs for reported photo posts (best effort; rows without
+      // a URL simply show no thumbnail).
+      const withPhotos = items.filter((i) => i.photoPath);
+      if (withPhotos.length > 0) {
+        const urls = await Promise.all(withPhotos.map((i) => signedPhotoUrl(i.photoPath!)));
+        setReportedPhotos((prev) => {
+          const next = { ...prev };
+          withPhotos.forEach((item, idx) => {
+            const url = urls[idx];
+            if (url) next[item.id] = url;
+          });
+          return next;
+        });
+      }
     } catch (e) {
       useToast.getState().show(friendlyMessage(e));
     }
@@ -121,6 +139,42 @@ export default function BoardSettingsScreen() {
     } catch (e) {
       useToast.getState().show(friendlyMessage(e));
     }
+  };
+
+  // Remove the post AND block its author in one owner action. Dismisses the
+  // reports for the removed post either way.
+  const removeAndBlockReported = async (item: ReportedItem) => {
+    const authorId = item.createdBy;
+    const authorLabel = item.author?.displayName ?? 'the author';
+    if (!authorId || authorId === user?.id) {
+      // No author to block (already left, or the owner's own post): just
+      // remove the post.
+      await removeReported(item);
+      return;
+    }
+    Alert.alert(
+      `Remove post and block ${authorLabel}?`,
+      'The post is removed and they leave this fridge and can’t rejoin, even with a fresh invite link.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove + Block',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiRemoveItem(item.id);
+              await apiDismissReports(item.id);
+              await apiBlockMember(boardId, authorId);
+              setReported((prev) => (prev ? prev.filter((i) => i.id !== item.id) : prev));
+              await reload();
+              setBlocked(await apiGetBlocked(boardId));
+            } catch (e) {
+              useToast.getState().show(friendlyMessage(e));
+            }
+          },
+        },
+      ],
+    );
   };
 
   const openBlocked = async () => {
@@ -335,21 +389,44 @@ export default function BoardSettingsScreen() {
                 {reported.length === 0 ? (
                   <Text style={styles.rowValue}>No reports. Nice fridge.</Text>
                 ) : (
-                  reported.map((item) => (
-                    <View key={item.id} style={styles.removedRow}>
-                      <Text style={styles.removedText} numberOfLines={1}>
-                        {item.title ?? item.body ?? 'Post'}
-                      </Text>
-                      <View style={styles.reportActions}>
-                        <Pressable onPress={() => keepReported(item)} hitSlop={8}>
-                          <Text style={styles.restore}>Keep</Text>
-                        </Pressable>
-                        <Pressable onPress={() => removeReported(item)} hitSlop={8}>
-                          <Text style={styles.dangerText}>Remove</Text>
-                        </Pressable>
+                  reported.map((item) => {
+                    const photoUrl = reportedPhotos[item.id] ?? null;
+                    const subtitle = [
+                      item.author?.displayName ?? 'Former member',
+                      `${item.reportCount} ${item.reportCount === 1 ? 'report' : 'reports'}${
+                        item.reporterNames.length > 0 ? ` · by ${item.reporterNames.join(', ')}` : ''
+                      }`,
+                    ].join(' · ');
+                    return (
+                      <View key={item.id} style={styles.reportCard}>
+                        {photoUrl ? (
+                          <Image source={{ uri: photoUrl }} style={styles.reportPhoto} />
+                        ) : null}
+                        <Text style={styles.removedText} numberOfLines={2}>
+                          {item.title ?? item.body ?? 'Photo post'}
+                        </Text>
+                        <Text style={styles.reportMeta} numberOfLines={1}>
+                          {subtitle}
+                        </Text>
+                        {item.reasons.length > 0 ? (
+                          <Text style={styles.reportMeta} numberOfLines={2}>
+                            “{item.reasons.join('” · “')}”
+                          </Text>
+                        ) : null}
+                        <View style={styles.reportActions}>
+                          <Pressable onPress={() => keepReported(item)} hitSlop={8}>
+                            <Text style={styles.restore}>Keep</Text>
+                          </Pressable>
+                          <Pressable onPress={() => removeReported(item)} hitSlop={8}>
+                            <Text style={styles.dangerText}>Remove</Text>
+                          </Pressable>
+                          <Pressable onPress={() => removeAndBlockReported(item)} hitSlop={8}>
+                            <Text style={styles.dangerText}>Remove + Block</Text>
+                          </Pressable>
+                        </View>
                       </View>
-                    </View>
-                  ))
+                    );
+                  })
                 )}
               </View>
             ) : null}
@@ -466,6 +543,16 @@ const styles = StyleSheet.create({
   },
   removedText: { flex: 1, fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.ink },
   restore: { fontFamily: fonts.ui.bold, fontSize: 14, color: colors.accentDeep },
-  reportActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  reportActions: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 10 },
+  reportCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  reportPhoto: { width: '100%', height: 180, borderRadius: 10, marginBottom: 10 },
+  reportMeta: { fontFamily: fonts.ui.regular, fontSize: 13, color: colors.inkSoft, marginTop: 4 },
   dangerText: { color: colors.danger },
 });

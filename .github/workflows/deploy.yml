@@ -51,6 +51,17 @@ jobs:
               *) echo "missing Vault secret: $want"; exit 1;;
             esac
           done
+          # The Edge Functions read the SAME value as JOB_SECRET: pg_net sends
+          # the Vault job_secret as the bearer token and the functions compare
+          # it against their JOB_SECRET env. A mismatch fails closed (403) on
+          # every nightly run, so compare them now instead of discovering it
+          # the next morning.
+          vault_job=$(psql "$SUPABASE_DB_URL" \
+            -tAc "select decrypted_secret from vault.decrypted_secrets where name = 'job_secret' limit 1")
+          if [ "$vault_job" != "$JOB_SECRET" ]; then
+            echo "Vault job_secret does not equal the JOB_SECRET that will be set on the Edge Functions"; exit 1
+          fi
+          echo "job secrets match"
         env:
           JOB_SECRET: ${{ secrets.JOB_SECRET }}
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}

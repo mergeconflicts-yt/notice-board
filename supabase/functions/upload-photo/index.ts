@@ -97,16 +97,23 @@ Deno.serve(async (req: Request) => {
   if (file.size <= 0 || file.size > MAX_INPUT_BYTES) return bad('invalid_input');
 
   // Decode: rejects anything that is not image data (arbitrary bytes labelled
-  // as JPEG fail here). Strict mode — no tolerant partial decode.
+  // as JPEG fail here). Strict mode — no tolerant partial decode. NOTE: the
+  // options object is the SECOND argument (format-or-options); a third
+  // argument would be silently ignored and tolerant decoding would stay on.
   let image;
   try {
-    image = await Image.decode(new Uint8Array(await file.arrayBuffer()), undefined, {
+    image = await Image.decode(new Uint8Array(await file.arrayBuffer()), {
       tolerantDecoding: false,
       runtimeDecoding: 'never',
-    } as never);
+    });
   } catch {
     return bad('invalid_input');
   }
+
+  // Strip all metadata (EXIF/GPS) BEFORE resize: resize preserves metadata
+  // and encode writes it back, so clearing must happen first. A fresh empty
+  // object with merge=false replaces rather than merges.
+  image.setMetadata({}, false);
 
   // Downsize to the same 2048px longest side the client targets, then
   // re-encode as JPEG: the output carries no EXIF/GPS and is real image data.
