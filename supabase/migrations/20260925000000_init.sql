@@ -318,12 +318,16 @@ create policy profiles_select on public.profiles
   for select to authenticated
   using (
     id = auth.uid()
+    -- A stale membership on a soft-deleted board must not keep exposing the
+    -- profile: only a shared *live* board counts.
     or exists (
       select 1
       from public.board_members m1
       join public.board_members m2 on m2.board_id = m1.board_id
+      join public.boards b on b.id = m1.board_id
       where m1.user_id = auth.uid()
         and m2.user_id = profiles.id
+        and b.deleted_at is null
     )
   );
 

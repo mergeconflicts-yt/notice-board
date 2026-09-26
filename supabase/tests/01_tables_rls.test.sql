@@ -1,7 +1,7 @@
 -- Phase 1d: direct table access is closed; reads are member-scoped.
 -- Roles: O owner, M member, S stranger (all authenticated), plus anon.
 begin;
-select plan(27);
+select plan(32);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000001', 'authenticated', 'authenticated'),
@@ -84,6 +84,21 @@ select is(
 select throws_ok(
   $$update public.profiles set display_name = 'x' where id = 'a0000000-0000-0000-0000-000000000001'$$,
   '42501', 'permission denied for table profiles', 'owner cannot update profiles directly');
+reset role;
+
+-- A soft-deleted board keeps its memberships, but they no longer expose
+-- anything: no co-member profiles, no board/items/entries rows.
+update public.boards set deleted_at = now()
+where id = 'b0000000-0000-0000-0000-000000000001';
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000002', true);
+set role authenticated;
+select is(
+  (select count(*)::integer from public.profiles where id = 'a0000000-0000-0000-0000-000000000001'),
+  0, 'deleted-board membership exposes no co-member profile');
+select is((select count(*)::integer from public.boards), 0, 'deleted board hidden');
+select is((select count(*)::integer from public.items), 0, 'deleted-board items hidden');
+select is((select count(*)::integer from public.list_entries), 0, 'deleted-board entries hidden');
+select is((select count(*)::integer from public.board_members), 0, 'deleted-board memberships hidden');
 reset role;
 
 -- Path constraints and supporting indexes exist.

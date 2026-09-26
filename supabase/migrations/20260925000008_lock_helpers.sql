@@ -40,6 +40,8 @@ revoke execute on function public._path_board_id(text) from public, anon;
 grant execute on function public._path_board_id(text) to authenticated;
 
 -- Inline the avatar sharing check so `_shares_board_with` can be removed.
+-- Like profiles_select, only a shared *live* board exposes the avatar: a
+-- stale membership on a soft-deleted board must not keep working.
 drop policy if exists "avatars_shared_read" on storage.objects;
 create policy "avatars_shared_read" on storage.objects
   for select to authenticated
@@ -54,8 +56,10 @@ create policy "avatars_shared_read" on storage.objects
           select 1
           from public.board_members me
           join public.board_members them on them.board_id = me.board_id
+          join public.boards b on b.id = me.board_id
           where me.user_id = auth.uid()
             and them.user_id = split_part(name, '/', 1)::uuid
+            and b.deleted_at is null
         )
       )
     )

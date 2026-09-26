@@ -452,6 +452,8 @@ begin
   select board_id into v_board
   from public.items
   where id = p_item_id and deleted_at is null;
+  -- is_member excludes soft-deleted boards, so reporting on a deleted board
+  -- lands here as not_member.
   if v_board is null or not public.is_member(v_board) then
     raise exception 'not_member';
   end if;
@@ -478,6 +480,11 @@ declare
 begin
   if auth.uid() is null then
     raise exception 'not_authenticated';
+  end if;
+  -- A soft-deleted board keeps its memberships for 30 days, but the report
+  -- queue dies with the board: require a live board first.
+  if not exists (select 1 from public.boards where id = p_board_id and deleted_at is null) then
+    raise exception 'not_member';
   end if;
   select role into v_role
   from public.board_members
@@ -515,6 +522,11 @@ begin
   select board_id into v_board from public.items where id = p_item_id;
   if v_board is null then
     raise exception 'not_found';
+  end if;
+  -- Dismissing on a soft-deleted board is refused: the report queue dies with
+  -- the board (its memberships linger 30 days for the purge job, not for use).
+  if not exists (select 1 from public.boards where id = v_board and deleted_at is null) then
+    raise exception 'not_member';
   end if;
   select role into v_role
   from public.board_members
@@ -632,6 +644,10 @@ declare
 begin
   if auth.uid() is null then
     raise exception 'not_authenticated';
+  end if;
+  -- The block list dies with the board: require a live board first.
+  if not exists (select 1 from public.boards where id = p_board_id and deleted_at is null) then
+    raise exception 'not_member';
   end if;
   select role into v_role
   from public.board_members

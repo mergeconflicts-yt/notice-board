@@ -2,3 +2,4 @@
 - Prefers exact visual parity between website and app — same background/design language reused across surfaces rather than platform-specific reinterpretations. Confidence: 0.8
 - Prefers state-changing actions to give immediate visible confirmation via in-place highlight/animation of the existing indicator rather than adding extra toast/pill, so the change is unmissable without redundant UI. Confidence: 0.85
 - Prefers consolidating database migrations into a clean baseline schema recreated from scratch for pre-release greenfield projects rather than maintaining incremental migration history until first release. Confidence: 0.8
+- Prefers validating targeted dependency overrides for compatibility over blindly applying audit-tool suggested downgrades. Confidence: 0.85

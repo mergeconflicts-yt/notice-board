@@ -1,7 +1,7 @@
 -- Phase 3: private photo/avatar storage policies.
 -- Roles: O owner/uploader, S stranger, M co-member.
 begin;
-select plan(17);
+select plan(19);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000051', 'authenticated', 'authenticated'),
@@ -113,6 +113,21 @@ select ok(
   (select count(*)::integer from storage.objects
    where bucket_id = 'board-photos' and name like 'b0000000%') >= 1,
   'co-member reads board photo');
+reset role;
+
+-- Soft-delete the board: the lingering membership no longer exposes the
+-- owner's avatar or photos.
+update public.boards set deleted_at = now()
+where id = 'b0000000-0000-0000-0000-000000000051';
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000053', true);
+set role authenticated;
+select is(
+  (select count(*)::integer from storage.objects where bucket_id = 'avatars'),
+  0, 'deleted-board membership exposes no avatars');
+select is(
+  (select count(*)::integer from storage.objects
+   where bucket_id = 'board-photos' and name like 'b0000000%'),
+  0, 'deleted-board membership exposes no photos');
 reset role;
 
 select * from finish();

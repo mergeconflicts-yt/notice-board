@@ -4,6 +4,16 @@
 - `supabase db reset && supabase test db`
 - `supabase db lint --level warning --fail-on warning`
 - `npm ci --legacy-peer-deps && npm run typecheck && npm run lint && node scripts/run-unit-tests.cjs` (plain `npm ci` fails on Expo 57 peer conflicts)
+- `npm audit --omit=dev`: no high/critical. The `uuid` advisory is fixed via
+  the `overrides` pin in `package.json` (`^11.1.1`; only `v4()` is used, and
+  it is verified working). Remaining: 3 moderate, one chain —
+  `decode-uri-component` (CVE-2026-45822, malformed-URI CPU DoS) via
+  `query-string@7.1.3` via `expo-router@57`. The only patched release
+  (`0.5.0`) is ESM-only, which the CJS `query-string@7` cannot consume, and
+  no Expo SDK 57-compatible upgrade exists — do NOT apply audit's suggested
+  expo-router@5 / expo@46 downgrades. Exposure here is narrow (only a tapped
+  malicious deep link reaches the decoder; availability-only, no data impact).
+  Re-check on every Expo SDK upgrade and drop the note once audit is clean.
 
 ## 2. Device tests on a production build, not Expo Go:
 - Apple and Google linking, and signing in on a second phone
@@ -12,6 +22,8 @@
 - invite and board links on a cold start
 - relaunching with the phone locked
 - deleting an account
+- guest sign-out (deletes the guest account — confirm the boards are gone and
+  no error toast appears)
 
 ## 3. Production Supabase settings
 `config.toml` only covers your local setup, so the hosted project needs:
@@ -31,7 +43,16 @@
   the storage webhook — track before scaling past family use.
 
 ## 4. Store requirements:
-- No `eas.json` means no way to make store builds yet.
+- Store builds run through `eas.json` (`development` for a dev client,
+  `preview` for internal device testing, `production` for the release build:
+  `eas build --profile production`). Set the four public env vars
+  (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`,
+  `EXPO_PUBLIC_INVITE_BASE_URL`, `EXPO_PUBLIC_TURNSTILE_SITE_KEY`) as EAS
+  project environment variables for the production profile — a production
+  build fails fast in `app.config.ts` when any is absent. The invite base URL
+  is the deployed origin of `web/` (see `web/README.md`).
+- Real-device production tests: see §2 above (all on a `production` build,
+  not Expo Go).
 - Privacy policy URL: `website/privacy.html` (with Terms and Contact pages
   beside it; the app links all three from You → Privacy/Terms/Contact). You
   store names, photos and optionally email addresses — all disclosed there.

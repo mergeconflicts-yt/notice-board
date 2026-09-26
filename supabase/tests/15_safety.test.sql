@@ -1,7 +1,7 @@
 -- Safety surfaces: report flow, owner queue, block list (store guideline 1.2).
 -- O owns a board; M is a member; S is a stranger.
 begin;
-select plan(24);
+select plan(29);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000091', 'authenticated', 'authenticated'),
@@ -142,6 +142,30 @@ set role authenticated;
 select is(
   (select public.accept_invite((select token from t_fresh_link))),
   'b0000000-0000-0000-0000-000000000091', 'unblocked member rejoins with a fresh link');
+reset role;
+
+-- Soft-delete the board: the safety RPCs die with it even though memberships
+-- linger for the purge job.
+update public.boards set deleted_at = now()
+where id = 'b0000000-0000-0000-0000-000000000091';
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000091', true);
+set role authenticated;
+select throws_ok(
+  $$select public.list_reported_items('b0000000-0000-0000-0000-000000000091')$$,
+  'P0001', 'not_member', 'report queue refused on a deleted board');
+select throws_ok(
+  $$select public.dismiss_reports('c0000000-0000-0000-0000-000000000091')$$,
+  'P0001', 'not_member', 'dismiss refused on a deleted board');
+select throws_ok(
+  $$select public.list_blocked('b0000000-0000-0000-0000-000000000091')$$,
+  'P0001', 'not_member', 'block list refused on a deleted board');
+select throws_ok(
+  $$select public.unblock_member('b0000000-0000-0000-0000-000000000091',
+    'a0000000-0000-0000-0000-000000000092')$$,
+  'P0001', 'not_member', 'unblock refused on a deleted board');
+select throws_ok(
+  $$select public.report_post('c0000000-0000-0000-0000-000000000091')$$,
+  'P0001', 'not_member', 'report refused on a deleted board');
 reset role;
 
 select * from finish();
