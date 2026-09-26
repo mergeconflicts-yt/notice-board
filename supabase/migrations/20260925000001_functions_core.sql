@@ -279,13 +279,14 @@ begin
   if v_pending >= 20 then
     raise exception 'rate_limited';
   end if;
-  -- Per-account storage quota: live linked photos (measured post re-encode)
-  -- plus pending intent bytes. Unknown sizes (legacy rows, in-flight uploads)
-  -- count at the bucket cap so they cannot hide usage.
+  -- Per-account storage quota: linked photos (measured post re-encode) plus
+  -- pending intent bytes. Soft-deleted items keep counting: their objects
+  -- remain stored and restorable for 30 days. Unknown sizes (legacy rows,
+  -- in-flight uploads) count at the bucket cap so they cannot hide usage.
   select coalesce(sum(coalesce(n.byte_size, 10485760)), 0)::bigint into v_used_bytes
   from public.photo_upload_intents n
   left join public.items i
-    on i.photo_path = n.path and i.deleted_at is null
+    on i.photo_path = n.path
   where n.user_id = auth.uid()
     and (n.consumed = false or i.id is not null);
   if v_used_bytes >= 1073741824 then

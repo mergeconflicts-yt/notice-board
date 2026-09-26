@@ -3,7 +3,7 @@
 ## 1. Run these locally, and all must pass:
 - `supabase db reset && supabase test db`
 - `supabase db lint --level warning --fail-on warning`
-- `npm ci --legacy-peer-deps && npm run typecheck && npm run lint && node scripts/run-unit-tests.cjs` (plain `npm ci` fails on Expo 57 peer conflicts)
+- `npm ci --legacy-peer-deps && npm run typecheck && npm run lint && node scripts/run-unit-tests.cjs` (plain `npm ci` fails on Expo 57 peer conflicts; production installs use `npm ci --legacy-peer-deps --omit=dev`, which is verified to work — `patch-package` is a regular dependency so the `postinstall` patch applies there too)
 - `npm audit --omit=dev`: no high/critical. The `uuid` advisory is fixed via
   the `overrides` pin in `package.json` (`^11.1.1`; only `v4()` is used, and
   it is verified working). The `decode-uri-component` chain (CVE-2026-45822,

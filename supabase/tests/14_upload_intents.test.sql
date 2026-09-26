@@ -4,7 +4,7 @@
 -- storage policy admits no client uploads. Quotas: 20 intents/hour/account,
 -- 20 pending per user, 500 live photos per board, 1 GB per account.
 begin;
-select plan(20);
+select plan(22);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000081', 'authenticated', 'authenticated'),
@@ -134,6 +134,25 @@ select throws_ok(
   $$select public.start_photo_upload('b0000000-0000-0000-0000-000000000081',
     'c0000000-0000-0000-0000-000000000091')$$,
   'P0001', 'rate_limited', 'account at 1 GB storage cap refused');
+reset role;
+
+-- Soft-deleted photos keep counting: link M's full intent to an item, remove
+-- the item, and the cap must still hold (objects remain stored 30 days).
+insert into public.items (id, board_id, type, photo_path, created_by) values
+  ('c0000000-0000-0000-0000-000000000090', 'b0000000-0000-0000-0000-000000000081',
+   'photo', 'b0000000-0000-0000-0000-000000000081/c0000000-0000-0000-0000-000000000090/full.jpg',
+   'a0000000-0000-0000-0000-000000000082');
+update public.photo_upload_intents set consumed = true
+where path = 'b0000000-0000-0000-0000-000000000081/c0000000-0000-0000-0000-000000000090/full.jpg';
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000082', true);
+set role authenticated;
+select lives_ok(
+  $$select public.remove_item('c0000000-0000-0000-0000-000000000090')$$,
+  'owner removes the full photo');
+select throws_ok(
+  $$select public.start_photo_upload('b0000000-0000-0000-0000-000000000081',
+    'c0000000-0000-0000-0000-000000000092')$$,
+  'P0001', 'rate_limited', 'soft-deleted bytes still count toward the cap');
 reset role;
 
 -- The 21st intent in the hour is refused (20/hour/account cap). O already
