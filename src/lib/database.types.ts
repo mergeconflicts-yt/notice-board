@@ -34,6 +34,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      board_blocks: {
+        Row: {
+          blocked_at: string
+          blocked_by: string | null
+          board_id: string
+          user_id: string
+        }
+        Insert: {
+          blocked_at?: string
+          blocked_by?: string | null
+          board_id: string
+          user_id: string
+        }
+        Update: {
+          blocked_at?: string
+          blocked_by?: string | null
+          board_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       board_members: {
         Row: {
           board_id: string
@@ -362,6 +383,63 @@ export type Database = {
         }
         Relationships: []
       }
+      photo_upload_intents: {
+        Row: {
+          board_id: string
+          consumed: boolean
+          created_at: string
+          expires_at: string
+          item_id: string
+          path: string
+          user_id: string
+        }
+        Insert: {
+          board_id: string
+          consumed?: boolean
+          created_at?: string
+          expires_at?: string
+          item_id: string
+          path: string
+          user_id: string
+        }
+        Update: {
+          board_id?: string
+          consumed?: boolean
+          created_at?: string
+          expires_at?: string
+          item_id?: string
+          path?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      post_reports: {
+        Row: {
+          board_id: string
+          created_at: string
+          id: string
+          item_id: string
+          reason: string | null
+          reporter_id: string
+        }
+        Insert: {
+          board_id: string
+          created_at?: string
+          id?: string
+          item_id: string
+          reason?: string | null
+          reporter_id: string
+        }
+        Update: {
+          board_id?: string
+          created_at?: string
+          id?: string
+          item_id?: string
+          reason?: string | null
+          reporter_id?: string
+        }
+        Relationships: []
+      }
       rate_limits: {
         Row: {
           action: string
@@ -659,6 +737,49 @@ export type Database = {
       }
       normalise_invite_code: { Args: { p_raw: string }; Returns: string }
       pick_invite_code: { Args: never; Returns: string }
+      purge_stale_upload_intents: { Args: never; Returns: number }
+      block_member: {
+        Args: { p_board_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      dismiss_reports: { Args: { p_item_id: string }; Returns: undefined }
+      list_blocked: {
+        Args: { p_board_id: string }
+        Returns: {
+          blocked_at: string
+          display_name: string
+          user_id: string
+        }[]
+      }
+      list_reported_items: {
+        Args: { p_board_id: string }
+        Returns: {
+          board_id: string
+          body: string | null
+          color: Database["public"]["Enums"]["item_color"]
+          created_at: string
+          created_by: string | null
+          event_at: string | null
+          id: string
+          keep_until: string | null
+          photo_path: string | null
+          pinned: boolean
+          place: string | null
+          report_count: number
+          title: string | null
+          type: Database["public"]["Enums"]["item_type"]
+          updated_at: string
+          version: number
+        }[]
+      }
+      report_post: {
+        Args: { p_item_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      unblock_member: {
+        Args: { p_board_id: string; p_user_id: string }
+        Returns: undefined
+      }
       post_item: {
         Args: {
           p_board_id: string
@@ -751,6 +872,10 @@ export type Database = {
       set_pinned: {
         Args: { p_id: string; p_pinned: boolean }
         Returns: undefined
+      }
+      start_photo_upload: {
+        Args: { p_board_id: string; p_item_id: string }
+        Returns: string
       }
       update_profile: {
         Args: { p_avatar_path?: string; p_clear_avatar?: boolean; p_display_name: string }

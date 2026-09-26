@@ -1,4 +1,3 @@
-import * as Crypto from 'expo-crypto';
 import { File as ExpoFile } from 'expo-file-system';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
@@ -364,6 +363,47 @@ export async function removeMember(boardId: string, userId: string): Promise<voi
   if (error) raise(error);
 }
 
+export type BlockedMember = { userId: string; displayName: string; blockedAt: string };
+
+function mapBlocked(row: any): BlockedMember {
+  return { userId: row.user_id, displayName: row.display_name, blockedAt: row.blocked_at };
+}
+
+export async function blockMember(boardId: string, userId: string): Promise<void> {
+  const { error } = await supabase.rpc('block_member', { p_board_id: boardId, p_user_id: userId });
+  if (error) raise(error);
+}
+
+export async function unblockMember(boardId: string, userId: string): Promise<void> {
+  const { error } = await supabase.rpc('unblock_member', { p_board_id: boardId, p_user_id: userId });
+  if (error) raise(error);
+}
+
+export async function getBlocked(boardId: string): Promise<BlockedMember[]> {
+  const { data, error } = await supabase.rpc('list_blocked', { p_board_id: boardId });
+  if (error) raise(error);
+  return (data ?? []).map(mapBlocked);
+}
+
+export async function reportPost(itemId: string, reason?: string | null): Promise<void> {
+  const { error } = await supabase.rpc('report_post', {
+    p_item_id: itemId,
+    p_reason: reason ?? null,
+  } as never);
+  if (error) raise(error);
+}
+
+export async function getReportedItems(boardId: string): Promise<ItemWithAuthor[]> {
+  const { data, error } = await supabase.rpc('list_reported_items', { p_board_id: boardId });
+  if (error) raise(error);
+  return (data ?? []).map(mapItem);
+}
+
+export async function dismissReports(itemId: string): Promise<void> {
+  const { error } = await supabase.rpc('dismiss_reports', { p_item_id: itemId });
+  if (error) raise(error);
+}
+
 // ---------------------------------------------------------------------------
 // Items
 // ---------------------------------------------------------------------------
@@ -574,9 +614,68 @@ export async function deleteAccount(): Promise<void> {
   // (board cleanup) and then removes the auth user. Calling the RPC here too
   // would leave the caller's boards tidy but the account alive if the function
   // then failed, so the app only invokes the function.
-  const { error } = await supabase.functions.invoke('delete-account', { method: 'POST' });
-  if (error) raise(error as { message?: string });
+  const { error, response } = await supabase.functions.invoke('delete-account', {
+    method: 'POST',
+  });
+  if (error) {
+    // Functions errors carry a generic message ("Edge Function returned a
+    // non-2xx status code"), so read the real signal first: the function
+    // body's own error text (our functions return stable strings like
+    // `not authenticated` / `could not delete account`).
+    let body = '';
+    try {
+      body = response instanceof Response ? await response.text() : '';
+    } catch {
+      // Unreadable body — fall back to status-based classification below.
+    }
+    raise(functionError(error, response, body));
+  }
   await supabase.auth.signOut();
+}
+
+/**
+ * Translate an Edge Function invocation failure into something raise() can
+ * classify. A missing response means the request never reached the function
+ * (not served, offline) — a network failure, not a mystery.
+ */
+function functionError(
+  error: { message?: string; name?: string },
+  response?: { status?: number } | Response | null,
+  body = '',
+): { message?: string; code?: string } {
+  const status =
+    response instanceof Response
+      ? response.status
+      : typeof response?.status === 'number'
+        ? response.status
+        : undefined;
+  if (status === 401 || status === 403 || status === 404) return { message: 'not_authenticated' };
+  // Our functions answer failures as plain text (`could not delete account`);
+  // a JSON body is the gateway talking (e.g. Kong's 503 `{"message":"name
+  // resolution failed"}` when the function isn't served) — not usable signal.
+  if (body.trim() && !looksLikeGatewayJson(body)) return { message: body.trim().slice(0, 200) };
+  if (error?.name === 'FunctionsFetchError' || status === undefined) {
+    throw new ApiError('network', error?.message ?? 'fetch failed');
+  }
+  if (status >= 500) {
+    throw new ApiError('network', `function unreachable (HTTP ${status})`);
+  }
+  return error;
+}
+
+/** True when the body parses as a `{message: string}` JSON envelope — the
+ *  gateway/proxy error shape, never our functions' plain-text errors. */
+function looksLikeGatewayJson(body: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    return (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      typeof (parsed as { message?: unknown }).message === 'string'
+    );
+  } catch {
+    return false;
+  }
 }
 
 type OAuthProvider = 'apple' | 'google';
@@ -707,7 +806,17 @@ export async function signedPhotoUrl(path: string, expiresIn = 86400): Promise<s
 }
 
 export async function uploadPhoto(boardId: string, itemId: string, fileUri: string): Promise<string> {
-  const path = `${boardId}/${itemId}/${Crypto.randomUUID()}.jpg`;
+  // Every upload is bound to a server-issued intent: the storage policy only
+  // accepts the exact intent path, and post_item consumes the intent when the
+  // photo is linked — so bytes uploaded outside this flow can never appear on
+  // a board. The intent survives a post retry: post_item accepts an already-
+  // consumed intent for the same item, matching the client's id reuse.
+  const { data: path, error: intentError } = await supabase.rpc('start_photo_upload', {
+    p_board_id: boardId,
+    p_item_id: itemId,
+  });
+  if (intentError) raise(intentError);
+  if (!path) raise({ message: 'invalid_input' });
   // Resize + re-encode (strips EXIF) before the bytes leave the device. Read
   // the bytes with expo-file-system — `fetch()` on a local file URI is
   // unreliable on device.

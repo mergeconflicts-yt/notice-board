@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ActivityIndicator, Animated, useWindowDimensions } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator, Alert, Animated, useWindowDimensions } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,7 +10,7 @@ import { AddNoteSheet, NoteDraft } from '../../../../components/AddNoteSheet';
 import { useBoard } from '../../../../hooks/useBoard';
 import { useSession } from '../../../../store/session';
 import { useToast } from '../../../../store/toast';
-import { signedPhotoUrl } from '../../../../lib/api';
+import { friendlyMessage, reportPost, signedPhotoUrl } from '../../../../lib/api';
 import { keepUntilLabel } from '../../../../utils/note';
 
 const MAX_SCALE = 2.4;
@@ -151,6 +151,23 @@ export default function ItemDetailScreen() {
     });
   };
 
+  // Quiet report: the post stays up, the board owner sees it in Fridge
+  // settings, and the reporter only gets a thank-you (no details leak).
+  const handleReport = () => {
+    if (!item) return;
+    Alert.alert('Report this post?', 'The fridge owner will take a look. The person who posted it won’t be told.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Report',
+        onPress: () => {
+          void reportPost(item.id)
+            .then(() => useToast.getState().show('Thanks — the fridge owner will take a look.'))
+            .catch((e) => useToast.getState().show(friendlyMessage(e)));
+        },
+      },
+    ]);
+  };
+
   return (
     <Pressable style={styles.container} onPress={() => router.back()}>
       <BlurView intensity={20} tint="default" pointerEvents="none" style={StyleSheet.absoluteFill} />
@@ -249,7 +266,9 @@ export default function ItemDetailScreen() {
                 setEditing(true);
               }}
             />
-          ) : null}
+          ) : (
+            <ActionButton icon="flag-outline" label="Report" onPress={handleReport} />
+          )}
           <ActionButton
             icon="trash-can-outline"
             label="Remove"

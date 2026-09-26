@@ -36,7 +36,7 @@ export function SessionGate() {
     Alert.alert(
       'Sign out?',
       anonymous
-        ? 'You’ll lose this account and every fridge you’re on. This can’t be undone.'
+        ? 'Signing out deletes this guest account and removes you from every fridge you’re on. This can’t be undone.'
         : 'You’ll be signed out. Sign back in to get your fridges again.',
       [
         { text: 'Cancel', style: 'cancel' },

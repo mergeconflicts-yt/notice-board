@@ -403,5 +403,8 @@ For every table and function, test as: anon (no JWT), non-member, member, owner.
 
 - Push notifications and date reminders (later: local notifications on the device, no server).
 - Offline write queue beyond optimistic updates and retry.
-- Content moderation or reporting (boards are private and invite-only).
+- Content moderation beyond the release safety scope (quiet per-post Report
+  to the board owner, owner remove/keep queue, member block list — see
+  docs/api.md §Safety). Boards stay private and invite-only; no global
+  moderation queue.
 - Web app.

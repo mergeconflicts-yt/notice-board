@@ -124,6 +124,40 @@ create table public.rate_limits (
   primary key (user_id, action, window_start)
 );
 
+-- One-time upload intents: every photo upload is bound to a server-issued
+-- intent row. The storage policy only accepts the exact intent path, and
+-- post_item consumes the intent when the photo is linked — so bytes uploaded
+-- outside the intent flow can never appear on a board.
+create table public.photo_upload_intents (
+  path text primary key,
+  board_id uuid not null references public.boards (id) on delete cascade,
+  item_id uuid not null,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  consumed boolean not null default false,
+  expires_at timestamptz not null default now() + interval '1 hour',
+  created_at timestamptz not null default now()
+);
+
+-- Quiet per-post reports: visible only to the board owner (via RPCs).
+create table public.post_reports (
+  id uuid primary key default gen_random_uuid(),
+  item_id uuid not null references public.items (id) on delete cascade,
+  board_id uuid not null references public.boards (id) on delete cascade,
+  reporter_id uuid not null references public.profiles (id) on delete cascade,
+  reason text check (reason is null or char_length(reason) <= 500),
+  created_at timestamptz not null default now(),
+  unique (item_id, reporter_id)
+);
+
+-- Blocked members: cannot rejoin even with a fresh invite link.
+create table public.board_blocks (
+  board_id uuid not null references public.boards (id) on delete cascade,
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  blocked_by uuid references public.profiles (id) on delete set null,
+  blocked_at timestamptz not null default now(),
+  primary key (board_id, user_id)
+);
+
 -- ---------------------------------------------------------------------------
 -- Indexes
 -- ---------------------------------------------------------------------------
@@ -144,6 +178,11 @@ create index list_entries_board_idx on public.list_entries (board_id);
 create index board_members_user_idx on public.board_members (user_id);
 create index invites_board_idx on public.invites (board_id);
 create index invites_created_by_idx on public.invites (created_by);
+create index photo_upload_intents_user_idx on public.photo_upload_intents (user_id)
+  where consumed = false;
+create index photo_upload_intents_board_idx on public.photo_upload_intents (board_id);
+create index post_reports_board_idx on public.post_reports (board_id);
+create index post_reports_item_idx on public.post_reports (item_id);
 
 -- "Who did it" columns: indexed so account deletion (which nulls these on
 -- ON DELETE SET NULL) and audits don't scan the whole table.
@@ -223,6 +262,9 @@ alter table public.items enable row level security;
 alter table public.list_entries enable row level security;
 alter table public.invites enable row level security;
 alter table public.rate_limits enable row level security;
+alter table public.photo_upload_intents enable row level security;
+alter table public.post_reports enable row level security;
+alter table public.board_blocks enable row level security;
 
 -- No table writes for client roles, ever: mutations go through functions.
 revoke all on all tables in schema public from anon, authenticated;
@@ -231,7 +273,10 @@ grant select on public.boards to authenticated;
 grant select on public.board_members to authenticated;
 grant select on public.items to authenticated;
 grant select on public.list_entries to authenticated;
--- No grants at all on invites and rate_limits: only functions touch them.
+grant select on public.photo_upload_intents to authenticated;
+-- No grants at all on invites, rate_limits, post_reports and board_blocks:
+-- only functions touch them (intents are readable by their owner so the
+-- storage policy can match a live intent as the caller).
 
 -- Membership helper for policies and functions. Definer so policy checks
 -- never recurse into RLS; excludes soft-deleted boards.
@@ -281,6 +326,12 @@ create policy profiles_select on public.profiles
         and m2.user_id = profiles.id
     )
   );
+
+-- Upload intents are readable only by the user they were issued to, so the
+-- board-photos storage policy can match a live intent as the caller.
+create policy photo_upload_intents_select on public.photo_upload_intents
+  for select to authenticated
+  using (user_id = auth.uid());
 
 -- Board screen view: live items only. Invoker rights so RLS still applies;
 -- needs its own grant because auto-expose is off.

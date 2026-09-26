@@ -239,6 +239,83 @@ begin
 end;
 $$;
 
+-- ---------------------------------------------------------------------------
+-- Photo upload intents: every photo upload is bound to a server-issued path.
+-- The board-photos storage policy only accepts the exact live intent path,
+-- and post_item consumes the intent when the photo is linked — so bytes
+-- uploaded outside the intent flow can never appear on a board. Quotas bound
+-- the abuse: 300 intents/hour, 20 pending per user (orphan bytes), 500 live
+-- photos per board. Client-side resize/re-encode (EXIF strip) still happens
+-- on device; byte-level server-side validation needs an Edge Function on the
+-- storage webhook.
+-- ---------------------------------------------------------------------------
+
+create function public.start_photo_upload(p_board_id uuid, p_item_id uuid)
+returns text
+language plpgsql
+security definer
+set search_path = '' as $$
+declare
+  v_path text;
+  v_pending integer;
+  v_live_photos integer;
+begin
+  if auth.uid() is null then
+    raise exception 'not_authenticated';
+  end if;
+  if p_board_id is null or p_item_id is null then
+    raise exception 'invalid_input';
+  end if;
+  if not public.is_member(p_board_id) then
+    raise exception 'not_member';
+  end if;
+  perform public.hit_rate_limit('photo_upload', 300, interval '1 hour');
+  select count(*)::integer into v_pending
+  from public.photo_upload_intents
+  where user_id = auth.uid() and consumed = false and expires_at > now();
+  if v_pending >= 20 then
+    raise exception 'rate_limited';
+  end if;
+  select count(*)::integer into v_live_photos
+  from public.items
+  where board_id = p_board_id and photo_path is not null and deleted_at is null;
+  if v_live_photos >= 500 then
+    raise exception 'rate_limited';
+  end if;
+  v_path := p_board_id::text || '/' || p_item_id::text || '/'
+    || extensions.gen_random_uuid()::text || '.jpg';
+  insert into public.photo_upload_intents (path, board_id, item_id, user_id)
+  values (v_path, p_board_id, p_item_id, auth.uid());
+  return v_path;
+end;
+$$;
+
+-- Consume helper for post_item (nested use only, no grant): the path must
+-- resolve to an intent issued to this caller for this exact item — live, or
+-- already consumed by an idempotent retry of the same item id. A forged path,
+-- an expired unused intent, another user's path, or a replay onto another
+-- item (the path embeds the item id, checked by post_item first) all fail.
+create function public._consume_photo_intent(
+  p_board_id uuid, p_item_id uuid, p_photo_path text
+)
+returns void
+language plpgsql
+security definer
+set search_path = '' as $$
+begin
+  update public.photo_upload_intents
+  set consumed = true
+  where path = p_photo_path
+    and board_id = p_board_id
+    and item_id = p_item_id
+    and user_id = auth.uid()
+    and (consumed or expires_at > now());
+  if not found then
+    raise exception 'invalid_input';
+  end if;
+end;
+$$;
+
 create function public.leave_board(p_board_id uuid)
 returns void
 language plpgsql
@@ -348,6 +425,233 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
+-- Safety: quiet per-post reports (owner-only queue) and member blocking.
+-- Boards are private and invite-only, but anyone on a board can post to
+-- everyone else on it, so any member can report a post and the board owner
+-- can remove/keep it and block members. Blocked users get a silent NULL from
+-- accept_invite even with a fresh link.
+-- ---------------------------------------------------------------------------
+
+create function public.report_post(p_item_id uuid, p_reason text default null)
+returns void
+language plpgsql
+security definer
+set search_path = '' as $$
+declare
+  v_board uuid;
+begin
+  if auth.uid() is null then
+    raise exception 'not_authenticated';
+  end if;
+  if p_item_id is null then
+    raise exception 'invalid_input';
+  end if;
+  if p_reason is not null and char_length(p_reason) > 500 then
+    raise exception 'invalid_input';
+  end if;
+  select board_id into v_board
+  from public.items
+  where id = p_item_id and deleted_at is null;
+  if v_board is null or not public.is_member(v_board) then
+    raise exception 'not_member';
+  end if;
+  perform public.hit_rate_limit('report_post', 20, interval '1 hour');
+  insert into public.post_reports (item_id, board_id, reporter_id, reason)
+  values (p_item_id, v_board, auth.uid(),
+    case when p_reason is null then null else btrim(p_reason) end)
+  on conflict (item_id, reporter_id) do nothing;
+end;
+$$;
+
+create function public.list_reported_items(p_board_id uuid)
+returns table (
+  id uuid, board_id uuid, type public.item_type, color public.item_color,
+  body text, title text, event_at timestamptz, place text, photo_path text,
+  pinned boolean, keep_until timestamptz, created_by uuid, version integer,
+  created_at timestamptz, updated_at timestamptz, report_count integer
+)
+language plpgsql
+security definer
+set search_path = '' as $$
+declare
+  v_role public.member_role;
+begin
+  if auth.uid() is null then
+    raise exception 'not_authenticated';
+  end if;
+  select role into v_role
+  from public.board_members
+  where board_members.board_id = p_board_id and user_id = auth.uid();
+  if v_role is null then
+    raise exception 'not_member';
+  end if;
+  if v_role is distinct from 'owner' then
+    raise exception 'not_owner';
+  end if;
+  return query
+  select i.id, i.board_id, i.type, i.color, i.body, i.title, i.event_at,
+    i.place, i.photo_path, i.pinned, i.keep_until, i.created_by, i.version,
+    i.created_at, i.updated_at, count(r.id)::integer
+  from public.items i
+  join public.post_reports r on r.item_id = i.id
+  where i.board_id = p_board_id and i.deleted_at is null
+  group by i.id
+  order by max(r.created_at) desc;
+end;
+$$;
+
+create function public.dismiss_reports(p_item_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = '' as $$
+declare
+  v_board uuid;
+  v_role public.member_role;
+begin
+  if auth.uid() is null then
+    raise exception 'not_authenticated';
+  end if;
+  select board_id into v_board from public.items where id = p_item_id;
+  if v_board is null then
+    raise exception 'not_found';
+  end if;
+  select role into v_role
+  from public.board_members
+  where board_members.board_id = v_board and user_id = auth.uid();
+  if v_role is null then
+    raise exception 'not_member';
+  end if;
+  if v_role is distinct from 'owner' then
+    raise exception 'not_owner';
+  end if;
+  perform public.hit_rate_limit('item_write', 600, interval '1 hour');
+  delete from public.post_reports where item_id = p_item_id;
+end;
+$$;
+
+create function public.block_member(p_board_id uuid, p_user_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = '' as $$
+declare
+  v_caller_role public.member_role;
+  v_remaining integer;
+begin
+  if auth.uid() is null then
+    raise exception 'not_authenticated';
+  end if;
+  if p_user_id = auth.uid() then
+    raise exception 'invalid_input';
+  end if;
+  -- Same lock-then-check order as remove_member (board -> member rows).
+  perform 1 from public.boards where id = p_board_id for update;
+  if not exists (select 1 from public.boards where id = p_board_id and deleted_at is null) then
+    raise exception 'not_member';
+  end if;
+  select role into v_caller_role
+  from public.board_members
+  where board_id = p_board_id and user_id = auth.uid();
+  if v_caller_role is null then
+    raise exception 'not_member';
+  end if;
+  if v_caller_role is distinct from 'owner' then
+    raise exception 'not_owner';
+  end if;
+  perform public.hit_rate_limit('item_write', 600, interval '1 hour');
+  delete from public.board_members
+  where board_id = p_board_id and user_id = p_user_id;
+  -- The target must be a real account — otherwise the block insert would fail
+  -- on the raw foreign key instead of a stable error code.
+  if not exists (select 1 from public.profiles where id = p_user_id) then
+    raise exception 'not_found';
+  end if;
+  insert into public.board_blocks (board_id, user_id, blocked_by)
+  values (p_board_id, p_user_id, auth.uid())
+  on conflict (board_id, user_id) do nothing;
+  select count(*)::integer into v_remaining
+  from public.board_members
+  where board_id = p_board_id;
+  if v_remaining = 0 then
+    update public.boards
+    set deleted_at = now(), updated_at = now()
+    where id = p_board_id and deleted_at is null;
+  else
+    perform public.promote_longest_member(p_board_id);
+  end if;
+  -- A blocked member must not rejoin with the current link either.
+  update public.invites
+  set revoked_at = now()
+  where board_id = p_board_id and revoked_at is null;
+end;
+$$;
+
+create function public.unblock_member(p_board_id uuid, p_user_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = '' as $$
+declare
+  v_caller_role public.member_role;
+begin
+  if auth.uid() is null then
+    raise exception 'not_authenticated';
+  end if;
+  perform 1 from public.boards where id = p_board_id for update;
+  if not exists (select 1 from public.boards where id = p_board_id and deleted_at is null) then
+    raise exception 'not_member';
+  end if;
+  select role into v_caller_role
+  from public.board_members
+  where board_id = p_board_id and user_id = auth.uid();
+  if v_caller_role is null then
+    raise exception 'not_member';
+  end if;
+  if v_caller_role is distinct from 'owner' then
+    raise exception 'not_owner';
+  end if;
+  perform public.hit_rate_limit('item_write', 600, interval '1 hour');
+  delete from public.board_blocks
+  where board_id = p_board_id and user_id = p_user_id;
+  if not found then
+    raise exception 'not_found';
+  end if;
+  -- Unblocking does not re-add the membership: the person rejoins with a
+  -- fresh invite link, like any new member.
+end;
+$$;
+
+create function public.list_blocked(p_board_id uuid)
+returns table (user_id uuid, display_name text, blocked_at timestamptz)
+language plpgsql
+security definer
+set search_path = '' as $$
+declare
+  v_role public.member_role;
+begin
+  if auth.uid() is null then
+    raise exception 'not_authenticated';
+  end if;
+  select role into v_role
+  from public.board_members
+  where board_members.board_id = p_board_id and board_members.user_id = auth.uid();
+  if v_role is null then
+    raise exception 'not_member';
+  end if;
+  if v_role is distinct from 'owner' then
+    raise exception 'not_owner';
+  end if;
+  return query
+  select b.user_id, p.display_name, b.blocked_at
+  from public.board_blocks b
+  join public.profiles p on p.id = b.user_id
+  where b.board_id = p_board_id
+  order by b.blocked_at desc;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- Items
 -- ---------------------------------------------------------------------------
 
@@ -413,6 +717,10 @@ begin
     if p_photo_path not like p_board_id::text || '/' || p_id::text || '/%' then
       raise exception 'invalid_input';
     end if;
+    -- The path must come from a live upload intent issued to this caller for
+    -- this exact item (consumes the intent, so a path cannot be linked twice
+    -- or replayed onto another item). Retries of the same item id still pass.
+    perform public._consume_photo_intent(p_board_id, p_id, p_photo_path);
   end if;
   if p_type = 'photo' and p_photo_path is null then
     raise exception 'invalid_input';
@@ -1274,6 +1582,22 @@ grant execute on function public.leave_board(uuid) to authenticated;
 
 revoke all on function public.remove_member(uuid, uuid) from public, anon;
 grant execute on function public.remove_member(uuid, uuid) to authenticated;
+
+revoke all on function public.report_post(uuid, text) from public, anon;
+grant execute on function public.report_post(uuid, text) to authenticated;
+revoke all on function public.list_reported_items(uuid) from public, anon;
+grant execute on function public.list_reported_items(uuid) to authenticated;
+revoke all on function public.dismiss_reports(uuid) from public, anon;
+grant execute on function public.dismiss_reports(uuid) to authenticated;
+revoke all on function public.block_member(uuid, uuid) from public, anon;
+grant execute on function public.block_member(uuid, uuid) to authenticated;
+revoke all on function public.unblock_member(uuid, uuid) from public, anon;
+grant execute on function public.unblock_member(uuid, uuid) to authenticated;
+revoke all on function public.list_blocked(uuid) from public, anon;
+grant execute on function public.list_blocked(uuid) to authenticated;
+
+revoke all on function public.start_photo_upload(uuid, uuid) from public, anon;
+grant execute on function public.start_photo_upload(uuid, uuid) to authenticated;
 
 revoke all on function public.post_item(uuid, uuid, item_type, item_color, text, text, timestamptz, text, text, boolean, jsonb) from public, anon;
 grant execute on function public.post_item(uuid, uuid, item_type, item_color, text, text, timestamptz, text, text, boolean, jsonb) to authenticated;

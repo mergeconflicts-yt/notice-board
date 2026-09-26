@@ -26,8 +26,13 @@ supabase status         # URLs + keys
 supabase db reset       # wipe + replay all migrations (dev only!)
 supabase test db        # pgTAP suites in supabase/tests/
 supabase db lint --level warning
-supabase functions serve   # run Edge Functions locally
+supabase functions serve   # run Edge Functions locally (separate terminal!)
 ```
+
+`supabase start` does **not** serve Edge Functions. Guest sign-out and
+account deletion call the `delete-account` function, so without
+`supabase functions serve` running alongside, both fail with a network error.
+Keep both processes up during development.
 
 ### App wiring
 

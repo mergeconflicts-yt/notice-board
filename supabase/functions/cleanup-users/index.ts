@@ -1,5 +1,7 @@
 // Edge Function: cleanup-users (docs/plan.md §10). Service-role only.
-// Deletes anonymous users with no board memberships and no recent activity.
+// Deletes inactive anonymous users: memberless after 30 days, board members
+// after 90 days (uninstall/device-loss grace; guest sign-out itself deletes
+// the account immediately client-side).
 //
 // Candidate selection runs in SQL (inactive_anonymous_user_ids), joining
 // auth.users against board_members so it scales and sees boards joined

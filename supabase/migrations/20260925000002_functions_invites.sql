@@ -308,6 +308,15 @@ begin
     perform public.hit_rate_limit('invite_try', 10, interval '1 hour');
     return null;
   end if;
+  -- Blocked members stay out silently (same NULL as an invalid invite, so the
+  -- error never reveals the block). Unblocking does not re-add membership;
+  -- the person rejoins with a fresh invite link.
+  if exists (
+    select 1 from public.board_blocks
+    where board_id = v_inv.board_id and user_id = auth.uid()
+  ) then
+    return null;
+  end if;
   insert into public.board_members (board_id, user_id, role)
   values (v_inv.board_id, auth.uid(), 'member')
   on conflict (board_id, user_id) do nothing;

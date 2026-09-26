@@ -20,6 +20,8 @@ revoke execute on function public.pick_invite_code() from public, anon, authenti
 revoke execute on function public.normalise_invite_code(text) from public, anon, authenticated;
 revoke execute on function public.hit_rate_limit(text, integer, interval) from public, anon, authenticated;
 revoke execute on function public.run_list_lifetime(uuid) from public, anon, authenticated;
+revoke execute on function public._consume_photo_intent(uuid, uuid, text) from public, anon, authenticated;
+revoke execute on function public.purge_stale_upload_intents() from public, anon, authenticated;
 revoke execute on function public.promote_longest_member(uuid) from public, anon, authenticated;
 revoke execute on function public.expire_items() from public, anon, authenticated;
 revoke execute on function public.cleanup_rate_limits() from public, anon, authenticated;

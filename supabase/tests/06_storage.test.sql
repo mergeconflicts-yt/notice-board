@@ -1,7 +1,7 @@
 -- Phase 3: private photo/avatar storage policies.
 -- Roles: O owner/uploader, S stranger, M co-member.
 begin;
-select plan(15);
+select plan(17);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000051', 'authenticated', 'authenticated'),
@@ -12,6 +12,14 @@ values ('b0000000-0000-0000-0000-000000000051', 'Photos', 'a0000000-0000-0000-00
 insert into public.board_members (board_id, user_id, role) values
   ('b0000000-0000-0000-0000-000000000051', 'a0000000-0000-0000-0000-000000000051', 'owner'),
   ('b0000000-0000-0000-0000-000000000051', 'a0000000-0000-0000-0000-000000000053', 'member');
+
+-- Upload intent for the member-upload tests below (superuser bypasses RLS).
+-- The storage policy only accepts the exact intent path, so the upload test
+-- creates its intent first, exactly like the app does.
+insert into public.photo_upload_intents (path, board_id, item_id, user_id) values
+  ('b0000000-0000-0000-0000-000000000051/i2/new.jpg',
+   'b0000000-0000-0000-0000-000000000051', 'i2000000-0000-0000-0000-000000000051',
+   'a0000000-0000-0000-0000-000000000051');
 
 -- Fixture objects (superuser bypasses RLS).
 insert into storage.objects (bucket_id, name, owner) values
@@ -50,7 +58,17 @@ select lives_ok(
   $$insert into storage.objects (bucket_id, name, owner)
     values ('board-photos', 'b0000000-0000-0000-0000-000000000051/i2/new.jpg',
             'a0000000-0000-0000-0000-000000000051')$$,
-  'member uploads into their board folder');
+  'member uploads to their live intent path');
+select throws_ok(
+  $$insert into storage.objects (bucket_id, name, owner)
+    values ('board-photos', 'b0000000-0000-0000-0000-000000000051/i2/bypass.jpg',
+            'a0000000-0000-0000-0000-000000000051')$$,
+  '42501', null, 'member cannot upload outside an intent path');
+select throws_ok(
+  $$insert into storage.objects (bucket_id, name, owner)
+    values ('board-photos', 'b0000000-0000-0000-0000-000000000051/i2/new.png',
+            'a0000000-0000-0000-0000-000000000051')$$,
+  '42501', null, 'non-jpg upload rejected (intents only issue .jpg)');
 select throws_ok(
   $$insert into storage.objects (bucket_id, name, owner)
     values ('board-photos', 'c0000000-0000-0000-0000-000000000051/i2/x.jpg',

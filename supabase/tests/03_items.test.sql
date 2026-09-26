@@ -57,8 +57,9 @@ select throws_ok(
 select lives_ok(
   $$select public.post_item('c0000000-0000-0000-0000-000000000025', (select id from t_b),
     'photo', 'paper', 'cap', null, null, null,
-    (select id from t_b) || '/c0000000-0000-0000-0000-000000000025/f.jpg', false, null)$$,
-  'post photo');
+    public.start_photo_upload((select id from t_b), 'c0000000-0000-0000-0000-000000000025'),
+    false, null)$$,
+  'post photo with an intent path');
 select ok(
   (select keep_until > now() + interval '13 days' and keep_until < now() + interval '15 days'
    from public.items where id = 'c0000000-0000-0000-0000-000000000025'),

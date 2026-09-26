@@ -63,6 +63,16 @@ of any per-action bucket (`post_item`, `add_entry`, invites).
 | `leave_board(p_board_id)` | member | promotes longest member or soft-deletes empty board |
 | `remove_member(p_board_id, p_user_id)` | owner | cannot remove self |
 
+### Safety (report + block)
+| Function | Access | Notes |
+|---|---|---|
+| `report_post(p_item_id, p_reason?)` | member | idempotent per reporter/item; rate limit 20/h |
+| `list_reported_items(p_board_id)` | owner | live reported posts with report counts |
+| `dismiss_reports(p_item_id)` | owner | clears the queue for a kept post |
+| `block_member(p_board_id, p_user_id)` | owner | removes membership, revokes invite, records a block; blocked users get silent NULL from `accept_invite` even with a fresh link |
+| `unblock_member(p_board_id, p_user_id)` | owner | lifts the block; the person rejoins with a fresh invite link |
+| `list_blocked(p_board_id)` | owner | blocked users with timestamps |
+
 ### Invites
 | Function | Access | Notes |
 |---|---|---|
@@ -74,7 +84,7 @@ of any per-action bucket (`post_item`, `add_entry`, invites).
 ### Items
 | Function | Access | Notes |
 |---|---|---|
-| `post_item(p_id, p_board_id, p_type, p_color, p_body, p_title, p_event_at, p_place, p_photo_path, p_pinned, p_entries)` → item | member | idempotent on `p_id`; validates photo path `<board_id>/<item_id>/…` and that fields match the type (finite `event_at`, dates only); title list/date, place date; rate limit 300/h |
+| `post_item(p_id, p_board_id, p_type, p_color, p_body, p_title, p_event_at, p_place, p_photo_path, p_pinned, p_entries)` → item | member | idempotent on `p_id`; photo paths must come from a live `start_photo_upload` intent for the same item (consumed on link, so forged or replayed paths are rejected); validates photo path `<board_id>/<item_id>/…` and that fields match the type (finite `event_at`, dates only); title list/date, place date; rate limit 300/h |
 | `edit_item(p_id, p_expected_version, p_body, p_title, p_event_at, p_place, p_color)` | author | `version_conflict` on stale version; same type rules; a date's lifetime is recomputed only when `event_at` changes |
 | `set_pinned(p_id, p_pinned)` | member | pinned = `keep_until NULL`; no-op if already in that state |
 | `set_done(p_id, p_done)` | member | notes/dates only; first done wins; no-op if already in that state |
@@ -93,6 +103,17 @@ of any per-action bucket (`post_item`, `add_entry`, invites).
 
 Ticking/removing an entry locks the parent list first, so two people ticking
 the last two entries can't both recompute `keep_until` from stale state.
+
+### Photo uploads
+| Function | Access | Notes |
+|---|---|---|
+| `start_photo_upload(p_board_id, p_item_id)` → path | member | issues a one-time intent path; ≤20 pending intents/user, ≤500 live photos/board, 300/h |
+
+Every photo upload is bound to a server-issued intent: the `board-photos`
+INSERT policy only accepts the exact live intent path (`.jpg`), and
+`post_item` consumes the intent when the photo is linked. Client-side
+resize/re-encode (EXIF strip) still happens on device; byte-level
+server-side validation needs an Edge Function on the storage webhook.
 
 ## Realtime
 

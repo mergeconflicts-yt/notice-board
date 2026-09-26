@@ -1,9 +1,10 @@
 -- Phase 3 (docs/plan.md §7): private photo + avatar storage.
 --
 -- board-photos/<board_id>/<item_id>/<uuid>.jpg — readable by that board's
--- members, writable only by a member uploading their own object. No update
--- or delete policies: edits replace the file via a new item, and deletion is
--- the purge job's job (service role).
+-- members, writable only by a member uploading to a live upload intent issued
+-- to them for that exact path (see start_photo_upload). No update or delete
+-- policies: edits replace the file via a new item, and deletion is the purge
+-- job's job (service role).
 --
 -- avatars/<user_id>/<uuid>.jpg — readable by the user and by anyone who
 -- shares a board with them, writable only by the owning user.
@@ -56,6 +57,16 @@ create policy "board_photos_member_upload" on storage.objects
     bucket_id = 'board-photos'
     and public.is_member(public._path_board_id(name))
     and owner = auth.uid()
+    -- Intents only ever issue `<board>/<item>/<uuid>.jpg`: the exact live
+    -- intent path must exist for this caller.
+    and name like '%.jpg'
+    and exists (
+      select 1 from public.photo_upload_intents i
+      where i.path = name
+        and i.user_id = auth.uid()
+        and i.consumed = false
+        and i.expires_at > now()
+    )
   );
 
 -- ---------------------------------------------------------------------------

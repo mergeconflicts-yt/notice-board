@@ -21,14 +21,25 @@
 - `noticeboard://auth` in the redirect URLs
 - the Vault secrets `invite`, `functions_url` and `job_secret`
 - `JOB_SECRET`, `SUPABASE_DB_URL` and the other secrets in GitHub
-- a manual run of deploy.yml
+- a manual run of deploy.yml (it now ends with a fail-closed
+  "Verify production security posture" step: captcha, confirmations, redirect
+  allowlist, private buckets, Vault secrets and cron health — fix the dashboard
+  and re-run if it fails)
 - a check of `http_failures()` the next day to confirm the nightly jobs ran
+- photo uploads are bound to server-issued intents (`start_photo_upload`);
+  true server-side re-encode/EXIF validation still needs an Edge Function on
+  the storage webhook — track before scaling past family use.
 
 ## 4. Store requirements:
 - No `eas.json` means no way to make store builds yet.
-- A privacy policy URL is required by both stores. You store names, photos and optionally email addresses.
-- Report and block for posted content. Apple's guideline 1.2 asks apps where people post content to others to let them report or block. Your boards are private and invite-only, but reviewers often still ask. A "Report" action on a post plus
-"Remove member" is usually enough. Moderation was out of scope in your plan, so decide this now.
+- Privacy policy URL: `website/privacy.html` (with Terms and Contact pages
+  beside it; the app links all three from You → Privacy/Terms/Contact). You
+  store names, photos and optionally email addresses — all disclosed there.
+- Report and block for posted content: any member can Report a post to the
+  board owner from the post screen; owners review reports, remove/keep posts,
+  and block members (blocked users can't rejoin even with a fresh link) in
+  Fridge settings → Safety. Moderation was out of scope in your plan — this
+  is the decided scope.
 - App Privacy details for the App Store and the Data safety form for Play.
 - The bundle id `com.noticeboard.app` is generic. Make sure you own it before you register it.
 

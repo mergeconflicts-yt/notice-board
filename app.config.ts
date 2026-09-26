@@ -9,18 +9,31 @@ import appJson from './app.json';
 export default ({ config }: ConfigContext): ExpoConfig => {
   const base = appJson.expo as unknown as ExpoConfig;
   const inviteBase = process.env.EXPO_PUBLIC_INVITE_BASE_URL ?? '';
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
+  const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+  const turnstileSiteKey = process.env.EXPO_PUBLIC_TURNSTILE_SITE_KEY ?? '';
 
   // A production build must know its public origin: universal links and the
   // Turnstile page origin both depend on it, and a silent empty value would
-  // ship a broken invite/captcha flow.
+  // ship a broken invite/captcha flow. Supabase credentials and the Turnstile
+  // site key are equally load-bearing — without them the app cannot sign in
+  // (or can be signed in without any captcha) — so fail the build rather
+  // than shipping a build that can only fail at runtime.
   const isProdBuild =
     process.env.EAS_BUILD === 'true' && process.env.EAS_BUILD_PROFILE === 'production';
   if (isProdBuild) {
-    if (!inviteBase) {
-      throw new Error('EXPO_PUBLIC_INVITE_BASE_URL is required for a production build.');
+    const missing: string[] = [];
+    if (!inviteBase || !/^https:\/\/[^/]+/i.test(inviteBase)) {
+      missing.push('EXPO_PUBLIC_INVITE_BASE_URL (must be an https:// URL)');
     }
-    if (!/^https:\/\/[^/]+/i.test(inviteBase)) {
-      throw new Error('EXPO_PUBLIC_INVITE_BASE_URL must be an https:// URL.');
+    if (!supabaseUrl) missing.push('EXPO_PUBLIC_SUPABASE_URL');
+    if (!supabaseAnonKey) missing.push('EXPO_PUBLIC_SUPABASE_ANON_KEY');
+    if (!turnstileSiteKey) missing.push('EXPO_PUBLIC_TURNSTILE_SITE_KEY');
+    if (missing.length > 0) {
+      throw new Error(
+        `Missing required production config: ${missing.join(', ')}. ` +
+          'See docs/infrastructure.md.',
+      );
     }
   }
 

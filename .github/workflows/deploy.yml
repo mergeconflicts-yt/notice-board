@@ -78,3 +78,57 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Verify production security posture
+        # Fail-closed post-deployment check: captcha/auth hardening via the
+        # Management API (auth config is not visible from Postgres), plus
+        # private buckets, Vault secrets and scheduled-job health via SQL.
+        # DB checks use the session pooler — GitHub runners have no IPv6.
+        run: |
+          missing_db=$(psql "$SUPABASE_DB_URL" -tAc "
+            with checks(name, ok) as (
+              values
+                ('board-photos_private',
+                  (select not public from storage.buckets where id = 'board-photos')),
+                ('avatars_private',
+                  (select not public from storage.buckets where id = 'avatars')),
+                ('vault_functions_url',
+                  (select exists (select 1 from vault.secrets where name = 'functions_url'))),
+                ('vault_job_secret',
+                  (select exists (select 1 from vault.secrets where name = 'job_secret'))),
+                ('cron_expire-items',
+                  (select count(*) = 1 from cron.job where jobname = 'expire-items')),
+                ('cron_purge-nightly',
+                  (select count(*) = 1 from cron.job where jobname = 'purge-nightly')),
+                ('cron_cleanup-users-nightly',
+                  (select count(*) = 1 from cron.job where jobname = 'cleanup-users-nightly')),
+                ('cron_cleanup-upload-intents',
+                  (select count(*) = 1 from cron.job where jobname = 'cleanup-upload-intents'))
+            )
+            select string_agg(name, ',') from checks where not ok")
+          if [ -n "$missing_db" ]; then echo "db security check failed: $missing_db"; exit 1; fi
+          curl -sf -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config/auth" \
+            -o /tmp/auth-config.json
+          python3 - <<'EOF'
+          import json, sys
+          cfg = json.load(open('/tmp/auth-config.json'))
+          bad = []
+          if cfg.get('security_captcha_enabled') is not True:
+            bad.append('captcha_enabled')
+          if cfg.get('mailer_autoconfirm') is not False:
+            bad.append('email_confirmations_on')
+          allow = cfg.get('uri_allow_list') or ''
+          if 'noticeboard://' not in allow:
+            bad.append('redirect_allowlist_has_noticeboard_scheme')
+          if not cfg.get('smtp_host'):
+            bad.append('custom_smtp')
+          if bad:
+            print('auth security check failed: ' + ','.join(bad))
+            sys.exit(1)
+          print('production security posture OK')
+          EOF
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}

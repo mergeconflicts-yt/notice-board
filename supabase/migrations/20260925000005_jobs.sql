@@ -2,6 +2,8 @@
 --
 --   * expire-items          every 15 min — soft-delete keep_until lapses (SQL)
 --   * cleanup-rate-limits   hourly       — delete expired rate_limits windows
+--   * cleanup-invites       hourly       — delete stale invite rows
+--   * cleanup-upload-intents hourly      — sweep expired upload intents
 --   * purge-nightly         nightly      — Edge Function purge
 --   * cleanup-users-nightly nightly      — Edge Function cleanup-users
 --
@@ -133,6 +135,23 @@ begin
 end;
 $$;
 
+-- Sweep expired upload intents (issued but never linked, over an hour old).
+-- Orphan files keep their existing 24 h purge via photo_paths_in_use.
+create function public.purge_stale_upload_intents()
+returns integer
+language plpgsql
+security definer
+set search_path = '' as $$
+declare
+  v_deleted integer;
+begin
+  delete from public.photo_upload_intents
+  where expires_at < now() - interval '1 hour';
+  get diagnostics v_deleted = row_count;
+  return v_deleted;
+end;
+$$;
+
 -- POST to an Edge Function with a dedicated job secret from Vault. No-op (with
 -- a warning) when the secrets are not configured. Not callable by client roles.
 --
@@ -230,6 +249,13 @@ begin
   exception when others then null;
   end;
   perform cron.schedule('cleanup-invites', '20 * * * *', 'select public.purge_stale_invites()');
+
+  begin
+    perform cron.unschedule('cleanup-upload-intents');
+  exception when others then null;
+  end;
+  perform cron.schedule('cleanup-upload-intents', '25 * * * *',
+    'select public.purge_stale_upload_intents()');
 
   begin
     perform cron.unschedule('purge-nightly');

@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { KeychainError, LargeSecureStore } from '../lib/secureStore';
 import { forgetBoard } from '../lib/lastBoard';
 import {
+  ApiError,
   deleteAccount as apiDeleteAccount,
   friendlyMessage,
   sendSignupCode,
@@ -313,8 +314,29 @@ export const useSession = create<SessionState>((set) => ({
     resetRetry();
     intentionalSignOut = true;
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      // A guest account has no sign-in to come back to, so signing out would
+      // strand its boards, memberships and posts on the server forever. Delete
+      // the account instead (the UI already warns this is destructive); a
+      // linked account just ends the session.
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const isGuest = !user || (user as { is_anonymous?: boolean }).is_anonymous === true;
+      if (isGuest && user) {
+        try {
+          await apiDeleteAccount();
+        } catch (e) {
+          // The server has no such user (already deleted server-side, e.g. a
+          // half-finished earlier attempt or nightly cleanup): there is
+          // nothing left to delete, so fall through to local cleanup instead
+          // of stranding the user on an error toast.
+          if (!(e instanceof ApiError && e.code === 'not_authenticated')) throw e;
+          await supabase.auth.signOut({ scope: 'local' });
+        }
+      } else {
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+      }
       // Only drop the marker once the sign-out actually succeeded: a failed
       // sign-out must leave the stored identity for the next launch to offer
       // (rather than silently mint a new user).

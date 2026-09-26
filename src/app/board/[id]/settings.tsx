@@ -10,12 +10,19 @@ import { useBoard, fetchRemovedItems } from '../../../hooks/useBoard';
 import { useSession } from '../../../store/session';
 import { useToast } from '../../../store/toast';
 import {
+  BlockedMember,
+  blockMember as apiBlockMember,
   deleteBoard as apiDeleteBoard,
+  dismissReports as apiDismissReports,
   friendlyMessage,
+  getBlocked as apiGetBlocked,
   getInviteLink,
+  getReportedItems as apiGetReportedItems,
   leaveBoard as apiLeaveBoard,
+  removeItem as apiRemoveItem,
   renameBoard as apiRenameBoard,
   restoreItem as apiRestoreItem,
+  unblockMember as apiUnblockMember,
 } from '../../../lib/api';
 import { inviteMessage } from '../../../lib/inviteLinks';
 import { BoardColor, ItemWithAuthor } from '../../../types';
@@ -28,6 +35,8 @@ export default function BoardSettingsScreen() {
   const [draftName, setDraftName] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
   const [removed, setRemoved] = useState<ItemWithAuthor[] | null>(null);
+  const [reported, setReported] = useState<ItemWithAuthor[] | null>(null);
+  const [blocked, setBlocked] = useState<BlockedMember[] | null>(null);
 
   const name = draftName ?? board?.name ?? '';
   const myMembership = user ? members.find((m) => m.userId === user.id) : undefined;
@@ -82,6 +91,80 @@ export default function BoardSettingsScreen() {
     } catch (e) {
       useToast.getState().show(friendlyMessage(e));
     }
+  };
+
+  // Owner-only safety queue: reported posts with keep/dismiss actions, and the
+  // block list. Non-owners never see these rows (see the render below).
+  const openReported = async () => {
+    try {
+      setReported(await apiGetReportedItems(boardId));
+    } catch (e) {
+      useToast.getState().show(friendlyMessage(e));
+    }
+  };
+
+  const keepReported = async (item: ItemWithAuthor) => {
+    try {
+      await apiDismissReports(item.id);
+      setReported((prev) => (prev ? prev.filter((i) => i.id !== item.id) : prev));
+    } catch (e) {
+      useToast.getState().show(friendlyMessage(e));
+    }
+  };
+
+  const removeReported = async (item: ItemWithAuthor) => {
+    try {
+      await apiRemoveItem(item.id);
+      await apiDismissReports(item.id);
+      setReported((prev) => (prev ? prev.filter((i) => i.id !== item.id) : prev));
+      await reload();
+    } catch (e) {
+      useToast.getState().show(friendlyMessage(e));
+    }
+  };
+
+  const openBlocked = async () => {
+    try {
+      setBlocked(await apiGetBlocked(boardId));
+    } catch (e) {
+      useToast.getState().show(friendlyMessage(e));
+    }
+  };
+
+  const confirmBlock = (userId: string, name: string) => {
+    Alert.alert(`Block ${name}?`, 'They leave this fridge and can’t rejoin, even with a fresh invite link.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Block',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await apiBlockMember(boardId, userId);
+            await reload();
+            setBlocked(await apiGetBlocked(boardId));
+          } catch (e) {
+            useToast.getState().show(friendlyMessage(e));
+          }
+        },
+      },
+    ]);
+  };
+
+  const confirmUnblock = (userId: string, name: string) => {
+    Alert.alert(`Unblock ${name}?`, 'They can join again with a fresh invite link.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Unblock',
+        onPress: async () => {
+          try {
+            await apiUnblockMember(boardId, userId);
+            setBlocked((prev) => (prev ? prev.filter((b) => b.userId !== userId) : prev));
+          } catch (e) {
+            useToast.getState().show(friendlyMessage(e));
+          }
+        },
+      },
+    ]);
   };
 
   const confirmLeave = () => {
@@ -230,6 +313,87 @@ export default function BoardSettingsScreen() {
           </View>
         ) : null}
 
+        {isOwner ? (
+          <>
+            <Text style={styles.sectionLabel}>Safety</Text>
+            <View style={styles.group}>
+              <Pressable style={styles.row} onPress={openReported}>
+                <Text style={styles.rowLabel}>Reported posts</Text>
+                <Text style={styles.rowValue}>Review ›</Text>
+              </Pressable>
+              <View style={styles.divider} />
+              <Pressable style={styles.row} onPress={openBlocked}>
+                <Text style={styles.rowLabel}>Blocked people</Text>
+                <Text style={styles.rowValue}>
+                  {blocked === null ? 'View ›' : `${blocked.length} blocked ›`}
+                </Text>
+              </Pressable>
+            </View>
+
+            {reported ? (
+              <View style={styles.removedList}>
+                {reported.length === 0 ? (
+                  <Text style={styles.rowValue}>No reports. Nice fridge.</Text>
+                ) : (
+                  reported.map((item) => (
+                    <View key={item.id} style={styles.removedRow}>
+                      <Text style={styles.removedText} numberOfLines={1}>
+                        {item.title ?? item.body ?? 'Post'}
+                      </Text>
+                      <View style={styles.reportActions}>
+                        <Pressable onPress={() => keepReported(item)} hitSlop={8}>
+                          <Text style={styles.restore}>Keep</Text>
+                        </Pressable>
+                        <Pressable onPress={() => removeReported(item)} hitSlop={8}>
+                          <Text style={styles.dangerText}>Remove</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ))
+                )}
+              </View>
+            ) : null}
+
+            {blocked && blocked.length > 0 ? (
+              <View style={styles.removedList}>
+                {blocked.map((b) => (
+                  <View key={b.userId} style={styles.removedRow}>
+                    <Text style={styles.removedText} numberOfLines={1}>
+                      {b.displayName}
+                    </Text>
+                    <Pressable onPress={() => confirmUnblock(b.userId, b.displayName)} hitSlop={8}>
+                      <Text style={styles.restore}>Unblock</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            {members.filter((m) => m.userId !== user?.id).length > 0 ? (
+              <>
+                <Text style={styles.sectionLabel}>Block someone</Text>
+                <View style={styles.removedList}>
+                  {members
+                    .filter((m) => m.userId !== user?.id)
+                    .map((m) => (
+                      <View key={m.userId} style={styles.removedRow}>
+                        <Text style={styles.removedText} numberOfLines={1}>
+                          {m.user.displayName}
+                        </Text>
+                        <Pressable
+                          onPress={() => confirmBlock(m.userId, m.user.displayName)}
+                          hitSlop={8}
+                        >
+                          <Text style={styles.dangerText}>Block</Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                </View>
+              </>
+            ) : null}
+          </>
+        ) : null}
+
         <Text style={styles.sectionLabel}>Fridge access</Text>
         <View style={styles.group}>
           {memberCount > 1 ? (
@@ -302,5 +466,6 @@ const styles = StyleSheet.create({
   },
   removedText: { flex: 1, fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.ink },
   restore: { fontFamily: fonts.ui.bold, fontSize: 14, color: colors.accentDeep },
+  reportActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   dangerText: { color: colors.danger },
 });

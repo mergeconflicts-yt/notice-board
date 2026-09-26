@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, Alert, Platform } from 'react-native';
+import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, Alert, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -19,6 +19,18 @@ import {
   myAccount,
   requestEmailChange,
 } from '../lib/api';
+import { INVITE_BASE_URL } from '../lib/inviteLinks';
+
+/** Open a legal page on the website (Privacy / Terms / Contact). */
+async function openLegal(page: 'privacy.html' | 'terms.html' | 'contact.html'): Promise<void> {
+  const base = INVITE_BASE_URL.replace(/\/$/, '');
+  if (!base) return;
+  try {
+    await Linking.openURL(`${base}/${page}`);
+  } catch {
+    // No browser available — nothing to report.
+  }
+}
 
 export default function ProfileScreen() {
   const user = useSession((s) => s.user);
@@ -100,12 +112,12 @@ export default function ProfileScreen() {
   };
 
   const confirmSignOut = () => {
-    // A guest identity has no sign-in to come back to, so warn that leaving
-    // loses the boards; a saved account just ends the session.
+    // A guest identity is deleted on sign-out (there is no sign-in to come
+    // back to); a saved account just ends the session.
     Alert.alert(
       'Sign out?',
       isGuest
-        ? 'You’ll lose this account and every fridge you’re on. This can’t be undone. Save your account first to keep them.'
+        ? 'Signing out deletes this guest account and removes you from every fridge you’re on. This can’t be undone. Save your account first to keep them.'
         : 'You’ll be signed out. Sign back in to get your fridges again.',
       [
         { text: 'Cancel', style: 'cancel' },
@@ -224,6 +236,20 @@ export default function ProfileScreen() {
         <Pressable style={styles.dangerRow} onPress={confirmDelete}>
           <Text style={styles.dangerText}>Delete account</Text>
         </Pressable>
+
+        <View style={styles.legalRow}>
+          <Pressable onPress={() => void openLegal('privacy.html')}>
+            <Text style={styles.legalText}>Privacy</Text>
+          </Pressable>
+          <Text style={styles.legalDot}>·</Text>
+          <Pressable onPress={() => void openLegal('terms.html')}>
+            <Text style={styles.legalText}>Terms</Text>
+          </Pressable>
+          <Text style={styles.legalDot}>·</Text>
+          <Pressable onPress={() => void openLegal('contact.html')}>
+            <Text style={styles.legalText}>Contact</Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -295,4 +321,14 @@ const styles = StyleSheet.create({
   nameLinkText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.ink },
   dangerRow: { marginTop: 6, paddingVertical: 12 },
   dangerText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.danger },
+  legalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginTop: 28,
+    paddingBottom: 8,
+  },
+  legalText: { fontFamily: fonts.ui.semibold, fontSize: 14, color: colors.inkSoft },
+  legalDot: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.inkFaint },
 });
