@@ -1,5 +1,8 @@
 -- Phase 3: private photo/avatar storage policies.
 -- Roles: O owner/uploader, S stranger, M co-member.
+-- board-photos admits NO client writes: only the upload-photo Edge Function
+-- (service role) writes bytes, so every direct insert below must fail —
+-- including to a live intent path.
 begin;
 select plan(19);
 
@@ -13,12 +16,12 @@ insert into public.board_members (board_id, user_id, role) values
   ('b0000000-0000-0000-0000-000000000051', 'a0000000-0000-0000-0000-000000000051', 'owner'),
   ('b0000000-0000-0000-0000-000000000051', 'a0000000-0000-0000-0000-000000000053', 'member');
 
--- Upload intent for the member-upload tests below (superuser bypasses RLS).
--- The storage policy only accepts the exact intent path, so the upload test
--- creates its intent first, exactly like the app does.
+-- Upload intent for the denial tests below (superuser bypasses RLS).
+-- Even the exact live intent path admits no direct client upload: only the
+-- upload-photo Edge Function (service role) writes bytes.
 insert into public.photo_upload_intents (path, board_id, item_id, user_id) values
   ('b0000000-0000-0000-0000-000000000051/i2/new.jpg',
-   'b0000000-0000-0000-0000-000000000051', 'i2000000-0000-0000-0000-000000000051',
+   'b0000000-0000-0000-0000-000000000051', 'c0000000-0000-0000-0000-000000000051',
    'a0000000-0000-0000-0000-000000000051');
 
 -- Fixture objects (superuser bypasses RLS).
@@ -54,11 +57,11 @@ select is(
 select is(
   (select count(*)::integer from storage.objects where bucket_id = 'avatars'),
   1, 'owner reads own avatar');
-select lives_ok(
+select throws_ok(
   $$insert into storage.objects (bucket_id, name, owner)
     values ('board-photos', 'b0000000-0000-0000-0000-000000000051/i2/new.jpg',
             'a0000000-0000-0000-0000-000000000051')$$,
-  'member uploads to their live intent path');
+  '42501', null, 'member cannot upload even to their live intent path');
 select throws_ok(
   $$insert into storage.objects (bucket_id, name, owner)
     values ('board-photos', 'b0000000-0000-0000-0000-000000000051/i2/bypass.jpg',

@@ -418,6 +418,12 @@ verify_jwt = false
 # See [functions.purge]: self-authorised via the job secret.
 verify_jwt = false
 
+[functions.upload-photo]
+# Called by the app with the caller's JWT; the function re-checks intent
+# ownership itself. JWT verification stays on. This is the only writer of
+# board-photos bytes (the storage policy admits no direct client uploads).
+verify_jwt = true
+
 [edge_runtime]
 enabled = true
 # Supported request policies: `oneshot`, `per_worker`.

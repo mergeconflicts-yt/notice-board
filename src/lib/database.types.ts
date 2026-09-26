@@ -386,6 +386,7 @@ export type Database = {
       photo_upload_intents: {
         Row: {
           board_id: string
+          byte_size: number | null
           consumed: boolean
           created_at: string
           expires_at: string
@@ -395,6 +396,7 @@ export type Database = {
         }
         Insert: {
           board_id: string
+          byte_size?: number | null
           consumed?: boolean
           created_at?: string
           expires_at?: string
@@ -404,6 +406,7 @@ export type Database = {
         }
         Update: {
           board_id?: string
+          byte_size?: number | null
           consumed?: boolean
           created_at?: string
           expires_at?: string

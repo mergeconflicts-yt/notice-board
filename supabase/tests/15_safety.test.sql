@@ -25,10 +25,13 @@ select lives_ok(
 select lives_ok(
   $$select public.report_post('c0000000-0000-0000-0000-000000000091', 'rude')$$,
   'repeat report is a no-op');
+reset role;
 select is(
   (select count(*)::integer from public.post_reports
    where item_id = 'c0000000-0000-0000-0000-000000000091'),
   1, 'one report row per reporter/item');
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000092', true);
+set role authenticated;
 
 -- O reports too; the queue shows the post once with count 2.
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000091', true);

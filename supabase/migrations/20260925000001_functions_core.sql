@@ -241,13 +241,15 @@ $$;
 
 -- ---------------------------------------------------------------------------
 -- Photo upload intents: every photo upload is bound to a server-issued path.
--- The board-photos storage policy only accepts the exact live intent path,
--- and post_item consumes the intent when the photo is linked — so bytes
--- uploaded outside the intent flow can never appear on a board. Quotas bound
--- the abuse: 300 intents/hour, 20 pending per user (orphan bytes), 500 live
--- photos per board. Client-side resize/re-encode (EXIF strip) still happens
--- on device; byte-level server-side validation needs an Edge Function on the
--- storage webhook.
+-- Only the upload-photo Edge Function (service role) writes the bytes: it
+-- decodes the upload, rejects non-images, downsizes, and re-encodes as JPEG
+-- (which strips EXIF/GPS), then records byte_size. The board-photos storage
+-- policy admits no direct client uploads, and post_item consumes the intent
+-- when the photo is linked — so bytes uploaded outside the intent flow can
+-- never appear on a board. Quotas bound the abuse: 20 intents/hour/account
+-- (~200 MB worst case at the 10 MB bucket cap, before re-encode shrinks it),
+-- 20 pending intents per user, 500 live photos per board, and a 1 GB
+-- per-account cap over live + pending bytes.
 -- ---------------------------------------------------------------------------
 
 create function public.start_photo_upload(p_board_id uuid, p_item_id uuid)
@@ -259,6 +261,7 @@ declare
   v_path text;
   v_pending integer;
   v_live_photos integer;
+  v_used_bytes bigint;
 begin
   if auth.uid() is null then
     raise exception 'not_authenticated';
@@ -269,11 +272,23 @@ begin
   if not public.is_member(p_board_id) then
     raise exception 'not_member';
   end if;
-  perform public.hit_rate_limit('photo_upload', 300, interval '1 hour');
+  perform public.hit_rate_limit('photo_upload', 20, interval '1 hour');
   select count(*)::integer into v_pending
   from public.photo_upload_intents
   where user_id = auth.uid() and consumed = false and expires_at > now();
   if v_pending >= 20 then
+    raise exception 'rate_limited';
+  end if;
+  -- Per-account storage quota: live linked photos (measured post re-encode)
+  -- plus pending intent bytes. Unknown sizes (legacy rows, in-flight uploads)
+  -- count at the bucket cap so they cannot hide usage.
+  select coalesce(sum(coalesce(n.byte_size, 10485760)), 0)::bigint into v_used_bytes
+  from public.photo_upload_intents n
+  left join public.items i
+    on i.photo_path = n.path and i.deleted_at is null
+  where n.user_id = auth.uid()
+    and (n.consumed = false or i.id is not null);
+  if v_used_bytes >= 1073741824 then
     raise exception 'rate_limited';
   end if;
   select count(*)::integer into v_live_photos
@@ -483,7 +498,7 @@ begin
   end if;
   -- A soft-deleted board keeps its memberships for 30 days, but the report
   -- queue dies with the board: require a live board first.
-  if not exists (select 1 from public.boards where id = p_board_id and deleted_at is null) then
+  if not exists (select 1 from public.boards where boards.id = p_board_id and deleted_at is null) then
     raise exception 'not_member';
   end if;
   select role into v_role
@@ -646,7 +661,7 @@ begin
     raise exception 'not_authenticated';
   end if;
   -- The block list dies with the board: require a live board first.
-  if not exists (select 1 from public.boards where id = p_board_id and deleted_at is null) then
+  if not exists (select 1 from public.boards where boards.id = p_board_id and deleted_at is null) then
     raise exception 'not_member';
   end if;
   select role into v_role

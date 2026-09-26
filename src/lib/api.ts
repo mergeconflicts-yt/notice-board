@@ -1,4 +1,3 @@
-import { File as ExpoFile } from 'expo-file-system';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from './supabase';
@@ -806,25 +805,40 @@ export async function signedPhotoUrl(path: string, expiresIn = 86400): Promise<s
 }
 
 export async function uploadPhoto(boardId: string, itemId: string, fileUri: string): Promise<string> {
-  // Every upload is bound to a server-issued intent: the storage policy only
-  // accepts the exact intent path, and post_item consumes the intent when the
-  // photo is linked — so bytes uploaded outside this flow can never appear on
-  // a board. The intent survives a post retry: post_item accepts an already-
-  // consumed intent for the same item, matching the client's id reuse.
+  // Every upload is bound to a server-issued intent, and the bytes go through
+  // the upload-photo Edge Function — never a direct storage write. The
+  // function decodes the image (rejecting non-images), downsizes, re-encodes
+  // as JPEG (stripping EXIF/GPS), and stores it at the intent path. Client-
+  // side preparePhoto still runs first so oversized originals never cross the
+  // network; the server re-validates regardless.
   const { data: path, error: intentError } = await supabase.rpc('start_photo_upload', {
     p_board_id: boardId,
     p_item_id: itemId,
   });
   if (intentError) raise(intentError);
   if (!path) raise({ message: 'invalid_input' });
-  // Resize + re-encode (strips EXIF) before the bytes leave the device. Read
-  // the bytes with expo-file-system — `fetch()` on a local file URI is
-  // unreliable on device.
   const preparedUri = await preparePhoto(fileUri);
-  const bytes = await new ExpoFile(preparedUri).arrayBuffer();
-  const { error } = await supabase.storage
-    .from('board-photos')
-    .upload(path, bytes, { contentType: 'image/jpeg', upsert: false });
-  if (error) raise(error);
+  const form = new FormData();
+  form.append('path', path);
+  form.append('file', {
+    uri: preparedUri,
+    name: 'photo.jpg',
+    type: 'image/jpeg',
+  } as unknown as Blob);
+  const { error, response } = await supabase.functions.invoke('upload-photo', {
+    body: form,
+  });
+  if (error) {
+    // Same error translation as delete-account: the function answers
+    // failures as stable plain-text strings (`invalid_input`, `not_member`,
+    // `could not upload photo`).
+    let bodyText = '';
+    try {
+      bodyText = response instanceof Response ? await response.text() : '';
+    } catch {
+      // Unreadable body — fall back to status-based classification below.
+    }
+    raise(functionError(error, response, bodyText));
+  }
   return path;
 }

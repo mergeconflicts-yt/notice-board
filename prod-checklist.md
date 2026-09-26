@@ -38,9 +38,11 @@
   allowlist, private buckets, Vault secrets and cron health — fix the dashboard
   and re-run if it fails)
 - a check of `http_failures()` the next day to confirm the nightly jobs ran
-- photo uploads are bound to server-issued intents (`start_photo_upload`);
-  true server-side re-encode/EXIF validation still needs an Edge Function on
-  the storage webhook — track before scaling past family use.
+- photo uploads go through the `upload-photo` Edge Function (server-side
+  decode, non-image rejection, 2048px downsize, JPEG re-encode stripping
+  EXIF/GPS; quotas 20 intents/hour/account, 1 GB/account). It deploys with
+  the other functions in deploy.yml; local dev needs `supabase functions
+  serve` running or photo posts fail with a network error.
 
 ## 4. Store requirements:
 - Store builds run through `eas.json` (`development` for a dev client,

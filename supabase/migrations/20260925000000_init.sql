@@ -125,15 +125,18 @@ create table public.rate_limits (
 );
 
 -- One-time upload intents: every photo upload is bound to a server-issued
--- intent row. The storage policy only accepts the exact intent path, and
--- post_item consumes the intent when the photo is linked — so bytes uploaded
--- outside the intent flow can never appear on a board.
+-- intent row. Only the upload-photo Edge Function (service role) writes the
+-- bytes; the storage policy admits no direct client uploads. post_item
+-- consumes the intent when the photo is linked — so bytes uploaded outside
+-- the intent flow can never appear on a board. byte_size is filled in by the
+-- Edge Function after re-encoding and feeds the per-account storage quota.
 create table public.photo_upload_intents (
   path text primary key,
   board_id uuid not null references public.boards (id) on delete cascade,
   item_id uuid not null,
   user_id uuid not null references public.profiles (id) on delete cascade,
   consumed boolean not null default false,
+  byte_size integer check (byte_size is null or byte_size >= 0),
   expires_at timestamptz not null default now() + interval '1 hour',
   created_at timestamptz not null default now()
 );
