@@ -177,7 +177,12 @@ export type BoardStore = {
 };
 
 /** Internal store shape (adds the delta catch-up used by the channel). */
-type BoardStoreInternal = BoardStore & { catchUp: () => void; expireLocal: () => void };
+type BoardStoreInternal = BoardStore & {
+  catchUp: () => void;
+  expireLocal: () => void;
+  /** Re-read the full entry set (authoritative after a parent list update). */
+  refreshEntries: () => void;
+};
 export type BoardStoreApi = ReturnType<typeof createBoardStore>;
 
 function createBoardStore(boardId: string) {
@@ -300,6 +305,19 @@ function createBoardStore(boardId: string) {
           );
           return next.length === s.items.length ? s : { items: next };
         }),
+
+      // Authoritative entries after a parent list update. Realtime DELETE
+      // events on list_entries are not reliable (RLS evaluates against the
+      // deleted row, and filtered DELETEs need REPLICA IDENTITY FULL), so a
+      // parent update is the signal to re-read the whole set — every client
+      // converges on the same entries, removed or not.
+      refreshEntries: () => {
+        void getEntries(boardId)
+          .then((allEntries) => {
+            set({ entries: allEntries });
+          })
+          .catch(() => {});
+      },
 
       createItem: async (input) => {
         const me = useSession.getState().user;
@@ -475,15 +493,22 @@ function startBoard(store: BoardStoreApi, boardId: string): () => void {
       'postgres_changes',
       { event: '*', schema: 'public', table: 'items', filter: `board_id=eq.${boardId}` },
       (payload) => {
-        if (payload.eventType === 'DELETE') {
-          const id = (payload.old as { id?: string }).id;
-          if (id) store.setState((s) => ({ items: s.items.filter((i) => i.id !== id) }));
-          return;
-        }
+        // DELETE events are ignored: client-visible rows are never
+        // hard-deleted (removals are soft-deletes via UPDATE; the purge job
+        // only hard-deletes long-invisible rows). Filtered DELETEs also can't
+        // carry RLS reliably (needs REPLICA IDENTITY FULL).
+        if (payload.eventType === 'DELETE') return;
         const mapped = mapRealtimeItem(payload.new as Record<string, unknown>);
         const expired =
           mapped.deletedAt !== null ||
           (mapped.keepUntil !== null && new Date(mapped.keepUntil) <= new Date());
+        // A parent list update also means its entries changed (adds/edits/
+        // removes land in the same transaction as the item's version bump):
+        // re-read the authoritative set. A removed item's entries vanish with
+        // it, so refetch there too.
+        if (mapped.type === 'list' || expired) {
+          (store.getState() as BoardStoreInternal).refreshEntries();
+        }
         store.setState((s) => {
           const previous = s.items.find((i) => i.id === mapped.id);
           const without = s.items.filter((i) => i.id !== mapped.id);
@@ -496,10 +521,7 @@ function startBoard(store: BoardStoreApi, boardId: string): () => void {
       'postgres_changes',
       { event: '*', schema: 'public', table: 'boards', filter: `id=eq.${boardId}` },
       (payload) => {
-        if (payload.eventType === 'DELETE') {
-          store.setState({ board: null });
-          return;
-        }
+        if (payload.eventType === 'DELETE') return;
         const row = payload.new as { deleted_at?: string | null };
         if (row.deleted_at) {
           store.setState({ board: null });
@@ -517,11 +539,10 @@ function startBoard(store: BoardStoreApi, boardId: string): () => void {
       'postgres_changes',
       { event: '*', schema: 'public', table: 'list_entries', filter: `board_id=eq.${boardId}` },
       (payload) => {
-        if (payload.eventType === 'DELETE') {
-          const id = (payload.old as { id?: string }).id;
-          if (id) store.setState((s) => ({ entries: s.entries.filter((e) => e.id !== id) }));
-          return;
-        }
+        // DELETEs are handled via the parent list update (refreshEntries):
+        // realtime DELETE payloads carry only the old key and can't apply
+        // RLS to the deleted row.
+        if (payload.eventType === 'DELETE') return;
         const mapped = mapRealtimeEntry(payload.new as Record<string, unknown>);
         store.setState((s) => ({
           entries: [...s.entries.filter((e) => e.id !== mapped.id), mapped],

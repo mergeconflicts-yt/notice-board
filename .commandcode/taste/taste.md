@@ -8,3 +8,5 @@
 - Prefers deployment/health checks to fail closed on missing data, treating NULL as failure (e.g. `where not coalesce(ok, false)`) rather than silently passing. Confidence: 0.8
 - Prefers storage quotas to count soft-deleted but still-stored objects until physical deletion, rather than excluding them immediately. Confidence: 0.85
 - Prefers packages needed by postinstall/production installs to live in regular dependencies so `npm ci --omit=dev` succeeds, rather than in devDependencies. Confidence: 0.85
+- Prefers realtime collaboration to maintain a single convergent view where everyone sees the same board, favoring authoritative refetch on parent update over filtered DELETE events that cannot enforce RLS reliably. Confidence: 0.85
+- Prefers gated prod releases requiring full verification (clean install, DB reset + tests + lint + typechecks via CI plus manual deployment and real-device production-build checks) before shipping. Confidence: 0.8
