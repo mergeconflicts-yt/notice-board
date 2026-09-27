@@ -98,15 +98,15 @@ export const memberColors = [
 
 /** Board cover tints. Cream is plain white paper. */
 export const boardColors: Record<BoardColor, string> = {
-  sage: '#C9DCC0',
-  blue: '#BCD2E8',
-  clay: '#E5C3AE',
-  cream: '#FFFDF7',
-  charcoal: '#B9B4AD',
-  mint: '#BFE3D0',
-  butter: '#F4E3A1',
-  blush: '#F2C9CE',
-  powder: '#C9D8E8',
+  sage: '#AFCDA1',
+  blue: '#98BBDE',
+  clay: '#DBA98A',
+  cream: '#FFF7DE',
+  charcoal: '#A69E92',
+  mint: '#9ED6B8',
+  butter: '#F1D876',
+  blush: '#EAA3AC',
+  powder: '#A8C1DC',
 };
 
 export const boardColorKeys = Object.keys(boardColors) as BoardColor[];
@@ -114,29 +114,29 @@ export const boardColorKeys = Object.keys(boardColors) as BoardColor[];
 /** Enamel door tints per board colour: light face, base, shaded edge —
  *  the website fridge doors sprayed onto the app board. */
 export const doorTints: Record<BoardColor, { light: string; base: string; shade: string }> = {
-  sage: { light: '#DCE8D6', base: '#C9DCC0', shade: '#A9BE9C' },
-  blue: { light: '#D3E3F2', base: '#BCD2E8', shade: '#9DBBD9' },
-  clay: { light: '#F1D8C6', base: '#E5C3AE', shade: '#D0A78D' },
-  cream: { light: '#FFFFFF', base: '#FFFDF7', shade: '#E7DCC6' },
-  charcoal: { light: '#D2CEC7', base: '#B9B4AD', shade: '#A09B93' },
-  mint: { light: '#CDE9D9', base: '#A3D4BA', shade: '#79B495' },
-  butter: { light: '#F9ECB8', base: '#EDD68A', shade: '#D3B45E' },
-  blush: { light: '#F8D5DA', base: '#E9AEB6', shade: '#C98891' },
-  powder: { light: '#D5E2F2', base: '#ACC3DD', shade: '#7E9CBE' },
+  sage: { light: '#B6D1A9', base: '#9DBBA8', shade: '#A4C295' },
+  blue: { light: '#A0C1E2', base: '#98BBDE', shade: '#8EB3D8' },
+  clay: { light: '#E0B192', base: '#DBA98A', shade: '#D39F7F' },
+  cream: { light: '#FBF5E5', base: '#FFF7DE', shade: '#F4EACF' },
+  charcoal: { light: '#AFA79B', base: '#A69E92', shade: '#9D9589' },
+  mint: { light: '#91CEAD', base: '#82C7A2', shade: '#74BB95' },
+  butter: { light: '#EED16F', base: '#E9C960', shade: '#DFBC52' },
+  blush: { light: '#E795A0', base: '#E18894', shade: '#D47C88' },
+  powder: { light: '#98B6D9', base: '#8AABD1', shade: '#7A9DC6' },
 };
 
 /** Handle face per door colour: a deeper enamel tone that belongs with the
  *  door instead of generic steel. */
 export const handleTints: Record<BoardColor, [string, string, string]> = {
-  sage: ['#A9C29B', '#8BA87D', '#6E8F61'],
-  blue: ['#9DBEDC', '#7FA3C6', '#5F86AC'],
-  clay: ['#D8A985', '#C08A63', '#A06B45'],
-  cream: ['#D9CBAE', '#C2B28E', '#A8976F'],
-  charcoal: ['#8E8980', '#736E66', '#57534C'],
-  mint: ['#79B495', '#5F9A7C', '#477A60'],
-  butter: ['#D3B45E', '#B8943F', '#8F7330'],
-  blush: ['#C98891', '#A96C75', '#875057'],
-  powder: ['#7E9CBE', '#62819F', '#48637D'],
+  sage: ['#90B37C', '#729761', '#58764D'],
+  blue: ['#79A8D2', '#5D8CBA', '#496F94'],
+  clay: ['#CF9060', '#B17244', '#825535'],
+  cream: ['#CCB88D', '#B49F6E', '#948155'],
+  charcoal: ['#797367', '#5C574F', '#403C35'],
+  mint: ['#59A67E', '#4B8065', '#355E49'],
+  butter: ['#CCA437', '#987931', '#6E5823'],
+  blush: ['#BD6672', '#94535D', '#6C3D43'],
+  powder: ['#5D84B1', '#4E6A85', '#364C61'],
 };
 
 /** Nameplate face per door colour: lighter enamel than the door with a
@@ -145,15 +145,15 @@ export const plateTints: Record<
   BoardColor,
   { bg: string; edge: string; screw: string; screwEdge: string }
 > = {
-  sage: { bg: '#CBDDBF', edge: '#8AA37C', screw: '#6E8F61', screwEdge: '#4E6A44' },
-  blue: { bg: '#C3D8EC', edge: '#7CA0C2', screw: '#5F86AC', screwEdge: '#42607E' },
-  clay: { bg: '#EAC9AE', edge: '#B9835C', screw: '#9C6846', screwEdge: '#73492E' },
-  cream: { bg: '#F4EAD2', edge: '#C4AC7E', screw: '#A8976F', screwEdge: '#7D6D49' },
-  charcoal: { bg: '#BDB8B0', edge: '#7E7972', screw: '#57534C', screwEdge: '#38352F' },
-  mint: { bg: '#D8EDDF', edge: '#8CC3A6', screw: '#63A281', screwEdge: '#477A60' },
-  butter: { bg: '#FAF0C2', edge: '#D9BC62', screw: '#B8943F', screwEdge: '#8A6F2D' },
-  blush: { bg: '#FADFE2', edge: '#D69AA3', screw: '#B4717B', screwEdge: '#8C525A' },
-  powder: { bg: '#DEE8F5', edge: '#8CADCF', screw: '#6889AC', screwEdge: '#4A6580' },
+  sage: { bg: '#B2CFA0', edge: '#729061', screw: '#58764D', screwEdge: '#394F31' },
+  blue: { bg: '#9FC1E2', edge: '#5A89B6', screw: '#496F94', screwEdge: '#314961' },
+  clay: { bg: '#E2B188', edge: '#A46C43', screw: '#7E5336', screwEdge: '#533420' },
+  cream: { bg: '#ECD9AC', edge: '#B8985C', screw: '#948155', screwEdge: '#625437' },
+  charcoal: { bg: '#AAA295', edge: '#68625A', screw: '#403C35', screwEdge: '#201E19' },
+  mint: { bg: '#B8E0C5', edge: '#6CB58F', screw: '#4E896A', screwEdge: '#355E49' },
+  butter: { bg: '#F8E696', edge: '#D2AD3B', screw: '#987931', screwEdge: '#695420' },
+  blush: { bg: '#F5B6BD', edge: '#CB7784', screw: '#A4535F', screwEdge: '#713F46' },
+  powder: { bg: '#BACFEB', edge: '#6A96C4', screw: '#4F7297', screwEdge: '#384E64' },
 };
 
 /** The single fastener everywhere: round magnets in fixed colours (used by Pin). */
