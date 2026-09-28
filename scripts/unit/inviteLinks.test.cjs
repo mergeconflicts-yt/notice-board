@@ -18,14 +18,14 @@ describe('parseInviteInput', () => {
 
   it('pulls the code out of the share message', () => {
     assert.equal(
-      parseInviteInput('Join “Kranti” on Fridge Board. Invite code: ABCDE-FGHIJ'),
+      parseInviteInput('Join Jack on Fridge Board. Invite code: ABCDE-FGHIJ'),
       'ABCDE-FGHIJ',
     );
   });
 
   it('pulls a trailing token out of a share message', () => {
     assert.equal(
-      parseInviteInput('Join “Kranti” on Fridge Board: LPC42Kpp0VmFFIPFg8Yh3Q'),
+      parseInviteInput('Join Jack on Fridge Board: LPC42Kpp0VmFFIPFg8Yh3Q'),
       'LPC42Kpp0VmFFIPFg8Yh3Q',
     );
   });

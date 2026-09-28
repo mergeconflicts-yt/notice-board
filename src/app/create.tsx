@@ -114,7 +114,7 @@ export default function CreateBoardScreen() {
           <Text style={styles.label}>Fridge name</Text>
           <TextInput
             style={styles.input}
-            placeholder="Kranti Family"
+            placeholder="Jack Family"
             placeholderTextColor={colors.inkFaint}
             value={name}
             onChangeText={setName}
