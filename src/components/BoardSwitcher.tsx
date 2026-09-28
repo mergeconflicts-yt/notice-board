@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors, boardColors, fonts } from '../theme';
+import { colors, boardColors, doorInk, doorSoft, fonts } from '../theme';
 import { useMyBoards } from '../hooks/useBoards';
 import { getMembers } from '../lib/api';
 
@@ -61,33 +61,37 @@ export function BoardSwitcher({ visible, currentBoardId, onClose }: Props) {
     }
     router.replace(`/board/${id}`);
   };
+  // The whole sheet follows the open fridge's door.
+  const door = boards.find((b) => b.id === currentBoardId)?.color ?? 'sage';
+  const ink = doorInk(door);
+  const soft = doorSoft(door);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <Pressable style={styles.scrim} onPress={onClose} />
-        <View style={styles.sheet}>
-          <Text style={styles.label}>Your fridges</Text>
+        <View style={[styles.sheet, { backgroundColor: boardColors[door] }]}>
+          <Text style={[styles.label, { color: soft }]}>Your fridges</Text>
           <View style={styles.group}>
-          {boards.map((b) => {
+          {boards.map((b, i) => {
             const count = counts[b.id];
             return (
               <Pressable
                 key={b.id}
-                style={styles.row}
+                style={[styles.row, i === boards.length - 1 && styles.rowLast]}
                 onPress={() => goBoard(b.id)}
                 accessibilityRole="button"
                 accessibilityLabel={`Open ${b.name}`}
               >
                 <View style={[styles.chip, { backgroundColor: boardColors[b.color] }]}>
-                  <Text style={styles.chipText}>{boardAcronym(b.name)}</Text>
+                  <Text style={[styles.chipText, { color: doorInk(b.color) }]}>{boardAcronym(b.name)}</Text>
                 </View>
                 <View style={styles.rowText}>
-                  <Text style={styles.name} numberOfLines={1}>
+                  <Text style={[styles.name, { color: ink }]} numberOfLines={1}>
                     {b.name}
                   </Text>
                   {count != null ? (
-                    <Text style={styles.sub}>
+                    <Text style={[styles.sub, { color: soft }]}>
                       {count} {count === 1 ? 'person' : 'people'}
                     </Text>
                   ) : null}
@@ -110,11 +114,11 @@ export function BoardSwitcher({ visible, currentBoardId, onClose }: Props) {
             accessibilityRole="button"
             accessibilityLabel="New fridge"
           >
-            <MaterialCommunityIcons name="plus" size={22} color={colors.onPine} />
-            <Text style={styles.actionLabel}>New fridge</Text>
+            <MaterialCommunityIcons name="plus" size={22} color={ink} />
+            <Text style={[styles.actionLabel, { color: ink }]}>New fridge</Text>
           </Pressable>
           <Pressable
-            style={styles.row}
+            style={[styles.row, styles.rowLast]}
             onPress={() => {
               onClose();
               router.push('/join');
@@ -122,14 +126,14 @@ export function BoardSwitcher({ visible, currentBoardId, onClose }: Props) {
             accessibilityRole="button"
             accessibilityLabel="Join with an invite"
           >
-            <MaterialCommunityIcons name="link-variant" size={22} color={colors.onPine} />
-            <Text style={styles.actionLabel}>Join with an invite</Text>
+            <MaterialCommunityIcons name="link-variant" size={22} color={ink} />
+            <Text style={[styles.actionLabel, { color: ink }]}>Join with an invite</Text>
           </Pressable>
           </View>
 
           <View style={styles.group}>
           <Pressable
-            style={styles.row}
+            style={[styles.row, styles.rowLast]}
             onPress={() => {
               onClose();
               router.push(`/board/${currentBoardId}/settings`);
@@ -137,9 +141,9 @@ export function BoardSwitcher({ visible, currentBoardId, onClose }: Props) {
             accessibilityRole="button"
             accessibilityLabel="Fridge settings"
           >
-            <MaterialCommunityIcons name="cog-outline" size={22} color={colors.onPine} />
-            <Text style={[styles.actionLabel, styles.settingsLabel]}>Fridge settings</Text>
-            <MaterialCommunityIcons name="chevron-right" size={22} color={colors.onPineFaint} />
+            <MaterialCommunityIcons name="cog-outline" size={22} color={ink} />
+            <Text style={[styles.actionLabel, styles.settingsLabel, { color: ink }]}>Fridge settings</Text>
+            <MaterialCommunityIcons name="chevron-right" size={22} color={soft} />
           </Pressable>
           </View>
         </View>
@@ -188,6 +192,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: colors.onPineFaint,
   },
+  // No trailing divider under a group's last item.
+  rowLast: { borderBottomWidth: 0 },
   chip: {
     width: 46,
     height: 46,

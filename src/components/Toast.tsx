@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
     paddingRight: 8,
     paddingVertical: 12,
     borderRadius: 16,
-    backgroundColor: colors.ink,
+    backgroundColor: colors.pine,
     shadowColor: colors.shadow,
     shadowOpacity: 0.3,
     shadowRadius: 12,
@@ -109,6 +109,6 @@ const styles = StyleSheet.create({
   actionText: {
     fontFamily: fonts.ui.bold,
     fontSize: 15,
-    color: colors.accent,
+    color: colors.brandYellow,
   },
 });

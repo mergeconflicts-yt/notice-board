@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors, fonts } from '../theme';
+import { colors, boardColors, doorInk, doorSoft, doorTints, fonts, onTint } from '../theme';
+import type { BoardColor } from '../types';
 
 export type DateTimePopupMode = 'date' | 'time';
 
@@ -9,6 +10,8 @@ type Props = {
   visible: boolean;
   mode: DateTimePopupMode;
   onModeChange: (m: DateTimePopupMode) => void;
+  /** Fridge door colour: the card follows it; pills and wells stay stationery. */
+  doorColor: BoardColor;
   /** Current selection; the time part is preserved when picking a date and vice versa. */
   value: Date;
   minimumDate: Date;
@@ -38,17 +41,20 @@ export function DateTimePopup({
   visible,
   mode,
   onModeChange,
+  doorColor,
   value,
   minimumDate,
   onConfirmDate,
   onConfirmTime,
   onClose,
 }: Props) {
+  const tint = doorTints[doorColor];
+  const shadeInk = onTint(tint.shade);
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.wrap}>
         <Pressable style={styles.scrim} onPress={onClose} accessibilityLabel="Close picker" />
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: boardColors[doorColor] }]}>
           <View style={styles.tabs}>
             {(['date', 'time'] as const).map((m) => {
               const active = mode === m;
@@ -56,7 +62,7 @@ export function DateTimePopup({
                 <Pressable
                   key={m}
                   onPress={() => onModeChange(m)}
-                  style={[styles.tab, active && styles.tabActive]}
+                  style={[styles.tab, { backgroundColor: tint.light, borderColor: tint.light }, active && { backgroundColor: tint.shade, borderColor: tint.shade }]}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
                   accessibilityLabel={m === 'date' ? 'Pick a date' : 'Pick a time'}
@@ -64,9 +70,9 @@ export function DateTimePopup({
                   <MaterialCommunityIcons
                     name={m === 'date' ? 'calendar-month-outline' : 'clock-outline'}
                     size={18}
-                    color={active ? colors.background : colors.ink}
+                    color={active ? shadeInk : colors.ink}
                   />
-                  <Text style={[styles.tabText, active && styles.tabTextActive]}>
+                  <Text style={[styles.tabText, active && { color: shadeInk }]}>
                     {m === 'date' ? 'Date' : 'Time'}
                   </Text>
                 </Pressable>
@@ -74,9 +80,9 @@ export function DateTimePopup({
             })}
           </View>
           {mode === 'date' ? (
-            <DateGrid key={`date-${visible}`} value={value} minimumDate={minimumDate} onPick={onConfirmDate} />
+            <DateGrid key={`date-${visible}`} value={value} minimumDate={minimumDate} onPick={onConfirmDate} doorColor={doorColor} />
           ) : (
-            <TimeWheels key={`time-${visible}`} value={value} onDone={onConfirmTime} />
+            <TimeWheels key={`time-${visible}`} value={value} onDone={onConfirmTime} doorColor={doorColor} />
           )}
         </View>
       </View>
@@ -88,12 +94,18 @@ function DateGrid({
   value,
   minimumDate,
   onPick,
+  doorColor,
 }: {
   value: Date;
   minimumDate: Date;
   onPick: (d: Date) => void;
+  doorColor: BoardColor;
 }) {
   const [cursor, setCursor] = useState(() => new Date(value.getFullYear(), value.getMonth(), 1));
+  const ink = doorInk(doorColor);
+  const soft = doorSoft(doorColor);
+  const tint = doorTints[doorColor];
+  const shadeInk = onTint(tint.shade);
   const minDay = startOfDay(minimumDate);
 
   const cells = useMemo(() => {
@@ -123,9 +135,9 @@ function DateGrid({
           accessibilityLabel="Previous month"
           accessibilityRole="button"
         >
-          <MaterialCommunityIcons name="chevron-left" size={28} color={colors.ink} />
+          <MaterialCommunityIcons name="chevron-left" size={28} color={ink} />
         </Pressable>
-        <Text style={styles.monthLabel}>
+        <Text style={[styles.monthLabel, { color: ink }]}>
           {cursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
         </Text>
         <Pressable
@@ -134,12 +146,12 @@ function DateGrid({
           accessibilityLabel="Next month"
           accessibilityRole="button"
         >
-          <MaterialCommunityIcons name="chevron-right" size={28} color={colors.ink} />
+          <MaterialCommunityIcons name="chevron-right" size={28} color={ink} />
         </Pressable>
       </View>
       <View style={styles.weekRow}>
         {WEEKDAYS.map((w, i) => (
-          <Text key={`${w}-${i}`} style={styles.weekLabel}>
+          <Text key={`${w}-${i}`} style={[styles.weekLabel, { color: soft }]}>
             {w}
           </Text>
         ))}
@@ -152,11 +164,11 @@ function DateGrid({
           const selected = sameDay(date, value);
           const isToday = sameDay(date, new Date());
           return (
-            <Pressable
-              key={`day-${day}`}
-              disabled={disabled}
-              onPress={() => pickDay(day)}
-              style={[styles.day, selected && styles.daySelected]}
+              <Pressable
+                key={`day-${day}`}
+                disabled={disabled}
+                onPress={() => pickDay(day)}
+                style={[styles.day, selected && { backgroundColor: tint.shade }]}
               accessibilityRole="button"
               accessibilityLabel={date.toLocaleDateString(undefined, {
                 weekday: 'long',
@@ -168,8 +180,10 @@ function DateGrid({
               <Text
                 style={[
                   styles.dayText,
+                  { color: ink },
                   disabled && styles.dayTextDisabled,
-                  selected && styles.dayTextSelected,
+                  disabled && { color: soft },
+                  selected && { color: shadeInk },
                   !selected && isToday && styles.dayTextToday,
                 ]}
               >
@@ -197,10 +211,22 @@ function DateGrid({
   );
 }
 
-function TimeWheels({ value, onDone }: { value: Date; onDone: (d: Date) => void }) {
+function TimeWheels({
+  value,
+  onDone,
+  doorColor,
+}: {
+  value: Date;
+  onDone: (d: Date) => void;
+  doorColor: BoardColor;
+}) {
+  const ink = doorInk(doorColor);
+  const soft = doorSoft(doorColor);
   const [hour12, setHour12] = useState(() => value.getHours() % 12 || 12);
   const [minute, setMinute] = useState(() => value.getMinutes());
   const [period, setPeriod] = useState<'AM' | 'PM'>(() => (value.getHours() < 12 ? 'AM' : 'PM'));
+  const tint = doorTints[doorColor];
+  const shadeInk = onTint(tint.shade);
 
   const hours = useMemo(() => Array.from({ length: 12 }, (_, i) => i + 1), []);
   const minutes = useMemo(() => Array.from({ length: 60 }, (_, i) => i), []);
@@ -220,38 +246,40 @@ function TimeWheels({ value, onDone }: { value: Date; onDone: (d: Date) => void 
           selected={hour12}
           onSelect={setHour12}
           format={(h) => String(h)}
+          doorColor={doorColor}
         />
-        <Text style={styles.colon}>:</Text>
+        <Text style={[styles.colon, { color: ink }]}>:</Text>
         <Wheel
           label="Minute"
           data={minutes}
           selected={minute}
           onSelect={setMinute}
           format={(m) => String(m).padStart(2, '0')}
+          doorColor={doorColor}
         />
         <View style={styles.periodCol}>
-          <Text style={styles.wheelLabel}>AM/PM</Text>
+          <Text style={[styles.wheelLabel, { color: soft }]}>AM/PM</Text>
           {(['AM', 'PM'] as const).map((p) => (
-            <Pressable
-              key={p}
-              onPress={() => setPeriod(p)}
-              style={[styles.periodBtn, period === p && styles.periodBtnActive]}
+              <Pressable
+                key={p}
+                onPress={() => setPeriod(p)}
+                style={[styles.periodBtn, { backgroundColor: tint.light, borderColor: tint.light }, period === p && { backgroundColor: tint.shade, borderColor: tint.shade }]}
               accessibilityRole="button"
               accessibilityState={{ selected: period === p }}
               accessibilityLabel={p}
             >
-              <Text style={[styles.periodText, period === p && styles.periodTextActive]}>{p}</Text>
+              <Text style={[styles.periodText, period === p && { color: shadeInk }]}>{p}</Text>
             </Pressable>
           ))}
         </View>
       </View>
       <Pressable
         onPress={done}
-        style={styles.doneBtn}
+        style={[styles.doneBtn, { backgroundColor: tint.shade }]}
         accessibilityRole="button"
         accessibilityLabel="Confirm time"
       >
-        <Text style={styles.doneText}>
+        <Text style={[styles.doneText, { color: shadeInk }]}>
           {`Set ${hour12}:${String(minute).padStart(2, '0')} ${period}`}
         </Text>
       </Pressable>
@@ -265,34 +293,39 @@ function Wheel({
   selected,
   onSelect,
   format,
+  doorColor,
 }: {
   label: string;
   data: number[];
   selected: number;
   onSelect: (v: number) => void;
   format: (v: number) => string;
+  doorColor: BoardColor;
 }) {
+  const soft = doorSoft(doorColor);
+  const tint = doorTints[doorColor];
+  const shadeInk = onTint(tint.shade);
   return (
     <View style={styles.wheelCol}>
-      <Text style={styles.wheelLabel}>{label}</Text>
+      <Text style={[styles.wheelLabel, { color: soft }]}>{label}</Text>
       <FlatList
         data={data}
         keyExtractor={(v) => String(v)}
-        style={styles.wheel}
+        style={[styles.wheel, { backgroundColor: tint.light }]}
         showsVerticalScrollIndicator={false}
         getItemLayout={(_, index) => ({ length: ROW_H, offset: ROW_H * index, index })}
         initialScrollIndex={Math.max(0, data.indexOf(selected))}
         renderItem={({ item }) => {
           const active = item === selected;
           return (
-            <Pressable
-              onPress={() => onSelect(item)}
-              style={[styles.wheelRow, active && styles.wheelRowActive]}
+              <Pressable
+                onPress={() => onSelect(item)}
+                style={[styles.wheelRow, active && { backgroundColor: doorTints[doorColor].shade }]}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
               accessibilityLabel={`${label} ${format(item)}`}
             >
-              <Text style={[styles.wheelText, active && styles.wheelTextActive]}>
+              <Text style={[styles.wheelText, active && { fontFamily: fonts.ui.bold, color: shadeInk }]}>
                 {format(item)}
               </Text>
             </Pressable>
@@ -333,7 +366,8 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.background,
+    // Unselected tabs stay white on every door.
+    backgroundColor: colors.surface,
   },
   tabActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   tabText: { fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.ink },
@@ -377,7 +411,7 @@ const styles = StyleSheet.create({
     color: colors.inkFaint,
     marginBottom: 4,
   },
-  wheel: { height: ROW_H * 5, backgroundColor: colors.background, borderRadius: 14 },
+  wheel: { height: ROW_H * 5, backgroundColor: colors.surface, borderRadius: 14 },
   wheelRow: { height: ROW_H, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
   wheelRowActive: { backgroundColor: colors.accent },
   wheelText: { fontFamily: fonts.ui.semibold, fontSize: 17, color: colors.inkSoft },
@@ -397,7 +431,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.background,
+    // Unselected AM/PM stays white on every door.
+    backgroundColor: colors.surface,
     minHeight: ROW_H,
   },
   periodBtnActive: { backgroundColor: colors.accent, borderColor: colors.accent },

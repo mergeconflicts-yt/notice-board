@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, fonts, noteColors } from '../theme';
+import { colors, doorSoft, fonts, noteColors } from '../theme';
+import type { BoardColor } from '../types';
 import { NotePaper } from './NotePaper';
 import { ItemWithAuthor, ListEntry } from '../types';
 
@@ -15,6 +16,8 @@ type Props = {
   entries: ListEntry[];
   photoUrls: Record<string, string>;
   onOpen: (item: ItemWithAuthor) => void;
+  /** Fridge door colour: the empty hint follows it. */
+  doorColor: BoardColor;
 };
 
 /**
@@ -22,7 +25,7 @@ type Props = {
  * card fills the band's height and is clipped, so pinned notes can never
  * overlap one another vertically (and dragging is left to the main board).
  */
-export function PinnedStrip({ items, entries, photoUrls, onOpen }: Props) {
+export function PinnedStrip({ items, entries, photoUrls, onOpen, doorColor }: Props) {
   const [height, setHeight] = useState(0);
   // Full content height per card, so the fade only renders when the card is
   // actually clipped (a short card must not get a gradient washed over it).
@@ -37,7 +40,7 @@ export function PinnedStrip({ items, entries, photoUrls, onOpen }: Props) {
   return (
     <View style={styles.wrap} onLayout={(e) => setHeight(e.nativeEvent.layout.height)}>
       {items.length === 0 ? (
-        <Text style={styles.hint}>Pin a note to keep it up here.</Text>
+        <Text style={[styles.hint, { color: doorSoft(doorColor) }]}>Pin a note to keep it up here.</Text>
       ) : (
         <ScrollView
           horizontal

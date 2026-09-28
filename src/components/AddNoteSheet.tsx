@@ -15,8 +15,8 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { DateTimePopup } from './DateTimePopup';
-import { colors, fonts, noteColors, noteColorKeys } from '../theme';
-import { ItemColor, ItemType, ItemWithAuthor } from '../types';
+import { boardColors, colors, doorInk, doorSoft, doorTints, fonts, noteColors, noteColorKeys, onTint } from '../theme';
+import { BoardColor, ItemColor, ItemType, ItemWithAuthor } from '../types';
 import { colorForItem, parseListItems } from '../utils/note';
 import { randomId } from '../hooks/useBoard';
 
@@ -71,6 +71,8 @@ type Props = {
   visible: boolean;
   submitting?: boolean;
   submitLabel?: string;
+  /** Fridge door colour: the sheet frame follows it (all 4 post types). */
+  doorColor: BoardColor;
   /** Present when editing; drives the initial tab and fields. */
   initial?: ItemWithAuthor | null;
   entries?: { id: string; text: string }[];
@@ -84,6 +86,7 @@ export function AddNoteSheet({
   visible,
   submitting,
   submitLabel = 'Post',
+  doorColor,
   initial = null,
   entries = [],
   photoUrl = null,
@@ -310,6 +313,17 @@ export function AddNoteSheet({
   };
 
   const palette = noteColors[color];
+  // Sheet chrome follows the fridge door (all 4 post types); paper content
+  // and pills keep stationery colors.
+  const ink = doorInk(doorColor);
+  const soft = doorSoft(doorColor);
+  const doorBg = boardColors[doorColor];
+  // Option pills follow the door: light tint at rest, shade when selected.
+  const tint = doorTints[doorColor];
+  const tintInk = onTint(tint.light);
+  const shadeInk = onTint(tint.shade);
+  const tintRest = { backgroundColor: tint.light, borderColor: tint.light };
+  const tintActive = { backgroundColor: tint.shade, borderColor: tint.shade };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -321,12 +335,12 @@ export function AddNoteSheet({
         style={styles.backdrop}
       >
         <Pressable style={styles.scrim} onPress={onClose} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { backgroundColor: doorBg }]}>
           <View style={styles.header}>
             <Pressable hitSlop={12} onPress={onClose} style={styles.cancelBtn}>
-              <Text style={styles.cancelText}>Cancel</Text>
+              <Text style={[styles.cancelText, { color: ink }]}>Cancel</Text>
             </Pressable>
-            <Text style={styles.title}>{editing ? 'Edit' : 'Add to fridge'}</Text>
+            <Text style={[styles.title, { color: ink }]}>{editing ? 'Edit' : 'Add to fridge'}</Text>
             <View style={styles.headerSpacer} />
           </View>
 
@@ -338,14 +352,14 @@ export function AddNoteSheet({
                   <Pressable
                     key={t.id}
                     onPress={() => selectTab(t.id)}
-                    style={[styles.tab, active && styles.tabActive]}
+                    style={[styles.tab, tintRest, active && tintActive]}
                   >
                     <MaterialCommunityIcons
                       name={t.icon}
                       size={20}
-                      color={active ? colors.background : colors.ink}
+                      color={active ? shadeInk : tintInk}
                     />
-                    <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{t.label}</Text>
+                    <Text style={[styles.tabLabel, { color: active ? shadeInk : tintInk }]}>{t.label}</Text>
                   </Pressable>
                 );
               })}
@@ -392,19 +406,23 @@ export function AddNoteSheet({
                     ) : null}
                   </View>
                 ) : (
-                  <Pressable style={styles.photoDrop} onPress={pickImage} disabled={picking}>
+                  <Pressable
+                    style={[styles.photoDrop, { backgroundColor: tint.light, borderColor: tintInk }]}
+                    onPress={pickImage}
+                    disabled={picking}
+                  >
                     {picking ? (
-                      <ActivityIndicator color={colors.inkSoft} />
+                      <ActivityIndicator color={tintInk} />
                     ) : (
                       <>
-                        <MaterialCommunityIcons name="image-outline" size={36} color={colors.inkFaint} />
-                        <Text style={styles.photoDropText}>Choose a photo</Text>
+                        <MaterialCommunityIcons name="image-outline" size={36} color={tintInk} />
+                        <Text style={[styles.photoDropText, { color: tintInk }]}>Choose a photo</Text>
                       </>
                     )}
                   </Pressable>
                 )}
                 <TextInput
-                  style={[styles.input, styles.captionInput]}
+                  style={[styles.input, styles.captionInput, { backgroundColor: tint.light }]}
                   placeholder="Add a caption (optional)..."
                   placeholderTextColor={colors.inkFaint}
                   value={text}
@@ -417,7 +435,7 @@ export function AddNoteSheet({
             ) : null}
 
             {tab === 'list' ? (
-              <View style={styles.notepad}>
+              <View style={[styles.notepad, { backgroundColor: palette.bg, borderColor: palette.edge }]}>
                 <View style={styles.npHoles} pointerEvents="none">
                   {[0, 1, 2, 3, 4].map((i) => (
                     <View key={i} style={styles.npTornHole}>
@@ -427,9 +445,9 @@ export function AddNoteSheet({
                   ))}
                 </View>
                 <TextInput
-                  style={styles.npTitle}
+                  style={[styles.npTitle, { color: palette.ink }]}
                   placeholder="List title..."
-                  placeholderTextColor={colors.inkFaint}
+                  placeholderTextColor={palette.ink}
                   value={listTitle}
                   onChangeText={setListTitle}
                   maxLength={120}
@@ -442,12 +460,12 @@ export function AddNoteSheet({
                 />
                 <View style={styles.rows}>
                   {rows.map((row, index) => (
-                    <View key={row.id} style={styles.npRow}>
-                      <View style={styles.rowBullet} />
+                    <View key={row.id} style={[styles.npRow, { borderColor: palette.edge }]}>
+                      <View style={[styles.rowBullet, { borderColor: palette.ink }]} />
                       <TextInput
-                        style={styles.rowInput}
+                        style={[styles.rowInput, { color: palette.ink }]}
                         placeholder="List item..."
-                        placeholderTextColor={colors.inkFaint}
+                        placeholderTextColor={palette.ink}
                         value={row.text}
                         onChangeText={(v) => updateRow(row.id, v)}
                         maxLength={200}
@@ -464,13 +482,13 @@ export function AddNoteSheet({
                         onPress={() => setRows((prev) => (prev.length <= 1 ? prev : prev.filter((r) => r.id !== row.id)))}
                         accessibilityLabel={`Remove item ${index + 1}`}
                       >
-                        <Text style={styles.rowRemove}>✕</Text>
+                        <Text style={[styles.rowRemove, { color: palette.ink }]}>✕</Text>
                       </Pressable>
                     </View>
                   ))}
                 </View>
-                <Pressable onPress={addRowAndFocus} style={styles.addRow}>
-                  <Text style={styles.addRowText}>＋ Add item</Text>
+                <Pressable onPress={addRowAndFocus} style={[styles.addRow, { borderColor: palette.ink }]}>
+                  <Text style={[styles.addRowText, { color: palette.ink }]}>＋ Add item</Text>
                 </Pressable>
               </View>
             ) : null}
@@ -493,24 +511,24 @@ export function AddNoteSheet({
                 </View>
                 <View style={styles.dtRow}>
                   <Pressable
-                    style={[styles.dtTrigger, pickerOpen && pickerMode === 'date' && styles.dtTriggerActive]}
+                    style={[styles.dtTrigger, tintRest, pickerOpen && pickerMode === 'date' && tintActive]}
                     onPress={openDatePicker}
                     accessibilityRole="button"
                     accessibilityLabel="Pick a date"
                   >
-                    <MaterialCommunityIcons name="calendar-month-outline" size={20} color={colors.pine} />
-                    <Text style={styles.dtTriggerText}>
+                    <MaterialCommunityIcons name="calendar-month-outline" size={20} color={tintInk} />
+                    <Text style={[styles.dtTriggerText, { color: tintInk }]}>
                       {eventAt.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
                     </Text>
                   </Pressable>
                   <Pressable
-                    style={[styles.dtTrigger, pickerOpen && pickerMode === 'time' && styles.dtTriggerActive]}
+                    style={[styles.dtTrigger, tintRest, pickerOpen && pickerMode === 'time' && tintActive]}
                     onPress={openTimePicker}
                     accessibilityRole="button"
                     accessibilityLabel="Pick a time"
                   >
-                    <MaterialCommunityIcons name="clock-outline" size={20} color={colors.pine} />
-                    <Text style={styles.dtTriggerText}>
+                    <MaterialCommunityIcons name="clock-outline" size={20} color={tintInk} />
+                    <Text style={[styles.dtTriggerText, { color: tintInk }]}>
                       {eventAt.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
                     </Text>
                   </Pressable>
@@ -519,6 +537,7 @@ export function AddNoteSheet({
                   visible={pickerOpen}
                   mode={pickerMode}
                   onModeChange={setPickerMode}
+                  doorColor={doorColor}
                   value={eventAt}
                   minimumDate={todayStart}
                   onConfirmDate={confirmPickedDate}
@@ -529,9 +548,9 @@ export function AddNoteSheet({
             ) : null}
           </ScrollView>
 
-          <ColorDots color={color} onPick={setColor} />
+          <ColorDots color={color} onPick={setColor} doorColor={doorColor} />
 
-          <View style={styles.footerDivider} />
+          <View style={[styles.footerDivider, { backgroundColor: soft }]} />
 
           {!editing ? (
             <View style={styles.createRow}>
@@ -551,12 +570,13 @@ export function AddNoteSheet({
                   <MaterialCommunityIcons
                     name={keepExtra > 0 ? 'clock-plus' : 'clock-outline'}
                     size={20}
-                    color={pinned ? colors.onPineFaint : keepExtra > 0 ? colors.accentDeep : colors.onPine}
+                    color={pinned ? soft : keepExtra > 0 ? colors.accentDeep : ink}
                   />
                   <Text
                     style={[
                       styles.keepText,
-                      pinned && styles.keepTextDisabled,
+                      { color: ink },
+                      pinned && { color: soft },
                       keepExtra > 0 && !pinned && styles.keepTextActive,
                     ]}
                   >
@@ -574,22 +594,22 @@ export function AddNoteSheet({
                 <MaterialCommunityIcons
                   name={pinned ? 'pin' : 'pin-outline'}
                   size={20}
-                    color={pinned ? colors.accentDeep : colors.onPine}
-                />
-                <Text style={styles.keepText}>Keep at top</Text>
+                    color={pinned ? colors.accentDeep : ink}
+                  />
+                  <Text style={[styles.keepText, { color: ink }]}>Keep at top</Text>
               </Pressable>
               <View style={styles.createSpacer} />
-              <Pressable onPress={submit} disabled={!canPost} style={[styles.postBtn, !canPost && styles.postDisabled]}>
-                <Text style={styles.postText}>Post</Text>
+              <Pressable onPress={submit} disabled={!canPost} style={[styles.postBtn, tintActive, !canPost && styles.postDisabled]}>
+                <Text style={[styles.postText, { color: shadeInk }]}>Post</Text>
               </Pressable>
             </View>
           ) : (
             <View style={styles.actions}>
               <Pressable onPress={onClose} style={styles.cancelBtn}>
-                <Text style={styles.cancelText}>Cancel</Text>
+                <Text style={[styles.cancelText, { color: ink }]}>Cancel</Text>
               </Pressable>
-              <Pressable onPress={submit} disabled={!canPost} style={[styles.postBtn, !canPost && styles.postDisabled]}>
-                <Text style={styles.postText}>{submitLabel}</Text>
+              <Pressable onPress={submit} disabled={!canPost} style={[styles.postBtn, tintActive, !canPost && styles.postDisabled]}>
+                <Text style={[styles.postText, { color: shadeInk }]}>{submitLabel}</Text>
               </Pressable>
             </View>
           )}
@@ -599,7 +619,7 @@ export function AddNoteSheet({
   );
 }
 
-function ColorDots({ color, onPick }: { color: ItemColor; onPick: (c: ItemColor) => void }) {
+function ColorDots({ color, onPick, doorColor }: { color: ItemColor; onPick: (c: ItemColor) => void; doorColor: BoardColor }) {
   return (
     <View style={styles.dots}>
       {noteColorKeys.map((k) => {
@@ -612,7 +632,11 @@ function ColorDots({ color, onPick }: { color: ItemColor; onPick: (c: ItemColor)
             onPress={() => onPick(k)}
             accessibilityLabel={`${k} colour`}
             accessibilityState={{ selected }}
-            style={[styles.dot, { backgroundColor: p.bg, borderColor: p.edge }, selected && styles.dotSelected]}
+            style={[
+              styles.dot,
+              { backgroundColor: p.bg, borderColor: p.edge },
+              selected && { borderColor: doorInk(doorColor), borderWidth: 2.5 },
+            ]}
           />
         );
       })}
@@ -685,7 +709,6 @@ const styles = StyleSheet.create({
   dateInput: { minHeight: 64, fontSize: 24 },
   dots: { flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 12 },
   dot: { width: 26, height: 26, borderRadius: 13, borderWidth: 1 },
-  dotSelected: { borderColor: colors.onPine, borderWidth: 2 },
   footerDivider: {
     height: 1,
     backgroundColor: colors.onPineFaint,
@@ -708,27 +731,32 @@ const styles = StyleSheet.create({
   photoDrop: {
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: colors.inkFaint,
+    borderColor: colors.pine,
     borderRadius: 18,
     minHeight: 140,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.leaf,
   },
-  photoDropText: { fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.inkSoft },
+  photoDropText: { fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.pine },
   input: {
     minHeight: 96,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.leaf,
     borderRadius: 18,
-    borderWidth: 1,
-    borderColor: colors.border,
     padding: 16,
     fontFamily: fonts.hand.semibold,
     fontSize: 20,
+    color: colors.pine,
+  },
+  captionInput: {
+    minHeight: 60,
+    marginTop: 12,
+    fontSize: 18,
+    // Caption follows the door tint like the other composer fields.
+    backgroundColor: colors.surface,
     color: colors.ink,
   },
-  captionInput: { minHeight: 60, marginTop: 12, fontSize: 18 },
   notepad: {
     backgroundColor: colors.paper,
     borderRadius: 6,
@@ -810,9 +838,8 @@ const styles = StyleSheet.create({
   },
   keepText: { fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.onPine },
   keepTextActive: { color: colors.accentDeep, fontFamily: fonts.ui.bold },
-  keepTextDisabled: { color: colors.onPineFaint },
   createSpacer: { flex: 1 },
-  postBtn: { backgroundColor: colors.accent, borderRadius: 999, paddingHorizontal: 22, paddingVertical: 9 },
+  postBtn: { backgroundColor: colors.leaf, borderRadius: 999, paddingHorizontal: 22, paddingVertical: 9 },
   postDisabled: { backgroundColor: colors.inkFaint },
-  postText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.background },
+  postText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.pine },
 });

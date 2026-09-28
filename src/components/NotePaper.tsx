@@ -206,9 +206,6 @@ function TicketBody({
         </View>
       ) : null}
       <View style={styles.ticketMain}>
-        {parts ? (
-          <Text style={[styles.dayLabel, { fontSize: compactFont(13, compact) }]}>{parts.label}</Text>
-        ) : null}
         <Text
           numberOfLines={large ? undefined : TITLE_LINES}
           style={[
@@ -365,14 +362,7 @@ const styles = StyleSheet.create({
   calDow: { fontFamily: fonts.ui.bold, fontSize: 12, letterSpacing: 0.5, color: colors.danger },
   calDay: { fontFamily: fonts.hand.bold, fontSize: 30, lineHeight: 32 },
   calMon: { fontFamily: fonts.ui.semibold, fontSize: 12, opacity: 0.7 },
-  ticketMain: { flex: 1 },
-  dayLabel: {
-    fontFamily: fonts.ui.bold,
-    fontSize: 13,
-    letterSpacing: 0.5,
-    color: colors.danger,
-    marginBottom: 2,
-  },
+  ticketMain: { flex: 1, flexShrink: 1, minWidth: 0 },
   ticketTime: { fontFamily: fonts.hand.bold, fontSize: 19, lineHeight: 23, marginTop: 2 },
   place: { fontFamily: fonts.ui.semibold, fontSize: 14, marginTop: 6, opacity: 0.85 },
   listTitle: {

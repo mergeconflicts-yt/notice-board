@@ -12,7 +12,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { setStatusBarStyle } from 'expo-status-bar';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { colors, fonts } from '../../../theme';
+import { boardColors, colors, darkDoors, doorInk, doorSoft, fonts } from '../../../theme';
 import { BoardSection } from '../../../components/BoardSection';
 import { PinnedStrip } from '../../../components/PinnedStrip';
 import { FridgeDoor } from '../../../components/FridgeDoor';
@@ -375,8 +375,21 @@ export default function BoardScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Switch fridges"
               >
-                <Text style={styles.boardName} numberOfLines={1}>{board.name}</Text>
-                <MaterialCommunityIcons name="chevron-down" size={16} color={colors.inkSoft} />
+                <Text
+                  style={[
+                    styles.boardName,
+                    {
+                      color: doorInk(board.color),
+                      textShadowColor: darkDoors.has(board.color)
+                        ? 'rgba(0,0,0,0.45)'
+                        : 'rgba(255,255,255,0.55)',
+                    },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {board.name}
+                </Text>
+                <MaterialCommunityIcons name="chevron-down" size={16} color={doorSoft(board.color)} />
               </Pressable>
 
               <Pressable
@@ -389,7 +402,7 @@ export default function BoardScreen() {
                 <MemberDot seed={me?.id ?? 'me'} name={me?.displayName ?? 'Someone'} size={36} />
               </Pressable>
             </View>
-            <Text style={styles.tagline}>📌 Always here</Text>
+            <Text style={[styles.tagline, { color: doorSoft(board.color) }]}>📌 Always here</Text>
 
             {error ? <Text style={styles.banner}>{error}</Text> : null}
 
@@ -398,6 +411,7 @@ export default function BoardScreen() {
               entries={entries}
               photoUrls={photoUrls}
               onOpen={openItem}
+              doorColor={board.color}
             />
           </FridgeDoor>
         </View>
@@ -407,10 +421,13 @@ export default function BoardScreen() {
             {isEmpty ? (
               <View style={styles.empty}>
                 <Text style={styles.emptyHand}>✍️</Text>
-                <Text style={styles.emptyTitle}>Leave the first note</Text>
-                <Text style={styles.emptySub}>Pin something up — everyone here will see it.</Text>
-                <Pressable onPress={() => setSheetOpen(true)} style={styles.emptyBtn}>
-                  <Text style={styles.emptyBtnText}>+ Add note</Text>
+                <Text style={[styles.emptyTitle, { color: doorInk(board.color) }]}>Leave the first note</Text>
+                <Text style={[styles.emptySub, { color: doorSoft(board.color) }]}>Pin something up — everyone here will see it.</Text>
+                <Pressable
+                  onPress={() => setSheetOpen(true)}
+                  style={[styles.emptyBtn, { backgroundColor: boardColors[board.color] }]}
+                >
+                  <Text style={[styles.emptyBtnText, { color: doorInk(board.color) }]}>+ Add note</Text>
                 </Pressable>
               </View>
             ) : (
@@ -437,6 +454,7 @@ export default function BoardScreen() {
           pointerEvents="none"
           style={[
             styles.deleteZone,
+            { backgroundColor: boardColors[board.color] },
             { bottom: insets.bottom + 20 },
             overDelete && styles.deleteZoneOver,
           ]}
@@ -444,33 +462,41 @@ export default function BoardScreen() {
           <MaterialCommunityIcons
             name="trash-can-outline"
             size={22}
-            color={overDelete ? colors.white : colors.inkSoft}
+            color={overDelete ? colors.white : doorInk(board.color)}
           />
-          <Text style={[styles.deleteZoneText, overDelete && styles.deleteZoneTextOver]}>
+          <Text
+            style={[
+              styles.deleteZoneText,
+              { color: doorInk(board.color) },
+              overDelete && styles.deleteZoneTextOver,
+            ]}
+          >
             {overDelete ? 'Release to delete' : 'Drag here to delete'}
           </Text>
         </View>
       ) : null}
 
       {!isEmpty && !dragActive ? (
-        <Pressable
-          onPress={() => setSheetOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Add to fridge"
-          style={({ pressed }) => [
-            styles.composerBtn,
-            { bottom: insets.bottom + 20 },
-            pressed && styles.composerPressed,
-          ]}
-        >
-          <Text style={styles.composerGlyph}>+</Text>
-          <Text style={styles.composerText}>Add to fridge</Text>
-        </Pressable>
+          <Pressable
+            onPress={() => setSheetOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Add to fridge"
+            style={({ pressed }) => [
+              styles.composerBtn,
+              { backgroundColor: boardColors[board.color] },
+              pressed && styles.composerPressed,
+              { bottom: insets.bottom + 20 },
+            ]}
+          >
+            <Text style={[styles.composerGlyph, { color: doorInk(board.color) }]}>+</Text>
+            <Text style={[styles.composerText, { color: doorInk(board.color) }]}>Add to Fridge</Text>
+          </Pressable>
       ) : null}
 
       <AddNoteSheet
         visible={sheetOpen}
         submitting={submitting}
+        doorColor={board.color}
         onClose={handleSheetClose}
         onSubmit={handleAdd}
       />
@@ -541,12 +567,12 @@ const styles = StyleSheet.create({
   emptySub: { fontFamily: fonts.ui.regular, fontSize: 15, color: colors.inkSoft, textAlign: 'center' },
   emptyBtn: {
     marginTop: 22,
-    backgroundColor: colors.ink,
+    backgroundColor: colors.leaf,
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 16,
   },
-  emptyBtnText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.background },
+  emptyBtnText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.pine },
   deleteZone: {
     position: 'absolute',
     alignSelf: 'center',
@@ -556,9 +582,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 14,
     borderRadius: 999,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.leaf,
     shadowColor: colors.shadow,
     shadowOpacity: 0.25,
     shadowRadius: 8,
@@ -572,7 +596,7 @@ const styles = StyleSheet.create({
   deleteZoneText: {
     fontFamily: fonts.ui.bold,
     fontSize: 15,
-    color: colors.inkSoft,
+    color: colors.pine,
   },
   deleteZoneTextOver: {
     color: colors.white,
@@ -584,7 +608,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     borderRadius: 999,
-    backgroundColor: colors.ink,
+    backgroundColor: colors.leaf,
     paddingHorizontal: 22,
     paddingVertical: 14,
     shadowColor: colors.shadow,
@@ -594,8 +618,8 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   composerPressed: { transform: [{ scale: 0.96 }] },
-  composerGlyph: { fontSize: 22, lineHeight: 24, color: colors.white, fontFamily: fonts.ui.bold },
-  composerText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.white },
+  composerGlyph: { fontSize: 22, lineHeight: 24, color: colors.pine, fontFamily: fonts.ui.bold },
+  composerText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.pine },
   missingTitle: { fontFamily: fonts.hand.bold, fontSize: 30, color: colors.ink },
   missingSub: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.inkSoft, marginTop: 6 },
   missingBtn: {
@@ -603,7 +627,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 14,
-    backgroundColor: colors.ink,
+    backgroundColor: colors.accent,
   },
   missingBtnText: { fontFamily: fonts.ui.bold, color: colors.background },
   missingBack: { marginTop: 12, paddingVertical: 8 },

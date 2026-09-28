@@ -110,64 +110,124 @@ export const memberColors = [
   '#4FA3A3',
 ] as const;
 
-/** Board cover tints. Cream is plain white paper. */
+/** Board cover tints — a vivid multi-hue family at brand intensity, not
+ *  pastels. Keys are the stored DB enum: rename nothing, only retune hexes.
+ *  Pine + ember keep the brand anchor; blue/mint/powder/blush bring back
+ *  variety. `darkDoors` below stays {charcoal, sage, blue}. */
 export const boardColors: Record<BoardColor, string> = {
-  sage: '#AFCDA1',
-  blue: '#98BBDE',
-  clay: '#DBA98A',
-  cream: '#FFF7DE',
-  charcoal: '#A69E92',
-  mint: '#9ED6B8',
-  butter: '#F1D876',
-  blush: '#EAA3AC',
-  powder: '#A8C1DC',
+  vintage_mint: '#9ED6B8',
+  vintage_butter: '#F1D876',
+  vintage_blush: '#EAA3AC',
+  vintage_powder: '#A8C1DC',
+  charcoal: '#3A3733',
+  sage: '#4E7A5C',
+  blue: '#3B7BD4',
+  mint: '#3ECF8E',
+  powder: '#9CC3E5',
+  cream: '#FFF3D6',
+  butter: '#F0C443',
+  clay: '#CE7A45',
+  blush: '#E85D7A',
 };
+
+/** Doors dark enough to need cream ink instead of ink (badge, chips, id
+ *  card). Keep in sync with `boardColors` above. */
+export const darkDoors: ReadonlySet<BoardColor> = new Set(['charcoal', 'sage', 'blue']);
+
+export function doorInk(color: BoardColor): string {
+  return darkDoors.has(color) ? colors.onPine : colors.ink;
+}
+
+export function doorSoft(color: BoardColor): string {
+  return darkDoors.has(color) ? colors.onPineSoft : colors.inkSoft;
+}
+
+function luminance(hex: string): number {
+  const n = hex.replace('#', '');
+  const c = [0, 2, 4].map((i) => {
+    const v = parseInt(n.slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+}
+
+/** Readable text on an arbitrary tint: cream below the threshold, ink above.
+ *  Threshold picked so every door shade lands cream and every light tint
+ *  lands ink. */
+export function onTint(bg: string): string {
+  return luminance(bg) < 0.3 ? colors.onPine : colors.ink;
+}
 
 export const boardColorKeys = Object.keys(boardColors) as BoardColor[];
 
+/** Colors offered in the create/settings pickers, in display order. The rest
+ *  stay valid (existing boards keep rendering) — just not offered. */
+export const offeredBoardColors: BoardColor[] = [
+  'vintage_mint',
+  'vintage_powder',
+  'powder',
+  'cream',
+  'sage',
+  'vintage_blush',
+];
+
 /** Enamel door tints per board colour: light face, base, shaded edge —
- *  the website fridge doors sprayed onto the app board. */
+ *  the website fridge doors sprayed onto the app board. Bases match
+ *  `boardColors`; keep the three in step. */
 export const doorTints: Record<BoardColor, { light: string; base: string; shade: string }> = {
-  sage: { light: '#B6D1A9', base: '#9DBBA8', shade: '#A4C295' },
-  blue: { light: '#A0C1E2', base: '#98BBDE', shade: '#8EB3D8' },
-  clay: { light: '#E0B192', base: '#DBA98A', shade: '#D39F7F' },
-  cream: { light: '#FBF5E5', base: '#FFF7DE', shade: '#F4EACF' },
-  charcoal: { light: '#AFA79B', base: '#A69E92', shade: '#9D9589' },
-  mint: { light: '#91CEAD', base: '#82C7A2', shade: '#74BB95' },
-  butter: { light: '#EED16F', base: '#E9C960', shade: '#DFBC52' },
-  blush: { light: '#E795A0', base: '#E18894', shade: '#D47C88' },
-  powder: { light: '#98B6D9', base: '#8AABD1', shade: '#7A9DC6' },
+  charcoal: { light: '#4C4741', base: '#3A3733', shade: '#2B2724' },
+  sage: { light: '#5F8F6E', base: '#4E7A5C', shade: '#3D6448' },
+  blue: { light: '#5490DD', base: '#3B7BD4', shade: '#2F63AC' },
+  mint: { light: '#5BD9A0', base: '#3ECF8E', shade: '#31A572' },
+  powder: { light: '#AED0EB', base: '#9CC3E5', shade: '#82ABCB' },
+  cream: { light: '#FFFAEA', base: '#FFF3D6', shade: '#EFE1BC' },
+  butter: { light: '#F4D169', base: '#F0C443', shade: '#D4A731' },
+  clay: { light: '#DB9060', base: '#CE7A45', shade: '#AF6335' },
+  blush: { light: '#ED7591', base: '#E85D7A', shade: '#BB4A62' },
+  vintage_mint: { light: '#B5E2C6', base: '#9ED6B8', shade: '#84BD9E' },
+  vintage_butter: { light: '#F6DE85', base: '#F1D876', shade: '#D6BC5E' },
+  vintage_blush: { light: '#F2B3BD', base: '#EAA3AC', shade: '#D18B94' },
+  vintage_powder: { light: '#B9CFE8', base: '#A8C1DC', shade: '#8FA9C2' },
 };
 
 /** Handle face per door colour: a deeper enamel tone that belongs with the
  *  door instead of generic steel. */
 export const handleTints: Record<BoardColor, [string, string, string]> = {
-  sage: ['#90B37C', '#729761', '#58764D'],
-  blue: ['#79A8D2', '#5D8CBA', '#496F94'],
-  clay: ['#CF9060', '#B17244', '#825535'],
-  cream: ['#CCB88D', '#B49F6E', '#948155'],
-  charcoal: ['#797367', '#5C574F', '#403C35'],
-  mint: ['#59A67E', '#4B8065', '#355E49'],
-  butter: ['#CCA437', '#987931', '#6E5823'],
-  blush: ['#BD6672', '#94535D', '#6C3D43'],
-  powder: ['#5D84B1', '#4E6A85', '#364C61'],
+  charcoal: ['#2B2724', '#211E1B', '#171412'],
+  sage: ['#3D6448', '#2F4F3A', '#223A2B'],
+  blue: ['#2F63AC', '#244C85', '#1A375D'],
+  mint: ['#31A572', '#268058', '#1C5C40'],
+  powder: ['#82ABCB', '#64849D', '#475D70'],
+  cream: ['#D9C491', '#B39D63', '#84744A'],
+  butter: ['#D4A731', '#A37F27', '#77601D'],
+  clay: ['#AF6335', '#884D2A', '#63381F'],
+  blush: ['#BB4A62', '#8F394C', '#65303A'],
+  vintage_mint: ['#84BD9E', '#679A7E', '#4A705C'],
+  vintage_butter: ['#D6BC5E', '#A78E45', '#786734'],
+  vintage_blush: ['#D18B94', '#A26A71', '#744C51'],
+  vintage_powder: ['#8FA9C2', '#6F8399', '#4F5D6C'],
 };
 
 /** Nameplate face per door colour: lighter enamel than the door with a
- *  darker engraved edge and screw heads. */
+ *  darker engraved edge and screw heads. (Currently unused — the badge sits
+ *  straight on the enamel — kept coherent in case plates return.) */
 export const plateTints: Record<
   BoardColor,
   { bg: string; edge: string; screw: string; screwEdge: string }
 > = {
-  sage: { bg: '#B2CFA0', edge: '#729061', screw: '#58764D', screwEdge: '#394F31' },
-  blue: { bg: '#9FC1E2', edge: '#5A89B6', screw: '#496F94', screwEdge: '#314961' },
-  clay: { bg: '#E2B188', edge: '#A46C43', screw: '#7E5336', screwEdge: '#533420' },
-  cream: { bg: '#ECD9AC', edge: '#B8985C', screw: '#948155', screwEdge: '#625437' },
-  charcoal: { bg: '#AAA295', edge: '#68625A', screw: '#403C35', screwEdge: '#201E19' },
-  mint: { bg: '#B8E0C5', edge: '#6CB58F', screw: '#4E896A', screwEdge: '#355E49' },
-  butter: { bg: '#F8E696', edge: '#D2AD3B', screw: '#987931', screwEdge: '#695420' },
-  blush: { bg: '#F5B6BD', edge: '#CB7784', screw: '#A4535F', screwEdge: '#713F46' },
-  powder: { bg: '#BACFEB', edge: '#6A96C4', screw: '#4F7297', screwEdge: '#384E64' },
+  charcoal: { bg: '#4E4843', edge: '#241F1C', screw: '#1A1714', screwEdge: '#100E0C' },
+  sage: { bg: '#648F70', edge: '#3A5C44', screw: '#2C4634', screwEdge: '#1B2C21' },
+  blue: { bg: '#6395DB', edge: '#2C5DA3', screw: '#23497F', screwEdge: '#173154' },
+  mint: { bg: '#69D8A4', edge: '#2E9A67', screw: '#247852', screwEdge: '#185236' },
+  powder: { bg: '#B4D2EC', edge: '#6E9CC4', screw: '#577A99', screwEdge: '#3A5266' },
+  cream: { bg: '#FBEFCB', edge: '#C9AE72', screw: '#A08A58', screwEdge: '#6C5D3A' },
+  butter: { bg: '#F6D878', edge: '#C1932C', screw: '#96712A', screwEdge: '#66501E' },
+  clay: { bg: '#DE9A6B', edge: '#9C5A30', screw: '#7A4626', screwEdge: '#523019' },
+  blush: { bg: '#EE8299', edge: '#A8455C', screw: '#843647', screwEdge: '#5A2530' },
+  vintage_mint: { bg: '#B5E2C6', edge: '#7CB894', screw: '#60976F', screwEdge: '#42684D' },
+  vintage_butter: { bg: '#F6DE85', edge: '#CBB14E', screw: '#9E8A3E', screwEdge: '#6C5F2B' },
+  vintage_blush: { bg: '#F2B3BD', edge: '#C98C95', screw: '#9D6D74', screwEdge: '#6C4B50' },
+  vintage_powder: { bg: '#B9CFE8', edge: '#87A6C2', screw: '#688197', screwEdge: '#475A68' },
 };
 
 /** The single fastener everywhere: round magnets in fixed colours (used by Pin). */

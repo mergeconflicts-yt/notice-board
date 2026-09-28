@@ -3,7 +3,7 @@ import { View, Text, TextInput, ScrollView, Pressable, StyleSheet, Alert, Share,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { boardColorKeys, boardColors, colors, fonts } from '../../../theme';
+import { offeredBoardColors, boardColors, colors, doorInk, doorSoft, fonts } from '../../../theme';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { Avatar } from '../../../components/Avatar';
 import { useBoard, fetchRemovedItems } from '../../../hooks/useBoard';
@@ -259,14 +259,14 @@ export default function BoardSettingsScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScreenHeader title="Fridge settings" />
+      <ScreenHeader title="Fridge settings" tone="pine" />
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         <View style={[styles.idCard, { backgroundColor: boardColors[board?.color ?? 'sage'] }]}>
           <View style={styles.idTop}>
-            <Text style={styles.idName} numberOfLines={2}>{board?.name ?? ''}</Text>
+            <Text style={[styles.idName, { color: doorInk(board?.color ?? 'sage') }]} numberOfLines={2}>{board?.name ?? ''}</Text>
             {isOwner ? (
               <Pressable hitSlop={12} onPress={() => { setDraftName(board?.name ?? ''); setEditingName(true); }}>
-                <MaterialCommunityIcons name="pencil-outline" size={22} color={colors.ink} />
+                <MaterialCommunityIcons name="pencil-outline" size={22} color={doorInk(board?.color ?? 'sage')} />
               </Pressable>
             ) : null}
           </View>
@@ -278,7 +278,7 @@ export default function BoardSettingsScreen() {
                 </View>
               ))}
             </View>
-            <Text style={styles.idCount}>
+            <Text style={[styles.idCount, { color: doorSoft(board?.color ?? 'sage') }]}>
               {memberCount} {memberCount === 1 ? 'person' : 'people'}
             </Text>
           </Pressable>
@@ -291,7 +291,7 @@ export default function BoardSettingsScreen() {
               value={name}
               onChangeText={setDraftName}
               placeholder="Fridge name"
-              placeholderTextColor={colors.inkFaint}
+              placeholderTextColor={colors.pine}
               maxLength={60}
               autoFocus
             />
@@ -314,7 +314,7 @@ export default function BoardSettingsScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.swatches}
             >
-              {boardColorKeys.map((k) => (
+              {offeredBoardColors.map((k) => (
                 <Pressable
                   key={k}
                   onPress={() => pickColor(k)}
@@ -339,7 +339,7 @@ export default function BoardSettingsScreen() {
           <View style={styles.divider} />
           <Pressable style={styles.row} onPress={shareInvite}>
             <Text style={styles.rowLabel}>Invite someone</Text>
-            <MaterialCommunityIcons name="share-outline" size={22} color={colors.inkSoft} />
+            <MaterialCommunityIcons name="share-outline" size={22} color={colors.onPineSoft} />
           </Pressable>
           <View style={styles.divider} />
           <Pressable style={styles.row} onPress={openRemoved}>
@@ -491,7 +491,7 @@ export default function BoardSettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1, backgroundColor: colors.pine },
   body: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32 },
   idCard: { borderRadius: 20, paddingHorizontal: 18, paddingVertical: 16 },
   idTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
@@ -504,53 +504,47 @@ const styles = StyleSheet.create({
   editor: { marginTop: 14, gap: 10 },
   editorInput: {
     height: 50,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.leaf,
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
     paddingHorizontal: 14,
     fontFamily: fonts.ui.semibold,
     fontSize: 16,
-    color: colors.ink,
+    color: colors.pine,
   },
   editorActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
-  editorCancelText: { fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.inkSoft, paddingVertical: 10, paddingHorizontal: 14 },
-  editorSave: { paddingVertical: 10, paddingHorizontal: 22, borderRadius: 14, backgroundColor: colors.ink },
+  editorCancelText: { fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.onPineSoft, paddingVertical: 10, paddingHorizontal: 14 },
+  editorSave: { paddingVertical: 10, paddingHorizontal: 22, borderRadius: 14, backgroundColor: colors.accent },
   editorSaveText: { fontFamily: fonts.ui.bold, fontSize: 15, color: colors.background },
-  sectionLabel: { fontFamily: fonts.ui.regular, fontSize: 17, color: colors.ink, marginTop: 26, marginBottom: 10, paddingLeft: 4 },
+  sectionLabel: { fontFamily: fonts.ui.regular, fontSize: 17, color: colors.onPine, marginTop: 26, marginBottom: 10, paddingLeft: 4 },
   swatches: { flexDirection: 'row', gap: 12, paddingLeft: 4 },
   swatch: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: 'transparent' },
-  swatchActive: { borderColor: colors.ink },
-  group: { backgroundColor: colors.surface, borderRadius: 18, paddingHorizontal: 16 },
+  swatchActive: { borderColor: colors.accent },
+  group: { backgroundColor: colors.pineGhost, borderRadius: 18, paddingHorizontal: 16 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 15 },
-  rowLabel: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.ink, flexShrink: 1 },
-  rowValue: { fontFamily: fonts.ui.regular, fontSize: 15, color: colors.inkSoft },
-  chevron: { fontSize: 22, color: colors.inkFaint },
-  divider: { borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  rowLabel: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.onPine, flexShrink: 1 },
+  rowValue: { fontFamily: fonts.ui.regular, fontSize: 15, color: colors.onPineSoft },
+  chevron: { fontSize: 22, color: colors.onPineFaint },
+  divider: { borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.onPineFaint },
   removedList: { marginTop: 12, gap: 8 },
   removedRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.pineGhost,
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
     paddingVertical: 12,
     paddingHorizontal: 14,
   },
-  removedText: { flex: 1, fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.ink },
-  restore: { fontFamily: fonts.ui.bold, fontSize: 14, color: colors.accentDeep },
+  removedText: { flex: 1, fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.onPine },
+  restore: { fontFamily: fonts.ui.bold, fontSize: 14, color: colors.brandYellow },
   reportActions: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 10 },
   reportCard: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.pineGhost,
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
     paddingVertical: 12,
     paddingHorizontal: 14,
   },
   reportPhoto: { width: '100%', height: 180, borderRadius: 10, marginBottom: 10 },
-  reportMeta: { fontFamily: fonts.ui.regular, fontSize: 13, color: colors.inkSoft, marginTop: 4 },
+  reportMeta: { fontFamily: fonts.ui.regular, fontSize: 13, color: colors.onPineSoft, marginTop: 4 },
   dangerText: { color: colors.danger },
 });

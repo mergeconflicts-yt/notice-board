@@ -17,7 +17,11 @@ export type BoardColor =
   | 'mint'
   | 'butter'
   | 'blush'
-  | 'powder';
+  | 'powder'
+  | 'vintage_mint'
+  | 'vintage_butter'
+  | 'vintage_blush'
+  | 'vintage_powder';
 
 export type User = {
   id: string;
