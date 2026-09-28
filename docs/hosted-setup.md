@@ -20,7 +20,8 @@ Repeat per hosted project (`Fridge-Board-dev` first, then the prod twin).
 - [x] Turnstile CAPTCHA on (Managed, pre-clearance OFF, `fridge-board.kranehx.com`) + site key in EAS env (2026-09-28).
 - [x] Google OAuth: Web ID/secret + callback in Supabase; iOS + Android clients created (EAS SHA-1) — free, no Apple account needed (2026-09-28).
 - [ ] Apple (Services ID + `.p8`) — DEFERRED: no Apple Developer account. Blocks link-site `APPLE_TEAM_ID`/`APP_STORE_ID` too.
-- [ ] Run Deploy workflow → `SUPABASE-Dev`; fix verify until green.
+- [x] Run Deploy workflow → `SUPABASE-Dev` green 2026-09-28 (12 migrations, 4 functions, `JOB_SECRET`, lint, verify posture all pass).
+- [x] CI manual-only (2026-09-28): `ci.yml` is `workflow_dispatch` — nothing runs on push/merge/PR; dispatch `check` + `database` from Actions only when needed.
 - [ ] Link site — DEFERRED (needs Apple IDs; `build.mjs` fails by design without them). Interim `EXPO_PUBLIC_INVITE_BASE_URL=https://fridge-board.kranehx.com`. No Vercel needed: will merge `web/public/` into the existing Cloudflare host later.
 - [x] EAS project linked (`@mergeconflictss-team/fridge-board`) + prod env 4 vars set (2026-09-28); still to do: `eas build --profile production` → real-device tests.
 - [ ] Check `http_failures()` the next day.
@@ -49,6 +50,12 @@ select vault.create_secret('<job-secret-hex>', 'job_secret');
 Verified: `select name from vault.secrets …` returns all three.
 `<job-secret-hex>` is saved as the GitHub `JOB_SECRET` — the two must match
 exactly or every nightly job 403s (deploy.yml compares them first).
+Rotating (done 2026-09-28 after a mismatch — even one trailing newline
+counts): `openssl rand -hex 32` locally, then SQL Editor as `postgres`
+`select vault.update_secret(id, '<hex>') from vault.secrets where
+name = 'job_secret';` AND paste the same hex into the GitHub `JOB_SECRET`
+(env `SUPABASE-Dev`). Never reuse screen output from `decrypted_secrets`
+as the source — regenerate clean on both ends.
 
 ## GitHub — DONE
 
@@ -78,6 +85,34 @@ exactly or every nightly job 403s (deploy.yml compares them first).
  | Edge Function Secrets | Read & Write | sets `JOB_SECRET` on the functions |
  | Storage | Read | verify step checks both buckets are private |
  | API Gateway Keys | Read | `supabase link` fetches the project's API keys (added 2026-09-28 — Link step failed without it: `Missing required permission(s): api_gateway_keys_read`) |
+
+## Deploy workflow — link-free (2026-09-28)
+
+- `deploy.yml` has NO `supabase link` step on purpose. `link` queries a
+  project-status endpoint that scoped tokens can't reach (`Your account does
+  not have the necessary privileges`), even when the same token returns 200
+  via direct API calls and local `curl` — known CLI bug
+  (supabase/cli#3705, #6392; fails identically locally, so never a GitHub
+  secrets problem).
+- Instead: DB steps (`push` dry-run + real, remote `lint`) use
+  `supabase … --db-url "$SUPABASE_DB_URL"` (straight Postgres, no Management
+  API); function steps (`functions deploy`, `secrets set`) pass
+  `--project-ref` explicitly. Prereqs + verify were already pure `psql` +
+  `curl` and are untouched.
+- `psql` calls strip the pooler suffix (`DB_URL="${SUPABASE_DB_URL%%\?*}"`)
+  — libpq rejects `?pgbouncer=true`; port 6543 still routes via the pooler.
+  The CLI tolerates the suffix, so the secret keeps it.
+- Pair debugging (all local, never in CI/chat): token must start `sbp_…`
+  (avatar → Access Tokens; `sb_publishable_/sb_secret_/eyJ…` are project
+  keys and always 401 against `api.supabase.com`). Probe:
+  `GET /v1/projects/<ref>` → 200 pair OK / 401 bad value (check length
+  `echo -n … | wc -c`, re-export same shell) / 403-privileges wrong ref or
+  account role; `GET …/api-keys` exercises the Link-time permission;
+  `GET …/config/auth` exercises the verify step. Local 200s + GitHub red =
+  GitHub secrets differ from the terminal — overwrite and dispatch FRESH
+  (Actions → Deploy database → Run workflow → env), never Re-run.
+  Always dispatch fresh after secret/workflow changes so run number,
+  file, and secret versions are unambiguous.
 
 ## Auth dashboard — PARTIAL (emails + captcha + Google done; Apple deferred)
 
@@ -187,6 +222,11 @@ Open:
   (guest, Google, email codes, Turnstile, custom-scheme invites
   `fridgeboard://j/<token>` + code paste — `https://` auto-open waits
   for link files).
+- Build fix 2026-09-28: EAS runs plain `npm ci` (no flags), which fails on
+  Expo 57 peer conflicts (`Missing: … from lock file`) while CI passes
+  because it passes `--legacy-peer-deps` explicitly. Repo root `.npmrc`
+  now pins `legacy-peer-deps=true` so EAS resolves like CI/local
+  (`prod-checklist.md` already mandates the flag).
 
 ## Link site / domain decision — DEFERRED (no Apple account)
 
