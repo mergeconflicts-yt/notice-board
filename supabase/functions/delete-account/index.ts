@@ -4,7 +4,7 @@
 // as that user (board cleanup) and then removes the auth user via the admin
 // API. A user can only delete themselves. It is retryable: delete_account() is
 // safe to run again, so a failure after cleanup can simply be retried.
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient } from 'jsr:@supabase/supabase-js@2.116.0';
 
 Deno.serve(async (req: Request) => {
   const authHeader = req.headers.get('Authorization');

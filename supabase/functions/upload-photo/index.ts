@@ -10,7 +10,7 @@
 //
 // Auth: caller JWT (verify_jwt on), intent must belong to the caller.
 // Retryable: re-uploading to the same intent path overwrites (upsert).
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient } from 'jsr:@supabase/supabase-js@2.116.0';
 import { Image } from 'jsr:@cross/image';
 
 const BUCKET = 'board-photos';
