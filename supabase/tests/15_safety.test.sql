@@ -1,7 +1,7 @@
 -- Safety surfaces: report flow, owner queue, block list (store guideline 1.2).
 -- O owns a board; M is a member; S is a stranger.
 begin;
-select plan(29);
+select plan(39);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000091', 'authenticated', 'authenticated'),
@@ -9,6 +9,8 @@ insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000093', 'authenticated', 'authenticated');
 insert into public.boards (id, name, created_by)
 values ('b0000000-0000-0000-0000-000000000091', 'Safety', 'a0000000-0000-0000-0000-000000000091');
+update public.profiles set display_name = 'Olive' where id = 'a0000000-0000-0000-0000-000000000091';
+update public.profiles set display_name = 'Moss' where id = 'a0000000-0000-0000-0000-000000000092';
 insert into public.board_members (board_id, user_id, role) values
   ('b0000000-0000-0000-0000-000000000091', 'a0000000-0000-0000-0000-000000000091', 'owner'),
   ('b0000000-0000-0000-0000-000000000091', 'a0000000-0000-0000-0000-000000000092', 'member');
@@ -25,10 +27,13 @@ select lives_ok(
 select lives_ok(
   $$select public.report_post('c0000000-0000-0000-0000-000000000091', 'rude')$$,
   'repeat report is a no-op');
+reset role;
 select is(
   (select count(*)::integer from public.post_reports
    where item_id = 'c0000000-0000-0000-0000-000000000091'),
   1, 'one report row per reporter/item');
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000092', true);
+set role authenticated;
 
 -- O reports too; the queue shows the post once with count 2.
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000091', true);
@@ -41,6 +46,17 @@ select is(
 select is(
   (select report_count from public.list_reported_items('b0000000-0000-0000-0000-000000000091')),
   2, 'queue counts both reports');
+select is(
+  (select reasons from public.list_reported_items('b0000000-0000-0000-0000-000000000091')),
+  array['rude'], 'queue carries the distinct non-empty reasons');
+select is(
+  (select author_name from public.list_reported_items('b0000000-0000-0000-0000-000000000091')),
+  'Olive', 'queue carries the author display name');
+-- Reporter identities never leave the database: the function exposes no
+-- reporter_names column at all.
+select throws_ok(
+  $$select reporter_names from public.list_reported_items('b0000000-0000-0000-0000-000000000091')$$,
+  '42703', null, 'queue exposes no reporter identities');
 reset role;
 
 -- M (not owner) cannot see the queue or dismiss.
@@ -142,6 +158,44 @@ set role authenticated;
 select is(
   (select public.accept_invite((select token from t_fresh_link))),
   'b0000000-0000-0000-0000-000000000091', 'unblocked member rejoins with a fresh link');
+reset role;
+
+-- remove_and_block is atomic: one call removes the post, clears its
+-- reports, and blocks the author. M posts, O reports it, O removes+blocks.
+insert into public.items (id, board_id, type, body, created_by) values
+  ('c0000000-0000-0000-0000-000000000092', 'b0000000-0000-0000-0000-000000000091',
+   'note', 'spam post', 'a0000000-0000-0000-0000-000000000092');
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000091', true);
+set role authenticated;
+select lives_ok(
+  $$select public.report_post('c0000000-0000-0000-0000-000000000092', 'spam')$$,
+  'owner reports the spam post');
+select lives_ok(
+  $$select public.remove_and_block('c0000000-0000-0000-0000-000000000092')$$,
+  'remove_and_block runs');
+select is(
+  (select deleted_at is not null from public.items where id = 'c0000000-0000-0000-0000-000000000092'),
+  true, 'spam post soft-deleted');
+reset role;
+select is(
+  (select count(*)::integer from public.post_reports where item_id = 'c0000000-0000-0000-0000-000000000092'),
+  0, 'spam post reports cleared');
+select is(
+  (select count(*)::integer from public.board_blocks
+   where board_id = 'b0000000-0000-0000-0000-000000000091'
+     and user_id = 'a0000000-0000-0000-0000-000000000092'),
+  1, 'spam author blocked');
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000092', true);
+set role authenticated;
+select throws_ok(
+  $$select public.remove_and_block('c0000000-0000-0000-0000-000000000091')$$,
+  'P0001', 'not_member', 'blocked ex-member cannot remove_and_block');
+reset role;
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000093', true);
+set role authenticated;
+select throws_ok(
+  $$select public.remove_and_block('c0000000-0000-0000-0000-000000000091')$$,
+  'P0001', 'not_member', 'stranger cannot remove_and_block');
 reset role;
 
 -- Soft-delete the board: the safety RPCs die with it even though memberships

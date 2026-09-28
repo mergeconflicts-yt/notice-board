@@ -386,6 +386,7 @@ export type Database = {
       photo_upload_intents: {
         Row: {
           board_id: string
+          byte_size: number | null
           consumed: boolean
           created_at: string
           expires_at: string
@@ -395,6 +396,7 @@ export type Database = {
         }
         Insert: {
           board_id: string
+          byte_size?: number | null
           consumed?: boolean
           created_at?: string
           expires_at?: string
@@ -404,6 +406,7 @@ export type Database = {
         }
         Update: {
           board_id?: string
+          byte_size?: number | null
           consumed?: boolean
           created_at?: string
           expires_at?: string
@@ -754,6 +757,7 @@ export type Database = {
       list_reported_items: {
         Args: { p_board_id: string }
         Returns: {
+          author_name: string | null
           board_id: string
           body: string | null
           color: Database["public"]["Enums"]["item_color"]
@@ -765,6 +769,7 @@ export type Database = {
           photo_path: string | null
           pinned: boolean
           place: string | null
+          reasons: string[]
           report_count: number
           title: string | null
           type: Database["public"]["Enums"]["item_type"]
@@ -847,6 +852,7 @@ export type Database = {
         Returns: undefined
       }
       remove_entry: { Args: { p_id: string }; Returns: undefined }
+      remove_and_block: { Args: { p_item_id: string }; Returns: undefined }
       remove_item: { Args: { p_id: string }; Returns: undefined }
       remove_member: {
         Args: { p_board_id: string; p_user_id: string }

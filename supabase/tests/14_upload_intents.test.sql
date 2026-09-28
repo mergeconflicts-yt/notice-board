@@ -1,7 +1,10 @@
 -- Upload intents: issue, bind, consume, quotas (release hardening).
 -- O owns a board; M is a co-member; S is a stranger.
+-- Only the upload-photo Edge Function (service role) writes bytes; the
+-- storage policy admits no client uploads. Quotas: 20 intents/hour/account,
+-- 20 pending per user, 500 live photos per board, 1 GB per account.
 begin;
-select plan(16);
+select plan(22);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000081', 'authenticated', 'authenticated'),
@@ -78,11 +81,12 @@ select throws_ok(
   '42501', null, 'anon cannot start an upload');
 reset role;
 
--- Expired unused intents never link, and the hourly sweep clears them.
+-- Expired unused intents never link. The sweep only clears unreferenced rows
+-- past the orphan horizon (25h): accounting must outlive the bytes.
 insert into public.photo_upload_intents (path, board_id, item_id, user_id, expires_at) values
   ('b0000000-0000-0000-0000-000000000081/c0000000-0000-0000-0000-000000000086/stale.jpg',
    'b0000000-0000-0000-0000-000000000081', 'c0000000-0000-0000-0000-000000000086',
-   'a0000000-0000-0000-0000-000000000081', now() - interval '2 hours');
+   'a0000000-0000-0000-0000-000000000081', now() - interval '26 hours');
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000081', true);
 set role authenticated;
 select throws_ok(
@@ -92,10 +96,20 @@ select throws_ok(
     false, null)$$,
   'P0001', 'invalid_input', 'expired intent cannot link a photo');
 reset role;
-select is(public.purge_stale_upload_intents(), 1, 'sweep removes the expired intent');
+-- A recently-expired unreferenced row survives: its bytes may still exist
+-- (orphan sweeper horizon is 24h), so the quota must keep counting it.
+insert into public.photo_upload_intents (path, board_id, item_id, user_id, expires_at) values
+  ('b0000000-0000-0000-0000-000000000081/c0000000-0000-0000-0000-000000000087/fresh.jpg',
+   'b0000000-0000-0000-0000-000000000081', 'c0000000-0000-0000-0000-000000000087',
+   'a0000000-0000-0000-0000-000000000081', now() - interval '2 hours');
+select is(public.purge_stale_upload_intents(), 1, 'sweep removes only the oldest expired intent');
 select is(
   (select count(*)::integer from public.photo_upload_intents
-   where user_id = 'a0000000-0000-0000-0000-000000000081'),
+   where path = 'b0000000-0000-0000-0000-000000000081/c0000000-0000-0000-0000-000000000087/fresh.jpg'),
+  1, 'recently-expired accounting survives the sweep');
+select is(
+  (select count(*)::integer from public.photo_upload_intents
+   where path = (select path from t_intent)),
   1, 'the consumed live intent survives the sweep');
 select is(
   (select count(*)::integer from cron.job where jobname = 'cleanup-upload-intents'),
@@ -108,6 +122,54 @@ select ok(not has_function_privilege('authenticated',
   'public._consume_photo_intent(uuid, uuid, text)', 'execute'), '_consume_photo_intent is closed');
 select ok(not has_function_privilege('authenticated',
   'public.purge_stale_upload_intents()', 'execute'), 'purge_stale_upload_intents is closed');
+
+-- Per-account storage cap: M with 1 GB already stored cannot start another.
+insert into public.photo_upload_intents (path, board_id, item_id, user_id, byte_size) values
+  ('b0000000-0000-0000-0000-000000000081/c0000000-0000-0000-0000-000000000090/full.jpg',
+   'b0000000-0000-0000-0000-000000000081', 'c0000000-0000-0000-0000-000000000090',
+   'a0000000-0000-0000-0000-000000000082', 1073741824);
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000082', true);
+set role authenticated;
+select throws_ok(
+  $$select public.start_photo_upload('b0000000-0000-0000-0000-000000000081',
+    'c0000000-0000-0000-0000-000000000091')$$,
+  'P0001', 'rate_limited', 'account at 1 GB storage cap refused');
+reset role;
+
+-- Soft-deleted photos keep counting: link M's full intent to an item, remove
+-- the item, and the cap must still hold (objects remain stored 30 days).
+insert into public.items (id, board_id, type, photo_path, created_by) values
+  ('c0000000-0000-0000-0000-000000000090', 'b0000000-0000-0000-0000-000000000081',
+   'photo', 'b0000000-0000-0000-0000-000000000081/c0000000-0000-0000-0000-000000000090/full.jpg',
+   'a0000000-0000-0000-0000-000000000082');
+update public.photo_upload_intents set consumed = true
+where path = 'b0000000-0000-0000-0000-000000000081/c0000000-0000-0000-0000-000000000090/full.jpg';
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000082', true);
+set role authenticated;
+select lives_ok(
+  $$select public.remove_item('c0000000-0000-0000-0000-000000000090')$$,
+  'owner removes the full photo');
+select throws_ok(
+  $$select public.start_photo_upload('b0000000-0000-0000-0000-000000000081',
+    'c0000000-0000-0000-0000-000000000092')$$,
+  'P0001', 'rate_limited', 'soft-deleted bytes still count toward the cap');
+reset role;
+
+-- The 21st intent in the hour is refused (20/hour/account cap). O already
+-- issued 1 above; 19 more succeed, the next fails.
+-- NOTE: pgTAP runs in one transaction; hit_rate_limit windows keyed by hour.
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000081', true);
+set role authenticated;
+select lives_ok(
+  $$select count(public.start_photo_upload('b0000000-0000-0000-0000-000000000081',
+    ('c0000100-0000-0000-0000-0000000000' || lpad(g::text, 2, '0'))::uuid))
+    from generate_series(1, 19) g$$,
+  'intents 2..20 in the hour succeed');
+select throws_ok(
+  $$select public.start_photo_upload('b0000000-0000-0000-0000-000000000081',
+    'c0000000-0000-0000-0000-000000000099')$$,
+  'P0001', 'rate_limited', '21st intent in the hour refused');
+reset role;
 
 select * from finish();
 rollback;

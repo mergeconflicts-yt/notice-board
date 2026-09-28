@@ -241,13 +241,15 @@ $$;
 
 -- ---------------------------------------------------------------------------
 -- Photo upload intents: every photo upload is bound to a server-issued path.
--- The board-photos storage policy only accepts the exact live intent path,
--- and post_item consumes the intent when the photo is linked — so bytes
--- uploaded outside the intent flow can never appear on a board. Quotas bound
--- the abuse: 300 intents/hour, 20 pending per user (orphan bytes), 500 live
--- photos per board. Client-side resize/re-encode (EXIF strip) still happens
--- on device; byte-level server-side validation needs an Edge Function on the
--- storage webhook.
+-- Only the upload-photo Edge Function (service role) writes the bytes: it
+-- decodes the upload, rejects non-images, downsizes, and re-encodes as JPEG
+-- (which strips EXIF/GPS), then records byte_size. The board-photos storage
+-- policy admits no direct client uploads, and post_item consumes the intent
+-- when the photo is linked — so bytes uploaded outside the intent flow can
+-- never appear on a board. Quotas bound the abuse: 20 intents/hour/account
+-- (~200 MB worst case at the 10 MB bucket cap, before re-encode shrinks it),
+-- 20 pending intents per user, 500 live photos per board, and a 1 GB
+-- per-account cap over live + pending bytes.
 -- ---------------------------------------------------------------------------
 
 create function public.start_photo_upload(p_board_id uuid, p_item_id uuid)
@@ -259,6 +261,7 @@ declare
   v_path text;
   v_pending integer;
   v_live_photos integer;
+  v_used_bytes bigint;
 begin
   if auth.uid() is null then
     raise exception 'not_authenticated';
@@ -269,11 +272,24 @@ begin
   if not public.is_member(p_board_id) then
     raise exception 'not_member';
   end if;
-  perform public.hit_rate_limit('photo_upload', 300, interval '1 hour');
+  perform public.hit_rate_limit('photo_upload', 20, interval '1 hour');
   select count(*)::integer into v_pending
   from public.photo_upload_intents
   where user_id = auth.uid() and consumed = false and expires_at > now();
   if v_pending >= 20 then
+    raise exception 'rate_limited';
+  end if;
+  -- Per-account storage quota: linked photos (measured post re-encode) plus
+  -- pending intent bytes. Soft-deleted items keep counting: their objects
+  -- remain stored and restorable for 30 days. Unknown sizes (legacy rows,
+  -- in-flight uploads) count at the bucket cap so they cannot hide usage.
+  select coalesce(sum(coalesce(n.byte_size, 10485760)), 0)::bigint into v_used_bytes
+  from public.photo_upload_intents n
+  left join public.items i
+    on i.photo_path = n.path
+  where n.user_id = auth.uid()
+    and (n.consumed = false or i.id is not null);
+  if v_used_bytes >= 1073741824 then
     raise exception 'rate_limited';
   end if;
   select count(*)::integer into v_live_photos
@@ -470,7 +486,8 @@ returns table (
   id uuid, board_id uuid, type public.item_type, color public.item_color,
   body text, title text, event_at timestamptz, place text, photo_path text,
   pinned boolean, keep_until timestamptz, created_by uuid, version integer,
-  created_at timestamptz, updated_at timestamptz, report_count integer
+  created_at timestamptz, updated_at timestamptz, report_count integer,
+  reasons text[], author_name text
 )
 language plpgsql
 security definer
@@ -483,7 +500,7 @@ begin
   end if;
   -- A soft-deleted board keeps its memberships for 30 days, but the report
   -- queue dies with the board: require a live board first.
-  if not exists (select 1 from public.boards where id = p_board_id and deleted_at is null) then
+  if not exists (select 1 from public.boards where boards.id = p_board_id and deleted_at is null) then
     raise exception 'not_member';
   end if;
   select role into v_role
@@ -495,14 +512,20 @@ begin
   if v_role is distinct from 'owner' then
     raise exception 'not_owner';
   end if;
+  -- Reporter identities never leave the database: only the count and the
+  -- distinct reasons are exposed (even an owner whose own post was reported
+  -- learns nothing about who reported it).
   return query
   select i.id, i.board_id, i.type, i.color, i.body, i.title, i.event_at,
     i.place, i.photo_path, i.pinned, i.keep_until, i.created_by, i.version,
-    i.created_at, i.updated_at, count(r.id)::integer
+    i.created_at, i.updated_at, count(r.id)::integer,
+    array_remove(array_agg(distinct nullif(btrim(r.reason), '')) filter (where r.reason is not null), null),
+    a.display_name
   from public.items i
   join public.post_reports r on r.item_id = i.id
+  left join public.profiles a on a.id = i.created_by
   where i.board_id = p_board_id and i.deleted_at is null
-  group by i.id
+  group by i.id, a.display_name
   order by max(r.created_at) desc;
 end;
 $$;
@@ -634,6 +657,82 @@ begin
 end;
 $$;
 
+-- Owner moderation in one transaction: soft-delete the reported post, clear
+-- its reports, and block its author — all or nothing (plpgsql functions run
+-- in the caller's transaction, so any raise rolls everything back). When the
+-- post has no blockable author (already left, or the owner's own post) only
+-- the remove + dismiss happen.
+create function public.remove_and_block(p_item_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = '' as $$
+declare
+  v_row public.items%rowtype;
+  v_caller_role public.member_role;
+  v_remaining integer;
+begin
+  if auth.uid() is null then
+    raise exception 'not_authenticated';
+  end if;
+  if p_item_id is null then
+    raise exception 'invalid_input';
+  end if;
+  select * into v_row from public.items where id = p_item_id for update;
+  if v_row.id is null then
+    raise exception 'not_found';
+  end if;
+  -- Same lock-then-check order as remove_member (board -> member rows).
+  perform 1 from public.boards where id = v_row.board_id for update;
+  if not exists (
+    select 1 from public.boards where id = v_row.board_id and deleted_at is null
+  ) then
+    raise exception 'not_member';
+  end if;
+  select role into v_caller_role
+  from public.board_members
+  where board_id = v_row.board_id and user_id = auth.uid();
+  if v_caller_role is null then
+    raise exception 'not_member';
+  end if;
+  if v_caller_role is distinct from 'owner' then
+    raise exception 'not_owner';
+  end if;
+  perform public.hit_rate_limit('item_write', 600, interval '1 hour');
+  if v_row.deleted_at is null then
+    update public.items
+    set deleted_at = now(),
+        deleted_by = auth.uid(),
+        updated_by = auth.uid(),
+        updated_at = now(),
+        version = v_row.version + 1
+    where id = p_item_id and version = v_row.version;
+  end if;
+  delete from public.post_reports where item_id = p_item_id;
+  if v_row.created_by is null or v_row.created_by = auth.uid() then
+    return;
+  end if;
+  delete from public.board_members
+  where board_id = v_row.board_id and user_id = v_row.created_by;
+  insert into public.board_blocks (board_id, user_id, blocked_by)
+  values (v_row.board_id, v_row.created_by, auth.uid())
+  on conflict (board_id, user_id) do nothing;
+  select count(*)::integer into v_remaining
+  from public.board_members
+  where board_id = v_row.board_id;
+  if v_remaining = 0 then
+    update public.boards
+    set deleted_at = now(), updated_at = now()
+    where id = v_row.board_id and deleted_at is null;
+  else
+    perform public.promote_longest_member(v_row.board_id);
+  end if;
+  update public.invites
+  set revoked_at = now()
+  where board_id = v_row.board_id and revoked_at is null;
+end;
+$$;
+
 create function public.list_blocked(p_board_id uuid)
 returns table (user_id uuid, display_name text, blocked_at timestamptz)
 language plpgsql
@@ -646,7 +745,7 @@ begin
     raise exception 'not_authenticated';
   end if;
   -- The block list dies with the board: require a live board first.
-  if not exists (select 1 from public.boards where id = p_board_id and deleted_at is null) then
+  if not exists (select 1 from public.boards where boards.id = p_board_id and deleted_at is null) then
     raise exception 'not_member';
   end if;
   select role into v_role
@@ -1609,6 +1708,8 @@ revoke all on function public.block_member(uuid, uuid) from public, anon;
 grant execute on function public.block_member(uuid, uuid) to authenticated;
 revoke all on function public.unblock_member(uuid, uuid) from public, anon;
 grant execute on function public.unblock_member(uuid, uuid) to authenticated;
+revoke all on function public.remove_and_block(uuid) from public, anon;
+grant execute on function public.remove_and_block(uuid) to authenticated;
 revoke all on function public.list_blocked(uuid) from public, anon;
 grant execute on function public.list_blocked(uuid) to authenticated;
 

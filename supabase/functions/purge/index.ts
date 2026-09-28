@@ -121,7 +121,19 @@ Deno.serve(async (req: Request) => {
       const toRemove = (await listAll(admin, PHOTOS))
         .filter((o) => !used.has(o.path) && o.createdAt <= orphanCutoff)
         .map((o) => o.path);
-      if (toRemove.length > 0) orphans = await removeObjects(admin, PHOTOS, toRemove);
+      if (toRemove.length > 0) {
+        orphans = await removeObjects(admin, PHOTOS, toRemove);
+        // Drop the accounting rows for the objects just deleted, so quota
+        // stops counting bytes that no longer exist (the hourly sweep would
+        // otherwise keep them up to 25h past expiry).
+        for (const part of chunk(toRemove, CHUNK)) {
+          const { error: intentError } = await admin
+            .from('photo_upload_intents')
+            .delete()
+            .in('path', part);
+          if (intentError) throw new Error(`intent cleanup failed: ${intentError.message}`);
+        }
+      }
     }
 
     // --- 4. Avatar files that are no longer a user's current avatar ------

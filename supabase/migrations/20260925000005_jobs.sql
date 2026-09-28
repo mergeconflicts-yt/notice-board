@@ -67,6 +67,9 @@ set search_path = '' as $$
 $$;
 
 -- Hard-delete a batch of items (ids passed in the POST body, not the URL).
+-- Also drops the upload-intent accounting rows for their photos: the purge
+-- job deletes the storage objects BEFORE calling this, so the bytes stop
+-- counting exactly when they stop existing.
 create function public.purge_items(p_ids uuid[])
 returns integer
 language plpgsql
@@ -75,6 +78,11 @@ set search_path = '' as $$
 declare
   v_deleted integer;
 begin
+  delete from public.photo_upload_intents n
+  using public.items i
+  where i.id = any(p_ids)
+    and i.photo_path is not null
+    and n.path = i.photo_path;
   delete from public.items where id = any(p_ids);
   get diagnostics v_deleted = row_count;
   return v_deleted;
@@ -135,8 +143,9 @@ begin
 end;
 $$;
 
--- Sweep expired upload intents (issued but never linked, over an hour old).
--- Orphan files keep their existing 24 h purge via photo_paths_in_use.
+-- Sweep expired upload-intent accounting rows. Rows survive while their
+-- bytes may still exist (see function body); the orphan-photo sweeper
+-- removes unlinked objects on its own 24h horizon.
 create function public.purge_stale_upload_intents()
 returns integer
 language plpgsql
@@ -145,8 +154,16 @@ set search_path = '' as $$
 declare
   v_deleted integer;
 begin
-  delete from public.photo_upload_intents
-  where expires_at < now() - interval '1 hour';
+  -- Accounting rows live until the bytes stop existing:
+  --   * referenced by any item (live or soft-deleted, i.e. restorable) → keep;
+  --   * unreferenced (never linked, or item already purged) → keep for 25h
+  --     past expiry, covering the orphan-photo sweeper's 24h horizon, then
+  --     drop. Intent rows for purged items are removed by purge_items itself.
+  delete from public.photo_upload_intents n
+  where n.expires_at < now() - interval '25 hours'
+    and not exists (
+      select 1 from public.items i where i.photo_path = n.path
+    );
   get diagnostics v_deleted = row_count;
   return v_deleted;
 end;

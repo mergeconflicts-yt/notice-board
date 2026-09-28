@@ -1,3 +1,4 @@
+# - Prefers website/marketing copy that leads with concrete, relatable real-life pain points to create emotional resonance before presenting the solution. Confidence: 0.75
 - Prefers website/marketing copy that leads with concrete, relatable real-life pain points to create emotional resonance before presenting the solution. Confidence: 0.75
 - Prefers exact visual parity between website and app — same background/design language reused across surfaces rather than platform-specific reinterpretations. Confidence: 0.8
 - Prefers state-changing actions to give immediate visible confirmation via in-place highlight/animation of the existing indicator rather than adding extra toast/pill, so the change is unmissable without redundant UI. Confidence: 0.85

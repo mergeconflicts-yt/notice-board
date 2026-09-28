@@ -31,7 +31,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Notice Board to access your photos so you can pin pictures to the board."
+          "photosPermission": "Allow Notice Board to access your photos so you can pin pictures to the board.",
+          "microphonePermission": false
         }
       ],
       "expo-secure-store"

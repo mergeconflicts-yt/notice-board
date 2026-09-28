@@ -41,7 +41,10 @@ grant execute on function public._path_board_id(text) to authenticated;
 
 -- Inline the avatar sharing check so `_shares_board_with` can be removed.
 -- Like profiles_select, only a shared *live* board exposes the avatar: a
--- stale membership on a soft-deleted board must not keep working.
+-- stale membership on a soft-deleted board must not keep working. NOTE: the
+-- storage path MUST be qualified as storage.objects.name inside the EXISTS —
+-- the boards join brings its own `name` column (the board title), which would
+-- otherwise hijack the unqualified reference and break the cast.
 drop policy if exists "avatars_shared_read" on storage.objects;
 create policy "avatars_shared_read" on storage.objects
   for select to authenticated
@@ -50,7 +53,7 @@ create policy "avatars_shared_read" on storage.objects
     and (
       split_part(name, '/', 1) = auth.uid()::text
       or (
-        split_part(name, '/', 1)
+        split_part(storage.objects.name, '/', 1)
           ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
         and exists (
           select 1
@@ -58,7 +61,7 @@ create policy "avatars_shared_read" on storage.objects
           join public.board_members them on them.board_id = me.board_id
           join public.boards b on b.id = me.board_id
           where me.user_id = auth.uid()
-            and them.user_id = split_part(name, '/', 1)::uuid
+            and them.user_id = split_part(storage.objects.name, '/', 1)::uuid
             and b.deleted_at is null
         )
       )
