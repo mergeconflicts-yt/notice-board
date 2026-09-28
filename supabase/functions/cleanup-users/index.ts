@@ -7,7 +7,7 @@
 // auth.users against board_members so it scales and sees boards joined
 // mid-run; activity includes token refreshes, not just last_sign_in_at. Each
 // id is re-checked (is_inactive_anonymous_user) immediately before deletion.
-import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient } from 'jsr:@supabase/supabase-js@2.116.0';
 import { authorized } from '../_shared/auth.ts';
 
 const MAX_PER_RUN = 500;

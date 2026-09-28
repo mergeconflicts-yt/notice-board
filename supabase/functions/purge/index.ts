@@ -7,7 +7,7 @@
 // It stops starting new work after ~100s and reports partial results via
 // `timedOut`, so a huge backlog degrades to several nights instead of a
 // platform timeout.
-import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2';
+import { createClient, SupabaseClient } from 'jsr:@supabase/supabase-js@2.116.0';
 import { authorized } from '../_shared/auth.ts';
 
 const PHOTOS = 'board-photos';
@@ -17,6 +17,11 @@ const BATCH = 1000;
 const CHUNK = 100; // per storage/`in()` request, to stay within URL/body limits
 const DEADLINE_MS = 100_000; // stop starting new work after ~100s
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Row shape of the `expired_for_purge` RPC (`setof public.items` — only the
+// columns purge reads are listed). `rpc()` without generated Database types
+// returns untyped data, so cast once instead of implicit-any callbacks.
+type StaleItem = { id: string; photo_path: string | null };
 
 type Obj = { path: string; createdAt: number };
 
@@ -80,15 +85,16 @@ Deno.serve(async (req: Request) => {
       }
       const { data: stale, error } = await admin.rpc('expired_for_purge', { p_limit: BATCH });
       if (error) throw new Error(`expired_for_purge failed: ${error.message}`);
-      if (!stale || stale.length === 0) break;
-      const paths = stale.map((i) => i.photo_path).filter((p): p is string => !!p);
+      const rows = (stale ?? []) as StaleItem[];
+      if (rows.length === 0) break;
+      const paths = rows.map((i) => i.photo_path).filter((p): p is string => !!p);
       if (paths.length > 0) await removeObjects(admin, PHOTOS, paths);
       const { error: delError } = await admin.rpc('purge_items', {
-        p_ids: stale.map((i) => i.id),
+        p_ids: rows.map((i) => i.id),
       });
       if (delError) throw new Error(`purge_items failed: ${delError.message}`);
-      purged += stale.length;
-      if (stale.length < BATCH) break;
+      purged += rows.length;
+      if (rows.length < BATCH) break;
     }
 
     // --- 2. Boards soft-deleted > 30 days ago, with no items left -------
