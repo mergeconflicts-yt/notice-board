@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -26,11 +26,114 @@ type Props = {
 
 type Step = 'options' | 'guest' | 'email';
 
-const DECOS: { text: string; color: keyof typeof noteColors; top: number; left: number; rotate: string; w: number }[] = [
-  { text: 'Buy milk', color: 'butter', top: 14, left: 6, rotate: '-5deg', w: 96 },
-  { text: 'Dentist\nSat 10:30', color: 'sky', top: 0, left: 112, rotate: '3deg', w: 118 },
-  { text: 'Grandma visits\nSat', color: 'blush', top: 104, left: 54, rotate: '-2deg', w: 132 },
+type ShowcasePost =
+  | { kind: 'note'; color: keyof typeof noteColors; body: string; meta: string; rotate: string }
+  | { kind: 'list'; color: keyof typeof noteColors; title: string; rows: { text: string; done: boolean }[]; meta: string; rotate: string }
+  | { kind: 'date'; color: keyof typeof noteColors; title: string; time: string; place: string; dow: string; day: string; mon: string; meta: string; rotate: string }
+  | { kind: 'photo'; color: keyof typeof noteColors; caption: string; meta: string; rotate: string };
+
+// One bigger example per post type. The content inside each card is a
+// realistic use for that type — quick message, shared shopping, upcoming
+// plan, saved moment — so first-time users get the purpose at a glance.
+const SHOWCASE: ShowcasePost[] = [
+  {
+    kind: 'note',
+    color: 'butter',
+    body: "Dinner's in the fridge — reheat 3 min! 🍲",
+    meta: 'Mum · 2 h',
+    rotate: '-2deg',
+  },
+  {
+    kind: 'list',
+    color: 'paper',
+    title: 'Weekly shop',
+    rows: [
+      { text: 'Milk', done: true },
+      { text: 'Bread', done: false },
+      { text: 'Coffee', done: false },
+      { text: 'Eggs', done: false },
+    ],
+    meta: 'Dad · 1 h',
+    rotate: '1.5deg',
+  },
+  {
+    kind: 'date',
+    color: 'sky',
+    title: 'Dentist',
+    time: '10:30',
+    place: 'Smile Clinic',
+    dow: 'THU',
+    day: '12',
+    mon: 'MAR',
+    meta: 'Mum · Yesterday',
+    rotate: '-1.5deg',
+  },
+  {
+    kind: 'photo',
+    color: 'blush',
+    caption: 'Beach day! 🏖️',
+    meta: 'Sofia · 3 h',
+    rotate: '2deg',
+  },
 ];
+
+const TYPE_BADGE: Record<ShowcasePost['kind'], string> = {
+  note: 'NOTE',
+  list: 'LIST',
+  date: 'DATE',
+  photo: 'PHOTO',
+};
+
+/** Body of a showcase card: the same realistic per-type content. */
+function ShowcaseBody({ post }: { post: ShowcasePost }) {
+  const palette = noteColors[post.color];
+  if (post.kind === 'note') {
+    return <Text style={[styles.cardNote, { color: palette.ink }]}>{post.body}</Text>;
+  }
+  if (post.kind === 'list') {
+    return (
+      <View>
+        <Text style={[styles.cardListTitle, { color: palette.ink }]}>{post.title}</Text>
+        {post.rows.map((row) => (
+          <View key={row.text} style={styles.cardRow}>
+            <View style={[styles.cardBox, row.done && styles.cardBoxDone]}>
+              {row.done ? <Text style={styles.cardTick}>✓</Text> : null}
+            </View>
+            <Text
+              style={[styles.cardRowText, { color: palette.ink }, row.done && styles.cardRowDone]}
+            >
+              {row.text}
+            </Text>
+          </View>
+        ))}
+      </View>
+    );
+  }
+  if (post.kind === 'date') {
+    return (
+      <View style={styles.cardTicket}>
+        <View style={styles.cardCal}>
+          <Text style={styles.cardDow}>{post.dow}</Text>
+          <Text style={[styles.cardDay, { color: palette.ink }]}>{post.day}</Text>
+          <Text style={[styles.cardMon, { color: palette.ink }]}>{post.mon}</Text>
+        </View>
+        <View style={styles.cardTicketMain}>
+          <Text style={[styles.cardDateTitle, { color: palette.ink }]}>{post.title}</Text>
+          <Text style={[styles.cardDateTime, { color: palette.ink }]}>{post.time}</Text>
+          <Text style={[styles.cardPlace, { color: palette.ink }]}>{post.place}</Text>
+        </View>
+      </View>
+    );
+  }
+  return (
+    <View>
+      <View style={styles.cardPhoto}>
+        <MaterialCommunityIcons name="image-outline" size={26} color={palette.ink} />
+      </View>
+      <Text style={[styles.cardCaption, { color: palette.ink }]}>{post.caption}</Text>
+    </View>
+  );
+}
 
 const GUEST_WARNING =
   'Your fridges are tied to this phone. If you delete the app or lose the phone, they’re gone. You can save your account any time.';
@@ -130,27 +233,26 @@ export function Welcome({ mode, inviteToken }: Props) {
         </View>
       ) : (
         <>
-          <View style={styles.decor}>
-            {DECOS.map((d, i) => (
-              <View
-                key={d.text}
-                style={[
-                  styles.deco,
-                  {
-                    backgroundColor: noteColors[d.color].bg,
-                    top: d.top,
-                    left: d.left,
-                    width: d.w,
-                    transform: [{ rotate: d.rotate }],
-                  },
-                ]}
-              >
+          <View style={styles.grid}>
+            {SHOWCASE.map((post, i) => {
+              const palette = noteColors[post.color];
+              return (
                 <View
-                  style={[styles.decoMagnet, { backgroundColor: fastenerColors.magnets[i % fastenerColors.magnets.length] }]}
-                />
-                <Text style={[styles.decoText, { color: noteColors[d.color].ink }]}>{d.text}</Text>
-              </View>
-            ))}
+                  key={post.kind}
+                  style={[
+                    styles.gridCard,
+                    { backgroundColor: palette.bg, borderColor: palette.edge, transform: [{ rotate: post.rotate }] },
+                  ]}
+                >
+                  <View
+                    style={[styles.gridMagnet, { backgroundColor: fastenerColors.magnets[i % fastenerColors.magnets.length] }]}
+                  />
+                  <Text style={styles.cardBadge}>{TYPE_BADGE[post.kind]}</Text>
+                  <ShowcaseBody post={post} />
+                  <Text style={[styles.cardMeta, { color: palette.ink }]}>{post.meta}</Text>
+                </View>
+              );
+            })}
           </View>
           <Text style={styles.title}>Fridge Board</Text>
           <Text style={styles.subtitle}>
@@ -268,7 +370,7 @@ export function Welcome({ mode, inviteToken }: Props) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.body}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.bodyScroll} bounces={false}>
         {step === 'options' ? (
           <>
             {header}
@@ -325,7 +427,7 @@ export function Welcome({ mode, inviteToken }: Props) {
           <ActivityIndicator color={colors.accent} style={styles.spinner} />
         ) : null}
         {error && step === 'options' ? <Text style={styles.error}>{error}</Text> : null}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -333,16 +435,21 @@ export function Welcome({ mode, inviteToken }: Props) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.pine },
   body: { flex: 1, paddingHorizontal: 24, justifyContent: 'center' },
+  scroll: { flex: 1 },
+  bodyScroll: { flexGrow: 1, paddingHorizontal: 24, justifyContent: 'center', paddingVertical: 24, paddingBottom: 32 },
   spinner: { marginTop: 16 },
-  decor: { height: 200, marginBottom: 8 },
-  deco: {
-    position: 'absolute',
-    borderRadius: 10,
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10, marginBottom: 16 },
+  gridCard: {
+    width: '48%',
+    flexGrow: 1,
+    borderRadius: 4,
+    borderWidth: 1,
     paddingHorizontal: 12,
-    paddingVertical: 14,
-    boxShadow: '0 1px 1px rgba(0,0,0,0.08), 0 8px 14px -8px rgba(20,30,25,0.4)',
+    paddingTop: 18,
+    paddingBottom: 10,
+    boxShadow: '0 1px 1px rgba(0,0,0,0.08), 0 10px 18px -8px rgba(20,30,25,0.45)',
   },
-  decoMagnet: {
+  gridMagnet: {
     position: 'absolute',
     top: -7,
     left: '50%',
@@ -351,7 +458,61 @@ const styles = StyleSheet.create({
     height: 14,
     borderRadius: 7,
   },
-  decoText: { fontFamily: fonts.hand.semibold, fontSize: 17, lineHeight: 21 },
+  cardBadge: {
+    fontFamily: fonts.ui.bold,
+    fontSize: 10,
+    letterSpacing: 1.5,
+    color: colors.inkFaint,
+    marginBottom: 6,
+  },
+  cardNote: { fontFamily: fonts.hand.semibold, fontSize: 20, lineHeight: 25 },
+  cardListTitle: {
+    fontFamily: fonts.hand.regular,
+    fontSize: 21,
+    lineHeight: 25,
+    textDecorationLine: 'underline',
+    marginBottom: 4,
+  },
+  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 2 },
+  cardBox: {
+    width: 15,
+    height: 15,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: colors.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardBoxDone: { backgroundColor: colors.ink },
+  cardTick: { color: colors.paper, fontSize: 10, fontWeight: '800', marginTop: -1 },
+  cardRowText: { fontFamily: fonts.hand.regular, fontSize: 17, lineHeight: 21 },
+  cardRowDone: { textDecorationLine: 'line-through', opacity: 0.55 },
+  cardTicket: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  cardCal: { alignItems: 'center', minWidth: 40 },
+  cardDow: { fontFamily: fonts.ui.bold, fontSize: 10, letterSpacing: 0.5, color: colors.danger },
+  cardDay: { fontFamily: fonts.hand.bold, fontSize: 28.5, lineHeight: 30 },
+  cardMon: { fontFamily: fonts.ui.semibold, fontSize: 10, opacity: 0.7 },
+  cardTicketMain: { flex: 1, minWidth: 0 },
+  cardDateTitle: { fontFamily: fonts.hand.bold, fontSize: 21, lineHeight: 25 },
+  cardDateTime: { fontFamily: fonts.hand.bold, fontSize: 17, lineHeight: 21, marginTop: 2 },
+  cardPlace: { fontFamily: fonts.ui.semibold, fontSize: 12, marginTop: 4, opacity: 0.85 },
+  cardPhoto: {
+    width: '100%',
+    aspectRatio: 4 / 3,
+    borderRadius: 6,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  cardCaption: { fontFamily: fonts.hand.semibold, fontSize: 18, lineHeight: 23, textAlign: 'center' },
+  cardMeta: {
+    marginTop: 8,
+    fontFamily: fonts.ui.semibold,
+    fontSize: 10,
+    opacity: 0.65,
+    textAlign: 'right',
+  },
   title: { fontFamily: fonts.hand.bold, fontSize: 40, lineHeight: 42, color: colors.onPine },
   subtitle: { fontFamily: fonts.ui.regular, fontSize: 15, color: colors.onPineSoft, marginTop: 8 },
   providerBtn: {
@@ -371,7 +532,7 @@ const styles = StyleSheet.create({
   leafBtnText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.pine },
   providerText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.ink },
   darkText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.white },
-  guestLink: { alignSelf: 'center', marginTop: 20 },
+  guestLink: { alignSelf: 'center', marginTop: 14, paddingVertical: 6 },
   guestLinkText: {
     fontFamily: fonts.ui.semibold,
     fontSize: 16,
