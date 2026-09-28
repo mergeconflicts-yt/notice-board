@@ -3,6 +3,12 @@ name: Deploy database
 # Manual only: migrations reach a hosted project solely through this workflow
 # (docs/plan.md §14). Uses GitHub Environments so each target has its own
 # SUPABASE_PROJECT_REF / DB password.
+#
+# NOTE: no `supabase link` step on purpose. `link` queries a project-status
+# endpoint that scoped tokens can't reach ("necessary privileges" error),
+# even when the same token works via direct API calls
+# (supabase/cli#3705, #6392). DB steps use --db-url (straight Postgres, no
+# Management API); function steps use --project-ref.
 on:
   workflow_dispatch:
     inputs:
@@ -24,17 +30,12 @@ jobs:
           # Pinned to the CLI version used in development.
           version: 2.117.0
 
-      - name: Link project
-        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-
       - name: Dry-run migrations
-        run: supabase db push --dry-run
+        # Direct Postgres via the session pooler (runners have no IPv6).
+        # No `link`, no Management API — and read-only with --dry-run.
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
       - name: Check job prerequisites
         # Before touching anything: an empty JOB_SECRET would make every job
@@ -67,28 +68,28 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
       - name: Push migrations
-        run: supabase db push
+        run: supabase db push --db-url "$SUPABASE_DB_URL"
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
       - name: Deploy Edge Functions
-        run: supabase functions deploy purge cleanup-users delete-account upload-photo
+        run: supabase functions deploy purge cleanup-users delete-account upload-photo --project-ref "$SUPABASE_PROJECT_REF"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
 
       - name: Set job secret
         # pg_net calls the jobs with this bearer token; without it every
         # nightly invocation answers 403.
-        run: supabase secrets set "JOB_SECRET=${{ secrets.JOB_SECRET }}"
+        run: supabase secrets set "JOB_SECRET=${{ secrets.JOB_SECRET }}" --project-ref "$SUPABASE_PROJECT_REF"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
 
       - name: Lint remote schema
-        run: supabase db lint --linked --level warning --fail-on warning
+        run: supabase db lint --db-url "$SUPABASE_DB_URL" --level warning --fail-on warning
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
       - name: Verify production security posture
         # Fail-closed post-deployment check: captcha/auth hardening via the

@@ -1,9 +1,9 @@
 name: CI
 
+# Manual only — run from Actions → CI → Run workflow when needed.
+# (Auto-run on push/PR was disabled 2026-09-28.)
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 # A new commit supersedes an in-progress run for the same ref.
 concurrency:

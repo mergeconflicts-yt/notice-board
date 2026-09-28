@@ -7,13 +7,14 @@ Repeat per hosted project (`Fridge-Board-dev` first, then the prod twin).
 
 - [x] `Fridge-Board-dev` created — Data API on, auto-expose off, auto-RLS on.
 - [x] Vault `invite`, `functions_url`, `job_secret` created.
-- [x] GitHub env `SUPABASE-Dev` + scoped `SUPABASE_ACCESS_TOKEN` (7 permissions, see below).
+- [x] GitHub env `SUPABASE-Dev` + scoped `SUPABASE_ACCESS_TOKEN` (8 permissions, see below).
   (Renamed from `notice-dev` 2026-09-28 — secrets already lived in
   `SUPABASE-Dev`, so `deploy.yml` was switched to
   `[SUPABASE-Dev, SUPABASE-prod]` instead of re-entering everything.)
 - [x] Redirect `fridgeboard://auth` added (remove old `noticeboard://`).
 - [x] Rename to Fridge Board — `fridgeboard://`, `com.fridgeboard.app`.
 - [x] Local verify: reset + 487 pgTAP + lint + tsc + 33 unit pass, patch applied.
+  CI `check` + `database` green on main 2026-09-28 after the JSR pin fix (see CI fix note).
 - [x] Auth: anonymous ON + manual linking ON confirmed (per-IP rate limit NOT set — discussed 2026-09-28, explicitly excluded; values proposed but not applied — see Rate limits note).
 - [x] SMTP via Resend (key + subdomain + sender + 1s interval) + `{{ .Token }}` in 3 templates mirrored + Confirm email ON verified 2026-09-28.
 - [x] Turnstile CAPTCHA on (Managed, pre-clearance OFF, `fridge-board.kranehx.com`) + site key in EAS env (2026-09-28).
@@ -59,17 +60,21 @@ exactly or every nightly job 403s (deploy.yml compares them first).
   only used for manual deploys, so a short expiry just breaks deploys later;
   longest offered), scoped to this one project. Classic full-access token
   avoided on purpose — a leak would touch every project on the account.
+  Tokens are immutable: permissions can't be edited after creation, so scope
+  changes mean creating a new token, pasting it over the repo secret, and
+  revoking the old one (done 2026-09-28 for `api_gateway_keys_read`).
   Granted (everything else None):
 
   | Permission | Access | Why the deploy needs it |
   |---|---|---|
-  | Project Settings | Read | `supabase link` resolves the project |
+  | Project Settings | Read | was for `supabase link` — link step removed 2026-09-28 (CLI status-endpoint bug, supabase/cli#3705/#6392); deploy now uses `--db-url` / `--project-ref`, scope kept harmlessly |
   | Migrations | Read & Write | `db push` applies migration history |
   | Database | Read | remote lint + verify-step schema reads (writes go via migrations/`SUPABASE_DB_URL`, not the token) |
   | Auth Config | Read | verify step reads captcha/confirmations/allowlist/SMTP |
   | Edge Functions | Read & Write | deploys the 4 functions |
-  | Edge Function Secrets | Read & Write | sets `JOB_SECRET` on the functions |
-  | Storage | Read | verify step checks both buckets are private |
+ | Edge Function Secrets | Read & Write | sets `JOB_SECRET` on the functions |
+ | Storage | Read | verify step checks both buckets are private |
+ | API Gateway Keys | Read | `supabase link` fetches the project's API keys (added 2026-09-28 — Link step failed without it: `Missing required permission(s): api_gateway_keys_read`) |
 
 ## Auth dashboard — PARTIAL (emails + captcha + Google done; Apple deferred)
 
@@ -227,6 +232,25 @@ Open:
   `cleanup-upload-intents`. Health: `public.job_failures()`,
   `public.http_failures()` (service-role only).
 - Buckets `board-photos` + `avatars` are private; no direct client uploads.
+
+## CI fix — Edge Function JSR pin (2026-09-28; repo code, not hosted config)
+
+- First CI run on main failed at `deno check
+  supabase/functions/*/index.ts`: the 4 functions imported floating
+  `jsr:@supabase/supabase-js@2`, which resolved to 2.117.2 while the npm
+  lockfile pins 2.116.0 — with no `deno.json`, Deno runs
+  bring-your-own-node-modules mode and couldn't find
+  `npm:@supabase/realtime-js@2.117.2`. Not caused by the env rename; any
+  merge would have hit it once JSR published 2.117.2 (local verify never
+  ran this step — Deno wasn't installed locally).
+- Fix: pinned all 4 functions to `jsr:@supabase/supabase-js@2.116.0`
+  (matches `package.json` `^2.116.0` + lockfile — deterministic from now).
+  This unmasked 3× TS7006 implicit-any in `purge` (`rpc()` without
+  generated types returns untyped data): added `StaleItem = { id: string;
+  photo_path: string | null }`, matching `expired_for_purge → setof items`
+  (`20260925000005_jobs.sql:39`); runtime identical (compile-time cast).
+- Verified: `deno check` (exact CI command) + `tsc` + `expo lint` + local
+  `db reset` + 487 pgTAP + 33 unit + `db lint` green; CI green after push.
 
 ## App identity (post-rename)
 
