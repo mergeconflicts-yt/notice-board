@@ -1,7 +1,7 @@
 /**
  * Invite link/base URL config (docs/plan.md §11). The base URL is never
  * hard-coded — it comes from EXPO_PUBLIC_INVITE_BASE_URL, e.g.
- * `https://noticeboard-app.vercel.app`.
+ * `https://fridgeboard-app.vercel.app`.
  */
 export const INVITE_BASE_URL = process.env.EXPO_PUBLIC_INVITE_BASE_URL ?? '';
 
@@ -12,12 +12,12 @@ export function inviteWebLink(token: string): string {
 
 /** Message body for the React Native Share sheet. */
 export function inviteMessage(boardName: string, token: string): string {
-  return `Join “${boardName}” on Notice Board: ${inviteWebLink(token)}`;
+  return `Join “${boardName}” on Fridge Board: ${inviteWebLink(token)}`;
 }
 
 /** Fallback code message (the short XXXXX-XXXXX code). */
 export function inviteCodeMessage(boardName: string, code: string): string {
-  return `Join “${boardName}” on Notice Board. Invite code: ${code}`;
+  return `Join “${boardName}” on Fridge Board. Invite code: ${code}`;
 }
 
 export { parseInviteInput } from '../utils/invite';

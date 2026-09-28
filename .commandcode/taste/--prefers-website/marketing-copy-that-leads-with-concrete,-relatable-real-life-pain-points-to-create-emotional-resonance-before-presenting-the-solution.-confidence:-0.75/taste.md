@@ -11,3 +11,5 @@
 - Prefers packages needed by postinstall/production installs to live in regular dependencies so `npm ci --omit=dev` succeeds, rather than in devDependencies. Confidence: 0.85
 - Prefers realtime collaboration to maintain a single convergent view where everyone sees the same board, favoring authoritative refetch on parent update over filtered DELETE events that cannot enforce RLS reliably. Confidence: 0.85
 - Prefers gated prod releases requiring full verification (clean install, DB reset + tests + lint + typechecks via CI plus manual deployment and real-device production-build checks) before shipping. Confidence: 0.8
+- Prefers infrastructure/setup docs to include exact click-by-click dashboard locations for every external setting (Supabase sidebar paths, Google Cloud navigation, GitHub/Resend locations), not just values. Confidence: 0.75
+- Prefers infrastructure/setup docs to record each permission/scope granted and the reason it is needed, rather than just the values. Confidence: 0.7

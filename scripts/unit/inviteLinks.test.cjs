@@ -13,19 +13,19 @@ describe('parseInviteInput', () => {
   });
 
   it('extracts a token from a custom-scheme link', () => {
-    assert.equal(parseInviteInput('noticeboard://j/AB_C-d1'), 'AB_C-d1');
+    assert.equal(parseInviteInput('fridgeboard://j/AB_C-d1'), 'AB_C-d1');
   });
 
   it('pulls the code out of the share message', () => {
     assert.equal(
-      parseInviteInput('Join “Kranti” on Notice Board. Invite code: ABCDE-FGHIJ'),
+      parseInviteInput('Join “Kranti” on Fridge Board. Invite code: ABCDE-FGHIJ'),
       'ABCDE-FGHIJ',
     );
   });
 
   it('pulls a trailing token out of a share message', () => {
     assert.equal(
-      parseInviteInput('Join “Kranti” on Notice Board: LPC42Kpp0VmFFIPFg8Yh3Q'),
+      parseInviteInput('Join “Kranti” on Fridge Board: LPC42Kpp0VmFFIPFg8Yh3Q'),
       'LPC42Kpp0VmFFIPFg8Yh3Q',
     );
   });

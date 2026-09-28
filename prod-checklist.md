@@ -35,7 +35,7 @@
 - captcha on (it's `enabled = false` locally)
 - email confirmations on
 - custom SMTP (the built-in sender only sends a couple of emails an hour)
-- `noticeboard://auth` in the redirect URLs
+- `fridgeboard://auth` in the redirect URLs
 - the Vault secrets `invite`, `functions_url` and `job_secret`
 - `JOB_SECRET`, `SUPABASE_DB_URL` and the other secrets in GitHub
 - a manual run of deploy.yml (it now ends with a fail-closed
@@ -69,7 +69,7 @@
   Fridge settings → Safety. Moderation was out of scope in your plan — this
   is the decided scope.
 - App Privacy details for the App Store and the Data safety form for Play.
-- The bundle id `com.noticeboard.app` is generic. Make sure you own it before you register it.
+- The bundle id `com.fridgeboard.app` is generic. Make sure you own it before you register it.
 
 ## 5. Migrations: 
 They've been edited in place throughout. Before the first db push to production, confirm nothing has ever been pushed there. After that, only add new migrations and never edit old ones.

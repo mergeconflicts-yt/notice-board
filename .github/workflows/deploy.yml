@@ -9,7 +9,7 @@ on:
       environment:
         description: Target Supabase project
         type: choice
-        options: [notice-dev, notice-prod]
+        options: [SUPABASE-Dev, SUPABASE-prod]
         required: true
 
 jobs:
@@ -130,8 +130,8 @@ jobs:
           if cfg.get('mailer_autoconfirm') is not False:
             bad.append('email_confirmations_on')
           allow = cfg.get('uri_allow_list') or ''
-          if 'noticeboard://' not in allow:
-            bad.append('redirect_allowlist_has_noticeboard_scheme')
+          if 'fridgeboard://' not in allow:
+            bad.append('redirect_allowlist_has_fridgeboard_scheme')
           if not cfg.get('smtp_host'):
             bad.append('custom_smtp')
           if bad:

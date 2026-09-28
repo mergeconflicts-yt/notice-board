@@ -1,6 +1,6 @@
 /**
  * Pull the actual invite out of whatever the user pasted — a bare token/code,
- * a `https://…/j/<token>` (or `noticeboard://j/<token>`) link, or the whole
+ * a `https://…/j/<token>` (or `fridgeboard://j/<token>`) link, or the whole
  * share message. Tokens are case-sensitive and may contain `-`/`_`, so the
  * result is returned verbatim and never normalized here; the server hashes
  * the raw value for the token and a normalized copy for the code.

@@ -9,8 +9,8 @@
 //   ANDROID_SHA256    app signing SHA-256 fingerprint
 //   APP_STORE_ID      numeric App Store id
 // Optional:
-//   IOS_BUNDLE_ID     default com.noticeboard.app
-//   ANDROID_PACKAGE   default com.noticeboard.app
+//   IOS_BUNDLE_ID     default com.fridgeboard.app
+//   ANDROID_PACKAGE   default com.fridgeboard.app
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,8 +22,8 @@ const {
   APPLE_TEAM_ID,
   ANDROID_SHA256,
   APP_STORE_ID,
-  IOS_BUNDLE_ID = 'com.noticeboard.app',
-  ANDROID_PACKAGE = 'com.noticeboard.app',
+  IOS_BUNDLE_ID = 'com.fridgeboard.app',
+  ANDROID_PACKAGE = 'com.fridgeboard.app',
 } = process.env;
 
 const missing = ['APPLE_TEAM_ID', 'ANDROID_SHA256', 'APP_STORE_ID'].filter((k) => !process.env[k]);
@@ -56,7 +56,7 @@ const jHtml = `<!doctype html>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="apple-itunes-app" content="app-id=${APP_STORE_ID}" />
-    <title>Join a Notice Board</title>
+    <title>Join a Fridge Board</title>
     <style>
       body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
              background:#FBF5E9; color:#3E362E; display:grid; place-items:center;
@@ -70,7 +70,7 @@ const jHtml = `<!doctype html>
   <body>
     <main>
       <h1>You’re invited</h1>
-      <p>Open this invite in the Notice Board app.</p>
+      <p>Open this invite in the Fridge Board app.</p>
       <a class="btn" id="open" href="#">Open in the app</a>
       <a class="secondary" href="https://apps.apple.com/app/id${APP_STORE_ID}">Get it on the App Store</a>
       <a class="secondary" href="https://play.google.com/store/apps/details?id=${ANDROID_PACKAGE}">Get it on Google Play</a>
@@ -78,7 +78,7 @@ const jHtml = `<!doctype html>
     <script>
       var parts = window.location.pathname.split('/').filter(Boolean);
       var token = parts[parts.length - 1] || '';
-      var deepLink = 'noticeboard://j/' + encodeURIComponent(token);
+      var deepLink = 'fridgeboard://j/' + encodeURIComponent(token);
       document.getElementById('open').href = deepLink;
       window.location.replace(deepLink);
     </script>
@@ -109,7 +109,7 @@ const legalPage = (title, updated, body) => `<!doctype html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${title} — Notice Board</title>
+    <title>${title} — Fridge Board</title>
     <style>${legalStyle}</style>
   </head>
   <body>
@@ -124,8 +124,8 @@ const legalPage = (title, updated, body) => `<!doctype html>
 `;
 
 const privacyBody = `
-<h2>What Notice Board is</h2>
-<p>Notice Board is a private, invite-only family board. There are no feeds, followers, ads or analytics SDKs. Your boards are visible only to people you invite.</p>
+<h2>What Fridge Board is</h2>
+<p>Fridge Board is a private, invite-only family board. There are no feeds, followers, ads or analytics SDKs. Your boards are visible only to people you invite.</p>
 <h2>Data we collect</h2>
 <ul>
 <li><strong>Display name</strong> — you choose it; shown to people on your boards.</li>
@@ -155,13 +155,13 @@ const privacyBody = `
 <h2>Your rights &amp; data requests</h2>
 <p>To request a copy of your data, a correction, or deletion beyond the in-app controls, contact us via the <a href="contact.html">Contact</a> page. We respond within 30 days. Deletion requests follow the same rules as in-app deletion above.</p>
 <h2>Children</h2>
-<p>Notice Board is a family tool used under a household's supervision and is not directed at children under 13 on their own. If you believe a child has provided data without consent, contact us and we will delete it.</p>
+<p>Fridge Board is a family tool used under a household's supervision and is not directed at children under 13 on their own. If you believe a child has provided data without consent, contact us and we will delete it.</p>
 <h2>Changes</h2>
 <p>If this policy changes materially, we will update the date above and note it in the app before the change takes effect.</p>`;
 
 const termsBody = `
 <h2>The service</h2>
-<p>Notice Board provides private, invite-only boards for families and small groups to share notes, lists, dates and photos. Boards are visible only to people with an invite link.</p>
+<p>Fridge Board provides private, invite-only boards for families and small groups to share notes, lists, dates and photos. Boards are visible only to people with an invite link.</p>
 <h2>Your account</h2>
 <p>You may use the app as a guest with no account, or save your account with Apple, Google or email. Guest accounts live on the device: deleting the app or losing the phone can lose a guest account, so save it if your boards matter. You are responsible for who you share invite links with.</p>
 <h2>Acceptable use</h2>
@@ -180,7 +180,7 @@ const termsBody = `
 <p>Questions about these terms: see the <a href="contact.html">Contact</a> page.</p>`;
 
 const contactBody = `
-<p class="mail"><a href="mailto:support@noticeboard.app">support@noticeboard.app</a></p>
+<p class="mail"><a href="mailto:support@fridgeboard.app">support@fridgeboard.app</a></p>
 <h2>What to include</h2>
 <ul>
 <li><strong>Support</strong> — what happened, your device and app version, and (if relevant) the fridge name.</li>

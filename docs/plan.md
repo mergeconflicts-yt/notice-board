@@ -1,6 +1,6 @@
 # Backend plan: database, API, security
 
-Implementation plan for the Notice Board backend (Supabase + Expo). Written for the agent doing the work.
+Implementation plan for the Fridge Board backend (Supabase + Expo). Written for the agent doing the work.
 
 ## 0. Ground rules for the implementing agent
 
@@ -268,7 +268,7 @@ Put the rules in one SQL function, `public.default_keep_until(type, event_at, pi
 | list | `NULL` until all entries are checked, then `now() + 2 days` |
 | done (note or date) | `done_at + 2 days` |
 
-The app shows these words (the mockup `design-mockups/notice-board-redesign.html` has them: "Leaves the board Thu 1 Oct", "Keep longer"). The app never decides expiry itself; it trusts `keep_until` from the server.
+The app shows these words (the mockup `design-mockups/fridge-board-redesign.html` has them: "Leaves the board Thu 1 Oct", "Keep longer"). The app never decides expiry itself; it trusts `keep_until` from the server.
 
 ## 7. Photos (Storage)
 
@@ -326,16 +326,16 @@ Rate-limit helper: `public.hit_rate_limit(action text, max int, window interval)
 
 ## 11. Invite links and deep links
 
-- `EXPO_PUBLIC_INVITE_BASE_URL` in env (for example `https://noticeboard-app.vercel.app`). Link format: `<base>/j/<token>`. Never hard-code a domain.
+- `EXPO_PUBLIC_INVITE_BASE_URL` in env (for example `https://fridgeboard-app.vercel.app`). Link format: `<base>/j/<token>`. Never hard-code a domain.
 - Until there is a domain: host a tiny static site on a free Vercel or Netlify subdomain with:
   - `.well-known/apple-app-site-association` (applinks for `/j/*`)
   - `.well-known/assetlinks.json`
-  - `/j/[token]`: a page with "Open in the app" (tries `noticeboard://join/<token>`) and store links.
-- `app.json`: `ios.associatedDomains: ["applinks:<host>"]`, `android.intentFilters` for `https://<host>/j/*` with `autoVerify: true`, and scheme `noticeboard`.
+  - `/j/[token]`: a page with "Open in the app" (tries `fridgeboard://join/<token>`) and store links.
+- `app.json`: `ios.associatedDomains: ["applinks:<host>"]`, `android.intentFilters` for `https://<host>/j/*` with `autoVerify: true`, and scheme `fridgeboard`.
 - Expo Router route `src/app/j/[token].tsx`: calls `preview_invite`, shows the join screen, then `accept_invite`.
 - Universal links need a development build, not Expo Go.
 - The code fallback screen (`join.tsx`) accepts `XXXXX-XXXXX` and uses the same functions.
-- Share with the React Native Share API: message `Join "<board>" on Notice Board: <link>`.
+- Share with the React Native Share API: message `Join "<board>" on Fridge Board: <link>`.
 
 ## 12. Phases and checks
 

@@ -1,15 +1,15 @@
 {
   "expo": {
-    "name": "Notice Board",
-    "slug": "notice-board",
+    "name": "Fridge Board",
+    "slug": "fridge-board",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "noticeboard",
+    "scheme": "fridgeboard",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.noticeboard.app",
+      "bundleIdentifier": "com.fridgeboard.app",
       "usesAppleSignIn": true
     },
     "android": {
@@ -19,7 +19,7 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.noticeboard.app",
+      "package": "com.fridgeboard.app",
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -31,11 +31,18 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Notice Board to access your photos so you can pin pictures to the board.",
+          "photosPermission": "Allow Fridge Board to access your photos so you can pin pictures to the board.",
           "microphonePermission": false
         }
       ],
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "8b5574fa-2fe2-4c77-bdd3-b1850938965c"
+      }
+    },
+    "owner": "mergeconflictss-team"
   }
 }
