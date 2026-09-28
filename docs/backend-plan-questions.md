@@ -218,7 +218,7 @@ implemented slightly differently. Appended as work proceeds.
     by the per-IP auth rate limit plus Turnstile in production (no app-level
     per-IP store). **F12** the date picker and date display use the device zone
     while expiry uses the board zone — aligning display to the board zone is a
-    follow-up. **F19** the deep link is `noticeboard://j/<token>` (route
+    follow-up. **F19** the deep link is `fridgeboard://j/<token>` (route
     `/j/[token]`), matching the web `/j/<token>` path rather than the plan's
     `join`     wording.
 29. **Auth/session + jobs hardening (review N1–N8).** `/auth` exchanges a code

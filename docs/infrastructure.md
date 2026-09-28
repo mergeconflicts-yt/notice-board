@@ -105,7 +105,7 @@ hosted SQL editor if you want them gone.
    objects.
 3. Apply `supabase/migrations/` in filename order (`supabase db push`).
 4. Auth → enable **anonymous sign-ins** and **manual linking**; add
-   `noticeboard://auth` (and, if used, the web origin) to **Redirect URLs**.
+   `fridgeboard://auth` (and, if used, the web origin) to **Redirect URLs**.
    `config.toml` only covers the local stack, so this must be set per hosted
    project for identity linking to complete.
 5. Set the Vault secret `invite` (Dashboard → Vault, or SQL).
@@ -138,7 +138,7 @@ project's dashboard:
   magic-link and confirmation mail actually sends. Without it, email sign-in
   silently fails in production.
 - **Site URL + Redirect URLs**: `site_url` = the web origin, and
-  `noticeboard://auth` (plus the web origin if used) in Redirect URLs, or
+  `fridgeboard://auth` (plus the web origin if used) in Redirect URLs, or
   linking/sign-in can't complete.
 - **CAPTCHA** (`Auth → Settings`): Turnstile on with the secret, matching the
   app's `EXPO_PUBLIC_TURNSTILE_SITE_KEY`.
@@ -180,8 +180,8 @@ project's dashboard:
 - **Deploy** (`.github/workflows/deploy.yml`, manual `workflow_dispatch`):
   dry-runs then pushes migrations, deploys the Edge Functions, sets
   `JOB_SECRET`, verifies the `functions_url`/`job_secret` Vault secrets exist,
-  and lints the remote schema with warnings as failures. Pick the environment
-  (`notice-dev`/`notice-prod`); each has its own `SUPABASE_PROJECT_REF`,
+   and lints the remote schema with warnings as failures. Pick the environment
+   (`SUPABASE-Dev`/`SUPABASE-prod`); each has its own `SUPABASE_PROJECT_REF`,
   `SUPABASE_DB_PASSWORD`, `JOB_SECRET`, and `SUPABASE_DB_URL` — the
   **session-pooler** connection string (GitHub runners lack IPv6, so the
   direct `db.<ref>` host is unreachable) — plus a shared

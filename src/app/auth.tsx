@@ -9,7 +9,7 @@ import { isAuthFlowActive } from '../lib/api';
 import { useSession } from '../store/session';
 
 /**
- * Fallback target for the OAuth redirect (`noticeboard://auth`). Normally
+ * Fallback target for the OAuth redirect (`fridgeboard://auth`). Normally
  * `WebBrowser.openAuthSessionAsync` catches the redirect and completes the
  * exchange; this route stops Android from showing "unmatched route" if the
  * redirect lands in the app instead — and skips the exchange when the in-app

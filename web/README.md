@@ -23,7 +23,7 @@ variables at deploy time, so the association files always carry real IDs.
 ## How it works
 
 - iOS/Android verify the domain via `/.well-known/*`, then open
-  `https://<host>/j/<token>` in the app (`noticeboard://j/<token>`).
+  `https://<host>/j/<token>` in the app (`fridgeboard://j/<token>`).
 - Browsers land on `/j.html`, which immediately tries the custom scheme and
   offers store links as a fallback.
 
