@@ -56,6 +56,9 @@ exactly or every nightly job 403s (deploy.yml compares them first).
   `SUPABASE_DB_PASSWORD`, `SUPABASE_DB_URL` (session-pooler `:6543` URL with
   the real password — runners have no IPv6, so `db.<ref>` is unreachable),
   and `JOB_SECRET`. (Prod twin will be `SUPABASE-prod`.)
+  `SUPABASE_DB_URL` keeps its `?pgbouncer=true` suffix (pooler hint for the
+  CLI); deploy strips it (`${SUPABASE_DB_URL%%\?*}`) for `psql` calls only —
+  libpq rejects unknown URI query params.
 - Shared repo secret `SUPABASE_ACCESS_TOKEN`: scoped PAT (1-yr expiry —
   only used for manual deploys, so a short expiry just breaks deploys later;
   longest offered), scoped to this one project. Classic full-access token
