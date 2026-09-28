@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Platform, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -84,9 +84,16 @@ const TYPE_BADGE: Record<ShowcasePost['kind'], string> = {
   photo: 'PHOTO',
 };
 
+/** Demo beach shot for the welcome photo card (same photo as the website
+ *  hero). Remote so no binary ships with the app; falls back to the icon
+ *  placeholder when offline. */
+const SHOWCASE_PHOTO_URL =
+  'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80&auto=format&fit=crop';
+
 /** Body of a showcase card: the same realistic per-type content. */
 function ShowcaseBody({ post }: { post: ShowcasePost }) {
   const palette = noteColors[post.color];
+  const [imgFailed, setImgFailed] = useState(false);
   if (post.kind === 'note') {
     return <Text style={[styles.cardNote, { color: palette.ink }]}>{post.body}</Text>;
   }
@@ -128,7 +135,18 @@ function ShowcaseBody({ post }: { post: ShowcasePost }) {
   return (
     <View>
       <View style={styles.cardPhoto}>
-        <MaterialCommunityIcons name="image-outline" size={26} color={palette.ink} />
+        {imgFailed ? (
+          <MaterialCommunityIcons name="image-outline" size={26} color={palette.ink} />
+        ) : (
+          <Image
+            source={{ uri: SHOWCASE_PHOTO_URL }}
+            style={styles.cardPhotoImg}
+            resizeMode="cover"
+            onError={() => setImgFailed(true)}
+            accessibilityRole="image"
+            accessibilityLabel={post.caption}
+          />
+        )}
       </View>
       <Text style={[styles.cardCaption, { color: palette.ink }]}>{post.caption}</Text>
     </View>
@@ -500,11 +518,13 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 4 / 3,
     borderRadius: 6,
+    overflow: 'hidden',
     backgroundColor: 'rgba(0,0,0,0.06)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
   },
+  cardPhotoImg: { width: '100%', height: '100%' },
   cardCaption: { fontFamily: fonts.hand.semibold, fontSize: 18, lineHeight: 23, textAlign: 'center' },
   cardMeta: {
     marginTop: 8,

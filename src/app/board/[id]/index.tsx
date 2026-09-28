@@ -363,7 +363,7 @@ export default function BoardScreen() {
   const isEmpty = items.length === 0;
 
   return (
-    <View style={[styles.safe, { backgroundColor: colors.seam }]}>
+    <View style={[styles.safe, { backgroundColor: colors.black }]}>
       <View style={styles.sections}>
         <View style={styles.pinnedSection}>
           <FridgeDoor color={board.color} placement="top">
