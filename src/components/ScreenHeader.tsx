@@ -4,15 +4,22 @@ import { colors, fonts } from '../theme';
 
 type Props = {
   title?: string;
+  /** Cream (default, board screens) or pine (join/create/profile). */
+  tone?: 'cream' | 'pine';
 };
 
-export function ScreenHeader({ title }: Props) {
+export function ScreenHeader({ title, tone = 'cream' }: Props) {
+  const pine = tone === 'pine';
   return (
     <View style={styles.row}>
-      <Pressable hitSlop={12} onPress={() => router.back()} style={styles.back}>
-        <Text style={styles.backGlyph}>‹</Text>
+      <Pressable
+        hitSlop={12}
+        onPress={() => router.back()}
+        style={[styles.back, pine && styles.backPine]}
+      >
+        <Text style={[styles.backGlyph, pine && styles.backGlyphPine]}>‹</Text>
       </Pressable>
-      {title ? <Text style={styles.title}>{title}</Text> : <View style={styles.flex} />}
+      {title ? <Text style={[styles.title, pine && styles.titlePine]}>{title}</Text> : <View style={styles.flex} />}
       <View style={styles.rightSpacer} />
     </View>
   );
@@ -40,6 +47,8 @@ const styles = StyleSheet.create({
     color: colors.ink,
     marginTop: -2,
   },
+  backPine: { backgroundColor: colors.paper, borderColor: colors.paperEdge },
+  backGlyphPine: { color: colors.ink },
   title: {
     flex: 1,
     textAlign: 'center',
@@ -47,6 +56,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
     color: colors.ink,
   },
+  titlePine: { color: colors.onPine },
   flex: { flex: 1 },
   rightSpacer: { width: 40 },
 });

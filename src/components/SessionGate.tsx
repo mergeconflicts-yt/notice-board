@@ -76,8 +76,8 @@ export function SessionGate() {
         <Text style={styles.title}>Can’t reach the fridge</Text>
         <Text style={styles.sub}>{error ?? 'Check your connection and try again.'}</Text>
         <Button label="Retry" onPress={() => void init(undefined, true)} style={styles.btn} />
-        <Button label="Sign in" variant="soft" onPress={() => router.push('/sign-in')} style={styles.btn} />
-        <Button label="Sign out" variant="soft" onPress={confirmSignOut} style={styles.btn} />
+        <Button label="Sign in" variant="leaf" onPress={() => router.push('/sign-in')} style={styles.btn} />
+        <Button label="Sign out" variant="leaf" onPress={confirmSignOut} style={styles.btn} />
       </SafeAreaView>
     );
   }
@@ -97,7 +97,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: colors.background,
+    backgroundColor: colors.pine,
     paddingHorizontal: 32,
     zIndex: 100,
     elevation: 100,
@@ -109,16 +109,16 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: colors.background,
+    backgroundColor: colors.pine,
     zIndex: 100,
     elevation: 100,
   },
   center: { alignItems: 'center', justifyContent: 'center' },
-  title: { fontFamily: fonts.hand.bold, fontSize: 30, color: colors.ink },
+  title: { fontFamily: fonts.hand.bold, fontSize: 30, color: colors.onPine },
   sub: {
     fontFamily: fonts.ui.regular,
     fontSize: 15,
-    color: colors.inkSoft,
+    color: colors.onPineSoft,
     textAlign: 'center',
     marginTop: 8,
   },

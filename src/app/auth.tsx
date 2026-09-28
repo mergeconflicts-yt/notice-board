@@ -70,13 +70,13 @@ export default function AuthCallbackScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
-  title: { fontFamily: fonts.hand.bold, fontSize: 28, color: colors.ink },
+  safe: { flex: 1, backgroundColor: colors.pine, alignItems: 'center', justifyContent: 'center' },
+  title: { fontFamily: fonts.hand.bold, fontSize: 28, color: colors.onPine },
   text: {
     marginTop: 12,
     fontFamily: fonts.ui.regular,
     fontSize: 14,
-    color: colors.inkSoft,
+    color: colors.onPineSoft,
     textAlign: 'center',
     paddingHorizontal: 24,
   },

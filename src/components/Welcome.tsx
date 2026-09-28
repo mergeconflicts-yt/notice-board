@@ -152,7 +152,7 @@ export function Welcome({ mode, inviteToken }: Props) {
               </View>
             ))}
           </View>
-          <Text style={styles.title}>Notice fridge</Text>
+          <Text style={styles.title}>Fridge Board</Text>
           <Text style={styles.subtitle}>
             {mode === 'resume'
               ? 'Welcome back — pick how you’d like to continue.'
@@ -167,25 +167,29 @@ export function Welcome({ mode, inviteToken }: Props) {
     <>
       {Platform.OS === 'ios' ? (
         <Pressable
-          style={[styles.providerBtn, styles.darkBtn]}
+          style={[styles.providerBtn, styles.leafBtn]}
           onPress={() => void runAuthed(() => continueWithProvider('apple'))}
           disabled={busy}
         >
-          <MaterialCommunityIcons name="apple" size={20} color={colors.white} />
-          <Text style={styles.darkText}>Continue with Apple</Text>
+          <MaterialCommunityIcons name="apple" size={20} color={colors.pine} />
+          <Text style={styles.leafBtnText}>Continue with Apple</Text>
         </Pressable>
       ) : null}
       <Pressable
-        style={styles.providerBtn}
+        style={[styles.providerBtn, styles.leafBtn]}
         onPress={() => void runAuthed(() => continueWithProvider('google'))}
         disabled={busy}
       >
-        <MaterialCommunityIcons name="google" size={20} color={colors.ink} />
-        <Text style={styles.providerText}>Continue with Google</Text>
+        <MaterialCommunityIcons name="google" size={20} color={colors.pine} />
+        <Text style={styles.leafBtnText}>Continue with Google</Text>
       </Pressable>
-      <Pressable style={styles.providerBtn} onPress={() => setStep('email')} disabled={busy}>
-        <MaterialCommunityIcons name="email-outline" size={20} color={colors.ink} />
-        <Text style={styles.providerText}>Continue with email</Text>
+      <Pressable
+        style={[styles.providerBtn, styles.orangeBtn]}
+        onPress={() => setStep('email')}
+        disabled={busy}
+      >
+        <MaterialCommunityIcons name="email-outline" size={20} color={colors.white} />
+        <Text style={styles.darkText}>Continue with email</Text>
       </Pressable>
     </>
   );
@@ -194,22 +198,26 @@ export function Welcome({ mode, inviteToken }: Props) {
     <View style={styles.roundRow}>
       {Platform.OS === 'ios' ? (
         <Pressable
-          style={[styles.round, styles.darkBtn]}
+          style={[styles.round, styles.leafBtn]}
           onPress={() => void runAuthed(() => continueWithProvider('apple'))}
           disabled={busy}
         >
-          <MaterialCommunityIcons name="apple" size={22} color={colors.white} />
+          <MaterialCommunityIcons name="apple" size={22} color={colors.pine} />
         </Pressable>
       ) : null}
       <Pressable
-        style={styles.round}
+        style={[styles.round, styles.leafBtn]}
         onPress={() => void runAuthed(() => continueWithProvider('google'))}
         disabled={busy}
       >
-        <MaterialCommunityIcons name="google" size={22} color={colors.ink} />
+        <MaterialCommunityIcons name="google" size={22} color={colors.pine} />
       </Pressable>
-      <Pressable style={styles.round} onPress={() => setStep('email')} disabled={busy}>
-        <MaterialCommunityIcons name="email-outline" size={22} color={colors.ink} />
+      <Pressable
+        style={[styles.round, styles.orangeBtn]}
+        onPress={() => setStep('email')}
+        disabled={busy}
+      >
+        <MaterialCommunityIcons name="email-outline" size={22} color={colors.white} />
       </Pressable>
     </View>
   );
@@ -323,7 +331,7 @@ export function Welcome({ mode, inviteToken }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1, backgroundColor: colors.pine },
   body: { flex: 1, paddingHorizontal: 24, justifyContent: 'center' },
   spinner: { marginTop: 16 },
   decor: { height: 200, marginBottom: 8 },
@@ -344,8 +352,8 @@ const styles = StyleSheet.create({
     borderRadius: 7,
   },
   decoText: { fontFamily: fonts.hand.semibold, fontSize: 17, lineHeight: 21 },
-  title: { fontFamily: fonts.hand.bold, fontSize: 40, lineHeight: 42, color: colors.ink },
-  subtitle: { fontFamily: fonts.ui.regular, fontSize: 15, color: colors.inkSoft, marginTop: 8 },
+  title: { fontFamily: fonts.hand.bold, fontSize: 40, lineHeight: 42, color: colors.onPine },
+  subtitle: { fontFamily: fonts.ui.regular, fontSize: 15, color: colors.onPineSoft, marginTop: 8 },
   providerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -358,26 +366,28 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     marginTop: 12,
   },
-  darkBtn: { backgroundColor: colors.ink, borderColor: colors.ink },
+  orangeBtn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  leafBtn: { backgroundColor: colors.leaf, borderColor: colors.leaf },
+  leafBtnText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.pine },
   providerText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.ink },
   darkText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.white },
   guestLink: { alignSelf: 'center', marginTop: 20 },
   guestLinkText: {
     fontFamily: fonts.ui.semibold,
     fontSize: 16,
-    color: colors.ink,
+    color: colors.onPine,
     textDecorationLine: 'underline',
   },
   captcha: { marginTop: 18, alignItems: 'center' },
   primaryGap: { marginTop: 20 },
   backLink: { alignSelf: 'center', marginTop: 16 },
-  backText: { fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.ink },
+  backText: { fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.onPine },
   error: { fontFamily: fonts.ui.regular, color: colors.danger, fontSize: 13, marginTop: 12, textAlign: 'center' },
   // Invite
   inviteHead: { marginBottom: 28 },
   inviteByRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
   inviteDot: { width: 22, height: 22, borderRadius: 11 },
-  inviteBy: { fontFamily: fonts.ui.regular, fontSize: 15, color: colors.inkSoft },
+  inviteBy: { fontFamily: fonts.ui.regular, fontSize: 15, color: colors.onPineSoft },
   paper: { borderRadius: 12, paddingHorizontal: 20, paddingVertical: 26, alignSelf: 'flex-start' },
   magnet: {
     position: 'absolute',
@@ -405,14 +415,14 @@ const styles = StyleSheet.create({
   or: {
     fontFamily: fonts.ui.regular,
     fontSize: 14,
-    color: colors.inkSoft,
+    color: colors.onPineSoft,
     textAlign: 'center',
     marginTop: 20,
   },
   helper: {
     fontFamily: fonts.ui.regular,
     fontSize: 13,
-    color: colors.inkFaint,
+    color: colors.onPineFaint,
     textAlign: 'center',
     marginTop: 24,
   },

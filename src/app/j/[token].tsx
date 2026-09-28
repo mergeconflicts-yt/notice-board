@@ -107,7 +107,7 @@ export default function JoinByLinkScreen() {
           <>
             <Text style={styles.title}>Invite not found</Text>
             <Text style={styles.sub}>{error}</Text>
-            <Button label="Go home" variant="soft" onPress={() => router.replace('/')} style={styles.join} />
+            <Button label="Go home" variant="leaf" onPress={() => router.replace('/')} style={styles.join} />
           </>
         )}
       </View>
@@ -123,7 +123,7 @@ export default function JoinByLinkScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1, backgroundColor: colors.pine },
   center: { alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, paddingHorizontal: 24, justifyContent: 'center' },
   kicker: {
@@ -131,10 +131,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 2,
     textTransform: 'uppercase',
-    color: colors.accentDeep,
+    color: colors.brandYellow,
     marginBottom: 10,
   },
-  title: { fontFamily: fonts.hand.bold, fontSize: 40, color: colors.ink },
-  sub: { fontFamily: fonts.ui.regular, fontSize: 16, color: colors.inkSoft, marginTop: 8 },
+  title: { fontFamily: fonts.hand.bold, fontSize: 40, color: colors.onPine },
+  sub: { fontFamily: fonts.ui.regular, fontSize: 16, color: colors.onPineSoft, marginTop: 8 },
   join: { marginTop: 28 },
 });

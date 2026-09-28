@@ -1,7 +1,7 @@
 import { Pressable, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { colors, fonts } from '../theme';
 
-type Variant = 'primary' | 'soft' | 'accent';
+type Variant = 'primary' | 'soft' | 'accent' | 'leaf';
 
 type Props = {
   label: string;
@@ -41,12 +41,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   primary: {
-    backgroundColor: colors.ink,
+    // Important actions are orange; `primary` is the important CTA.
+    backgroundColor: colors.accent,
   },
   soft: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  // Secondary buttons: light green fill, pine text. No black buttons —
+  // important actions are orange (`primary`/`accent`), the rest are leaf.
+  leaf: {
+    backgroundColor: colors.leaf,
   },
   accent: {
     backgroundColor: colors.accent,
@@ -60,6 +66,9 @@ const styles = StyleSheet.create({
   },
   softText: {
     color: colors.ink,
+  },
+  leafText: {
+    color: colors.pine,
   },
   accentText: {
     color: colors.white,

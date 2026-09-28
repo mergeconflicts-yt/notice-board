@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, usePathname } from 'expo-router';
-import { colors, fonts, noteColors } from '../theme';
+import { colors, fonts, noteColors, fastenerColors } from '../theme';
 import { Button } from '../components/Button';
 import { IdentitySheet } from '../components/IdentitySheet';
 import { useSession } from '../store/session';
@@ -17,10 +17,12 @@ let restoredThisLaunch = false;
 type Deco = { text: string; color: keyof typeof noteColors; top: string; left: string; rotate: string; size: number };
 
 const DECOS: Deco[] = [
-  { text: 'Dentist — Thu 🦷', color: 'sky', top: '6%', left: '4%', rotate: '-6deg', size: 16 },
-  { text: 'Dinner is in\nthe fridge 🍲', color: 'butter', top: '14%', left: '58%', rotate: '5deg', size: 15 },
-  { text: 'Milk 🥛', color: 'blush', top: '2%', left: '40%', rotate: '3deg', size: 14 },
-  { text: '❤️', color: 'sage', top: '22%', left: '78%', rotate: '-4deg', size: 20 },
+  // Stationery collage, not stickers: paper notes overlapping like the
+  // reference — paint order is array order (last on top).
+  { text: 'Dentist — Thu\n10:30', color: 'sky', top: '0%', left: '4%', rotate: '-5deg', size: 15 },
+  { text: 'Dinner is in\nthe fridge', color: 'butter', top: '8%', left: '48%', rotate: '6deg', size: 15 },
+  { text: 'Milk · Bread\nCoffee', color: 'paper', top: '34%', left: '60%', rotate: '4deg', size: 14 },
+  { text: 'Grandma visits\nSaturday', color: 'blush', top: '40%', left: '16%', rotate: '-3deg', size: 15 },
 ];
 
 export default function StartScreen() {
@@ -116,7 +118,7 @@ export default function StartScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scroll} bounces={false}>
         <View style={styles.hero}>
-          {DECOS.map((d) => (
+          {DECOS.map((d, i) => (
             <View
               key={d.text}
               style={[
@@ -130,6 +132,9 @@ export default function StartScreen() {
                 },
               ]}
             >
+              <View
+                style={[styles.decoMagnet, { backgroundColor: fastenerColors.magnets[i % fastenerColors.magnets.length] }]}
+              />
               <Text style={[styles.decoText, { fontSize: d.size, color: noteColors[d.color].ink }]}>
                 {d.text}
               </Text>
@@ -137,7 +142,7 @@ export default function StartScreen() {
           ))}
 
           <View style={styles.heroTextWrap}>
-            <Text style={styles.kicker}>Notice Fridge</Text>
+            <Text style={styles.kicker}>Fridge Board</Text>
             <Text style={styles.headline}>A fridge for{'\n'}your people.</Text>
             <Text style={styles.subhead}>Just notes. No noise.</Text>
           </View>
@@ -182,7 +187,7 @@ export default function StartScreen() {
             </View>
           ) : null}
           <Button label="Create a fridge" onPress={startCreate} />
-          <Button label="Join a fridge" variant="soft" onPress={startJoin} />
+          <Button label="Join a fridge" variant="leaf" onPress={startJoin} />
           <Pressable onPress={() => router.push('/profile')} style={styles.you} hitSlop={8}>
             <Text style={styles.youText}>You · {user?.displayName ?? 'Someone'}</Text>
           </Pressable>
@@ -205,19 +210,29 @@ export default function StartScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1, backgroundColor: colors.pine },
   scroll: { flexGrow: 1, justifyContent: 'space-between', paddingHorizontal: 24 },
-  hero: { flex: 1, justifyContent: 'center', paddingVertical: 60 },
+  hero: { flex: 1, justifyContent: 'center', paddingVertical: 40 },
   deco: {
     position: 'absolute',
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 8,
     borderWidth: 1,
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    shadowColor: colors.pineDeep,
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  decoMagnet: {
+    position: 'absolute',
+    top: -7,
+    left: '50%',
+    marginLeft: -7,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
   },
   decoText: { fontFamily: fonts.hand.semibold, textAlign: 'center', lineHeight: 20 },
   heroTextWrap: { paddingHorizontal: 4 },
@@ -226,11 +241,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 2,
     textTransform: 'uppercase',
-    color: colors.accentDeep,
+    color: colors.brandYellow,
     marginBottom: 12,
   },
-  headline: { fontFamily: fonts.hand.bold, fontSize: 54, lineHeight: 56, color: colors.ink },
-  subhead: { fontFamily: fonts.ui.regular, fontSize: 17, color: colors.inkSoft, marginTop: 14 },
+  headline: { fontFamily: fonts.hand.bold, fontSize: 54, lineHeight: 56, color: colors.onPine },
+  subhead: { fontFamily: fonts.ui.regular, fontSize: 17, color: colors.onPineSoft, marginTop: 14 },
   footer: { gap: 12, paddingBottom: 24 },
   boardsError: {
     fontFamily: fonts.ui.regular,
@@ -244,22 +259,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 1,
     textTransform: 'uppercase',
-    color: colors.inkFaint,
+    color: colors.onPineFaint,
     marginBottom: 2,
   },
   boardRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.pineGhost,
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
     paddingVertical: 14,
     paddingHorizontal: 16,
   },
-  boardRowName: { flex: 1, fontFamily: fonts.hand.bold, fontSize: 22, color: colors.ink },
-  boardRowChevron: { fontSize: 22, color: colors.inkFaint },
+  boardRowName: { flex: 1, fontFamily: fonts.hand.bold, fontSize: 22, color: colors.onPine },
+  boardRowChevron: { fontSize: 22, color: colors.onPineFaint },
   prompt: {
     backgroundColor: colors.highlight,
     borderRadius: 16,
@@ -272,6 +285,6 @@ const styles = StyleSheet.create({
   promptDismiss: { fontFamily: fonts.ui.semibold, fontSize: 14, color: colors.inkSoft },
   promptSave: { fontFamily: fonts.ui.bold, fontSize: 14, color: colors.accentDeep },
   you: { alignSelf: 'center', paddingVertical: 10 },
-  youText: { fontFamily: fonts.ui.semibold, fontSize: 14, color: colors.inkSoft },
-  signInText: { fontFamily: fonts.ui.bold, fontSize: 14, color: colors.accentDeep },
+  youText: { fontFamily: fonts.ui.semibold, fontSize: 14, color: colors.onPineSoft },
+  signInText: { fontFamily: fonts.ui.bold, fontSize: 14, color: colors.brandYellow },
 });

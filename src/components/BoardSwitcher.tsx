@@ -93,7 +93,7 @@ export function BoardSwitcher({ visible, currentBoardId, onClose }: Props) {
                   ) : null}
                 </View>
                 {b.id === currentBoardId ? (
-                  <MaterialCommunityIcons name="check" size={24} color={colors.inkSoft} />
+                  <MaterialCommunityIcons name="check" size={24} color={colors.accent} />
                 ) : null}
               </Pressable>
             );
@@ -110,7 +110,7 @@ export function BoardSwitcher({ visible, currentBoardId, onClose }: Props) {
             accessibilityRole="button"
             accessibilityLabel="New fridge"
           >
-            <MaterialCommunityIcons name="plus" size={22} color={colors.ink} />
+            <MaterialCommunityIcons name="plus" size={22} color={colors.onPine} />
             <Text style={styles.actionLabel}>New fridge</Text>
           </Pressable>
           <Pressable
@@ -122,7 +122,7 @@ export function BoardSwitcher({ visible, currentBoardId, onClose }: Props) {
             accessibilityRole="button"
             accessibilityLabel="Join with an invite"
           >
-            <MaterialCommunityIcons name="link-variant" size={22} color={colors.ink} />
+            <MaterialCommunityIcons name="link-variant" size={22} color={colors.onPine} />
             <Text style={styles.actionLabel}>Join with an invite</Text>
           </Pressable>
           </View>
@@ -137,9 +137,9 @@ export function BoardSwitcher({ visible, currentBoardId, onClose }: Props) {
             accessibilityRole="button"
             accessibilityLabel="Fridge settings"
           >
-            <MaterialCommunityIcons name="cog-outline" size={22} color={colors.ink} />
+            <MaterialCommunityIcons name="cog-outline" size={22} color={colors.onPine} />
             <Text style={[styles.actionLabel, styles.settingsLabel]}>Fridge settings</Text>
-            <MaterialCommunityIcons name="chevron-right" size={22} color={colors.inkFaint} />
+            <MaterialCommunityIcons name="chevron-right" size={22} color={colors.onPineFaint} />
           </Pressable>
           </View>
         </View>
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.scrim,
   },
   sheet: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.pine,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 20,
@@ -171,15 +171,12 @@ const styles = StyleSheet.create({
   label: {
     fontFamily: fonts.ui.semibold,
     fontSize: 14,
-    color: colors.inkSoft,
+    color: colors.onPineSoft,
     paddingLeft: 4,
   },
   group: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.pineGhost,
     borderRadius: 18,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    borderColor: colors.border,
     paddingHorizontal: 16,
     overflow: 'hidden',
   },
@@ -189,7 +186,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.onPineFaint,
   },
   chip: {
     width: 46,
@@ -200,8 +197,8 @@ const styles = StyleSheet.create({
   },
   chipText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.ink },
   rowText: { flex: 1 },
-  name: { fontFamily: fonts.ui.semibold, fontSize: 17, color: colors.ink },
-  sub: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.inkSoft, marginTop: 2 },
-  actionLabel: { fontFamily: fonts.ui.semibold, fontSize: 17, color: colors.ink },
+  name: { fontFamily: fonts.ui.semibold, fontSize: 17, color: colors.onPine },
+  sub: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.onPineSoft, marginTop: 2 },
+  actionLabel: { fontFamily: fonts.ui.semibold, fontSize: 17, color: colors.onPine },
   settingsLabel: { flex: 1 },
 });

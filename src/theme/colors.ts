@@ -16,9 +16,11 @@ export const colors = {
   inkSoft: '#6B6156',
   inkFaint: '#A3998C',
 
-  // Accents
-  accent: '#E98A5E',
-  accentDeep: '#D6754A',
+  // Accents — marigold orange tuned against pine: fills read ~4.4:1 on the
+  // green; small bold uses on cream hold the previous ratio. Keep the pair
+  // in step (deep ≈ fill darkened) so active states match their fills.
+  accent: '#E8823C',
+  accentDeep: '#C96A27',
   /** Accent-tinted pill/background (e.g. role chips). */
   highlight: '#FFF0E4',
   /** Softer accent wash (selected controls). */
@@ -60,6 +62,18 @@ export const colors = {
 
   white: '#FFFFFF',
   black: '#000000',
+
+  // Brand pine (homescreen identity — deep green field, cream ink)
+  pine: '#1E3B2A',
+  pineDeep: '#152A1F',
+  onPine: '#F6F0DC',
+  onPineSoft: 'rgba(246, 240, 220, 0.72)',
+  onPineFaint: 'rgba(246, 240, 220, 0.5)',
+  brandYellow: '#F1D876',
+  /** Ghost button fill on pine: cream at low opacity ("opacity less"). */
+  pineGhost: 'rgba(246, 240, 220, 0.14)',
+  /** Light-green button fill: pine text on it (~7:1). Secondary buttons. */
+  leaf: '#A9CFB2',
 
   // Fridge chrome
   /** Dark cabinet strip visible between the two fridge doors. */

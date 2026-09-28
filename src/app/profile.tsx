@@ -155,7 +155,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScreenHeader title="You" />
+      <ScreenHeader title="You" tone="pine" />
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.identity}>
           <MemberDot seed={user?.id ?? 'me'} name={user?.displayName ?? 'Someone'} size={56} />
@@ -194,13 +194,13 @@ export default function ProfileScreen() {
                 : 'Keep your fridges if you change phones.'}
             </Text>
             {Platform.OS === 'ios' ? (
-              <Pressable style={[styles.saveBtnRow, styles.darkRow]} onPress={() => void link('apple')}>
-                <MaterialCommunityIcons name="apple" size={20} color={colors.white} />
-                <Text style={styles.darkRowText}>Save with Apple</Text>
-              </Pressable>
+            <Pressable style={[styles.saveBtnRow, styles.appleRow]} onPress={() => void link('apple')}>
+              <MaterialCommunityIcons name="apple" size={20} color={colors.white} />
+              <Text style={styles.appleRowText}>Save with Apple</Text>
+            </Pressable>
             ) : null}
             <Pressable style={styles.saveBtnRow} onPress={() => void link('google')}>
-              <MaterialCommunityIcons name="google" size={20} color={colors.ink} />
+              <MaterialCommunityIcons name="google" size={20} color={colors.pine} />
               <Text style={styles.saveRowText}>Save with Google</Text>
             </Pressable>
             {savingEmail ? (
@@ -217,7 +217,7 @@ export default function ProfileScreen() {
               />
             ) : (
               <Pressable style={styles.saveBtnRow} onPress={() => setSavingEmail(true)}>
-                <MaterialCommunityIcons name="email-outline" size={20} color={colors.ink} />
+                <MaterialCommunityIcons name="email-outline" size={20} color={colors.pine} />
                 <Text style={styles.saveRowText}>Save with email</Text>
               </Pressable>
             )}
@@ -229,7 +229,7 @@ export default function ProfileScreen() {
         </Pressable>
 
         <Pressable style={styles.signOutRow} onPress={confirmSignOut}>
-          <MaterialCommunityIcons name="logout" size={20} color={colors.ink} />
+          <MaterialCommunityIcons name="logout" size={20} color={colors.onPine} />
           <Text style={styles.signOutText}>Sign out</Text>
         </Pressable>
 
@@ -256,12 +256,12 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1, backgroundColor: colors.pine },
   body: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40 },
   identity: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 12 },
   identityText: { flex: 1 },
-  name: { fontFamily: fonts.ui.bold, fontSize: 22, color: colors.ink },
-  role: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.inkSoft, marginTop: 2 },
+  name: { fontFamily: fonts.ui.bold, fontSize: 22, color: colors.onPine },
+  role: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.onPineSoft, marginTop: 2 },
   nameRow: { flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 8 },
   input: {
     flex: 1,
@@ -279,24 +279,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     height: 52,
     borderRadius: 16,
-    backgroundColor: colors.ink,
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
   saveText: { fontFamily: fonts.ui.bold, fontSize: 15, color: colors.background },
   card: {
     marginTop: 22,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.pineGhost,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
     padding: 18,
   },
-  cardTitle: { fontFamily: fonts.ui.bold, fontSize: 18, color: colors.ink },
+  cardTitle: { fontFamily: fonts.ui.bold, fontSize: 18, color: colors.onPine },
   cardHint: {
     fontFamily: fonts.ui.regular,
     fontSize: 14,
-    color: colors.inkSoft,
+    color: colors.onPineSoft,
     marginTop: 4,
     marginBottom: 14,
   },
@@ -307,18 +305,16 @@ const styles = StyleSheet.create({
     gap: 10,
     height: 52,
     borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
+    backgroundColor: colors.leaf,
     marginTop: 10,
   },
-  saveRowText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.ink },
-  darkRow: { backgroundColor: colors.ink, borderColor: colors.ink },
-  darkRowText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.white },
+  saveRowText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.pine },
+  appleRow: { backgroundColor: colors.accent, borderColor: colors.accent },
+  appleRowText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.white },
   nameLink: { marginTop: 24, paddingVertical: 10 },
   signOutRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
-  signOutText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.ink },
-  nameLinkText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.ink },
+  signOutText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.onPine },
+  nameLinkText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.onPine },
   dangerRow: { marginTop: 6, paddingVertical: 12 },
   dangerText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.danger },
   legalRow: {
@@ -329,6 +325,6 @@ const styles = StyleSheet.create({
     marginTop: 28,
     paddingBottom: 8,
   },
-  legalText: { fontFamily: fonts.ui.semibold, fontSize: 14, color: colors.inkSoft },
-  legalDot: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.inkFaint },
+  legalText: { fontFamily: fonts.ui.semibold, fontSize: 14, color: colors.onPineSoft },
+  legalDot: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.onPineFaint },
 });

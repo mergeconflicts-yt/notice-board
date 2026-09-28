@@ -135,7 +135,7 @@ export function EmailCode({ mode, onSend, onVerify, onDone, onConflict, onBack }
       <View>
         {onBack ? (
           <Pressable onPress={back} hitSlop={10} style={styles.back}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color={colors.ink} />
+          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.onPine} />
           </Pressable>
         ) : null}
         <Text style={styles.title}>What’s your email?</Text>
@@ -246,11 +246,11 @@ export function EmailCode({ mode, onSend, onVerify, onDone, onConflict, onBack }
 
 const styles = StyleSheet.create({
   back: { marginBottom: 12, alignSelf: 'flex-start' },
-  title: { fontFamily: fonts.hand.bold, fontSize: 34, lineHeight: 36, color: colors.ink },
+  title: { fontFamily: fonts.hand.bold, fontSize: 34, lineHeight: 36, color: colors.onPine },
   subtitle: {
     fontFamily: fonts.ui.regular,
     fontSize: 15,
-    color: colors.inkSoft,
+    color: colors.onPineSoft,
     marginTop: 8,
     marginBottom: 18,
   },
@@ -285,21 +285,21 @@ const styles = StyleSheet.create({
   resend: {
     fontFamily: fonts.ui.semibold,
     fontSize: 14,
-    color: colors.inkSoft,
+    color: colors.onPineSoft,
     textAlign: 'center',
     marginTop: 16,
   },
   resendLink: {
     fontFamily: fonts.ui.bold,
     fontSize: 14,
-    color: colors.accentDeep,
+    color: colors.brandYellow,
     textAlign: 'center',
     marginTop: 16,
   },
   different: {
     fontFamily: fonts.ui.semibold,
     fontSize: 14,
-    color: colors.ink,
+    color: colors.onPine,
     textDecorationLine: 'underline',
     textAlign: 'center',
     marginTop: 14,
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
   helper: {
     fontFamily: fonts.ui.regular,
     fontSize: 13,
-    color: colors.inkSoft,
+    color: colors.onPineSoft,
     textAlign: 'center',
     marginTop: 22,
   },

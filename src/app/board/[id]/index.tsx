@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
+import { setStatusBarStyle } from 'expo-status-bar';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { colors, fonts } from '../../../theme';
 import { BoardSection } from '../../../components/BoardSection';
 import { PinnedStrip } from '../../../components/PinnedStrip';
@@ -53,6 +54,14 @@ export default function BoardScreen() {
   const boardId = id as string;
   const me = useSession((s) => s.user);
   const insets = useSafeAreaInsets();
+  // Cream doors need dark status icons; the app default is light (pine
+  // screens), so restore light when leaving for pine screens.
+  useFocusEffect(
+    useCallback(() => {
+      setStatusBarStyle('dark');
+      return () => setStatusBarStyle('light');
+    }, []),
+  );
   const { height: windowH } = useWindowDimensions();
   const {
     board,

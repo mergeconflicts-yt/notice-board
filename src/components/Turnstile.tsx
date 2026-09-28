@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
-import { colors } from '../theme';
 import { INVITE_BASE_URL } from '../lib/inviteLinks';
 
 type Props = {
@@ -17,7 +16,7 @@ type Props = {
 export function Turnstile({ siteKey, onToken, onError }: Props) {
   const html = useMemo(
     () => `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1" />
-<style>html,body{margin:0;padding:0;background:${colors.background};display:flex;align-items:center;justify-content:center;height:100%}</style>
+<style>html,body{margin:0;padding:0;background:transparent;display:flex;align-items:center;justify-content:center;height:100%}</style>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head><body>
 <div class="cf-turnstile" data-sitekey="${siteKey}" data-callback="onToken" data-error-callback="onError" data-expired-callback="onExpired"></div>

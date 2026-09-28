@@ -57,7 +57,7 @@ export default function JoinBoardScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}
       >
-        <ScreenHeader title="Join a fridge" />
+        <ScreenHeader title="Join a fridge" tone="pine" />
         <View style={styles.body}>
           <Text style={styles.label}>Invite code</Text>
           <TextInput
@@ -91,10 +91,10 @@ export default function JoinBoardScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1, backgroundColor: colors.pine },
   flex: { flex: 1 },
   body: { flex: 1, paddingHorizontal: 24, paddingTop: 24 },
-  label: { fontFamily: fonts.ui.semibold, fontSize: 13, color: colors.inkSoft, marginBottom: 10 },
+  label: { fontFamily: fonts.ui.semibold, fontSize: 13, color: colors.onPineSoft, marginBottom: 10 },
   input: {
     height: 56,
     backgroundColor: colors.surface,
@@ -107,8 +107,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     color: colors.ink,
   },
-  board: { fontFamily: fonts.hand.bold, fontSize: 22, color: colors.ink, marginTop: 14 },
+  board: { fontFamily: fonts.hand.bold, fontSize: 22, color: colors.onPine, marginTop: 14 },
   error: { fontFamily: fonts.ui.regular, color: colors.danger, fontSize: 13, marginTop: 12 },
-  hint: { fontFamily: fonts.ui.regular, color: colors.inkFaint, fontSize: 13, marginTop: 14 },
+  hint: { fontFamily: fonts.ui.regular, color: colors.onPineFaint, fontSize: 13, marginTop: 14 },
   join: { marginTop: 24 },
 });

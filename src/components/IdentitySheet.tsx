@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.scrim,
   },
   sheet: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.pine,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 20,
@@ -109,12 +109,12 @@ const styles = StyleSheet.create({
   title: {
     fontFamily: fonts.hand.bold,
     fontSize: 30,
-    color: colors.ink,
+    color: colors.onPine,
   },
   subtitle: {
     fontFamily: fonts.ui.regular,
     fontSize: 14,
-    color: colors.inkSoft,
+    color: colors.onPineSoft,
     marginTop: 4,
     marginBottom: 16,
   },
@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
   pickLabel: {
     fontFamily: fonts.ui.semibold,
     fontSize: 12,
-    color: colors.inkFaint,
+    color: colors.onPineFaint,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginTop: 18,

@@ -35,7 +35,7 @@ export default function CreateBoardScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}
       >
-        <ScreenHeader title="Create a fridge" />
+        <ScreenHeader title="Create a fridge" tone="pine" />
         <View style={styles.body}>
           <Text style={styles.label}>Fridge name</Text>
           <TextInput
@@ -81,10 +81,10 @@ export default function CreateBoardScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1, backgroundColor: colors.pine },
   flex: { flex: 1 },
   body: { flex: 1, paddingHorizontal: 24, paddingTop: 24 },
-  label: { fontFamily: fonts.ui.semibold, fontSize: 13, color: colors.inkSoft, marginBottom: 10 },
+  label: { fontFamily: fonts.ui.semibold, fontSize: 13, color: colors.onPineSoft, marginBottom: 10 },
   colorLabel: { marginTop: 24 },
   input: {
     height: 56,
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
   },
   swatches: { flexDirection: 'row', gap: 12 },
   swatch: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: 'transparent' },
-  swatchActive: { borderColor: colors.ink },
+  swatchActive: { borderColor: colors.accent },
   error: { fontFamily: fonts.ui.regular, color: colors.danger, fontSize: 13, marginTop: 12 },
   create: { marginTop: 28 },
 });
