@@ -394,7 +394,7 @@ For every table and function, test as: anon (no JWT), non-member, member, owner.
 ## 14. CI and environments
 
 - Add a database job to `.github/workflows/ci.yml`: `supabase/setup-cli@v1`, `supabase start`, `supabase db reset`, `supabase test db`, `supabase db lint --level warning`.
-- Two Supabase projects: `notice-dev` and `notice-prod`. Migrations reach prod only via `supabase db push` from a manual CI workflow with the access token in GitHub secrets.
+- Two Supabase projects: `notice-dev` and `notice-prod`. Migrations reach prod only via `supabase db push` from a manual CI workflow with the access token in GitHub secrets. (SUPERSEDED 2026-09-28: single shared project `Fridge-Board-dev` for dev + early prod, no twin — see `docs/hosted-setup.md` top block. Envs are `SUPABASE-Dev`/`SUPABASE-prod`, CI is manual-only.)
 - Secrets never in the repo: the service role key, Turnstile secret and Supabase access token live in GitHub secrets, Supabase Vault or Edge Function secrets.
 - `.env.example` lists only public values: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_INVITE_BASE_URL`, `EXPO_PUBLIC_TURNSTILE_SITE_KEY`.
 - Before launch: turn on point-in-time recovery, review the dashboard security and performance advisors, and set auth rate limits (anonymous sign-ins per IP).

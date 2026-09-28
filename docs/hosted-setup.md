@@ -3,6 +3,21 @@
 What has actually been configured outside this repo, and what is still open.
 Repeat per hosted project (`Fridge-Board-dev` first, then the prod twin).
 
+> **⚠ DECISION 2026-09-28 — SINGLE PROJECT FOR NOW (all agents read this).**
+> `Fridge-Board-dev` is the ONLY backend: dev testing AND early prod use
+> share it. No prod twin exists. Consequences:
+> - **Migration freeze in effect since the first push (2026-09-28):** only
+>   ADD new migrations, NEVER edit the 12 pushed ones, NEVER `db reset`
+>   or wipe hosted — it would destroy early-prod data.
+> - Test data mixes with real data: use clearly-marked test boards/users
+>   and delete them after; posts self-expire via purge anyway.
+> - No PITR/backups on free: take a manual dump (`supabase db dump --db-url
+>   …`) before any risky change.
+> - Endgame TBD: **(A)** promote this project (org → Pro + PITR, spin up a
+>   fresh free dev later — no data migration) or **(B)** throwaway + twin
+>   (early users start over). Current lean: **A**. Do NOT create the twin
+>   or re-point EAS Production vars without an explicit new decision.
+
 ## Hosting checklist
 
 - [x] `Fridge-Board-dev` created — Data API on, auto-expose off, auto-RLS on.
@@ -25,7 +40,16 @@ Repeat per hosted project (`Fridge-Board-dev` first, then the prod twin).
 - [ ] Link site — DEFERRED (needs Apple IDs; `build.mjs` fails by design without them). Interim `EXPO_PUBLIC_INVITE_BASE_URL=https://fridge-board.kranehx.com`. No Vercel needed: will merge `web/public/` into the existing Cloudflare host later.
 - [x] EAS project linked (`@mergeconflictss-team/fridge-board`) + prod env 4 vars set (2026-09-28); still to do: `eas build --profile production` → real-device tests.
 - [ ] Check `http_failures()` the next day.
-- [ ] Repeat all for the prod project + PITR + advisors + rate limits.
+- [ ] Prod twin — DEFERRED by the 2026-09-28 single-project decision (see top).
+  When revived: repeat all for the prod project + PITR + advisors + rate limits.
+  Billing (checked 2026-09-28): 2 active free projects per user (paused
+  don't count) — exactly dev+prod twins. But no mixing free+paid in one
+  org, and prod needs Pro (backups; PITR is a $100/mo per-project add-on).
+  So: dev stays in the free org; prod goes in a separate Pro org (free
+  quota survives as 2 projects in a free org). Free projects pause after
+  1 week of inactivity — restore from dashboard; keep dev alive by using
+  it. Free caps per project (500MB DB, 1GB storage, 50K MAU, 5GB egress)
+  are plenty for dev/family scale.
 - [ ] Store listings: privacy URL, App Privacy/Data safety, own `com.fridgeboard.app`.
 
 ## Hosted Supabase project — DONE
@@ -172,12 +196,11 @@ Done 2026-09-28 (with reasons):
   `com.fridgeboard.app`). Reason: Google OAuth is free (unlike Apple);
   v1 app flow uses the Web client via browser OAuth — native clients are
   ready for later native sheets + Play integrity.
-- Site URL: interim decision — `EXPO_PUBLIC_INVITE_BASE_URL` +
-  Supabase Site URL target = `https://fridge-board.kranehx.com`
-  (see Link-site decision below). Turnstile `baseUrl`
-  (`src/components/Turnstile.tsx:51`) uses the same origin, so all three
-  must match; captcha validates the widget allowlist even before link
-  files exist.
+- Site URL: set to `https://fridge-board.kranehx.com` 2026-09-28 (was
+  `localhost:3000`; interim — final confirm once the link files land).
+  Same origin as `EXPO_PUBLIC_INVITE_BASE_URL` and the Turnstile `baseUrl`
+  (`src/components/Turnstile.tsx:51`) — all three must match; captcha
+  validates the widget allowlist even before link files exist.
 
 Open:
 - **Apple**: Services ID + `.p8` — DEFERRED, needs paid Apple Developer

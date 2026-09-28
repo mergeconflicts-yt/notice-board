@@ -99,7 +99,10 @@ hosted SQL editor if you want them gone.
 
 ## Production (hosted Supabase)
 
-1. Create two projects: `notice-dev` and `notice-prod`.
+1. Create two projects: `notice-dev` and `notice-prod`. (DEFERRED 2026-09-28:
+   single shared project `Fridge-Board-dev` for dev + early prod — see
+   `docs/hosted-setup.md` top block. The second project comes only with an
+   explicit new decision.)
 2. Delete `[api] auto_expose_new_tables` default assumption — the migration
    sets it false in `config.toml`; confirm the hosted API exposes only granted
    objects.

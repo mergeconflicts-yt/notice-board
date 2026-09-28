@@ -1,5 +1,9 @@
 This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
 
+## Backend state — read first for any DB/deploy task (2026-09-28)
+
+Single shared backend: `Fridge-Board-dev` serves dev AND early prod — no prod twin exists. First `db push` ran 2026-09-28, so the **migration freeze is in effect**: only ADD new migrations under `supabase/migrations/`, NEVER edit pushed ones, NEVER reset/wipe hosted. Full context + decisions: `docs/hosted-setup.md` (top decision block).
+
 ## Expo has changed — do not trust your training data
 
 Expo ships breaking changes every SDK release. APIs you remember are likely renamed, moved, or removed. Before writing any code that touches an Expo, EAS, or React Native API:

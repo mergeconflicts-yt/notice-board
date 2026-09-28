@@ -72,4 +72,4 @@
 - The bundle id `com.fridgeboard.app` is generic. Make sure you own it before you register it.
 
 ## 5. Migrations: 
-They've been edited in place throughout. Before the first db push to production, confirm nothing has ever been pushed there. After that, only add new migrations and never edit old ones.
+They've been edited in place throughout. SUPERSEDED 2026-09-28: the first db push already ran — to the single shared project (`Fridge-Board-dev`, which serves dev + early prod; see `docs/hosted-setup.md` top block). Migration history there was empty so the edited files applied cleanly as-is (no squash needed). From here on: only add new migrations and never edit old ones.

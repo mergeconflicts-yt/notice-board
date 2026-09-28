@@ -96,6 +96,10 @@ implemented slightly differently. Appended as work proceeds.
     deploy workflow is manual and unused). If it has, this history is already
     applied and the changed migrations must be squashed into a fresh baseline
     before shipping.
+    > STATUS 2026-09-28: relaxation OVER — first push ran to the single
+    > shared project (see `docs/hosted-setup.md` top block). Hosted history
+    > was empty so the edited files applied cleanly (no squash was needed),
+    > but from here on the freeze holds: new migrations only, never edits.
 17. **`invite_try` counting.** Plan §5 had both `preview_invite` and
     `accept_invite` count, which charged the limit twice per join. Now
     `preview_invite` counts **every attempt at the top of the function** (so a
