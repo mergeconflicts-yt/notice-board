@@ -1,20 +1,28 @@
 :root {
-  --bg: #fbf5e9;
+  --bg: #EDF3EA;
   --ink: #3e362e;
   --ink-soft: #6b6156;
-  --accent: #e98a5e;
-  --accent-deep: #c05b4d;
-  --brown: #a4552f;
-  --paper: #fffdf7;
-  --border: #ede4d3;
+  --accent: #E8823C;
+  --accent-deep: #C96A27;
+  --brown: #1E3B2A;
+  --paper: #F5F9F2;
+  --border: #D5E0CF;
   --butter: #fff3a6;
   --blush: #f8dde0;
   --sage: #ddf3d5;
-  --board-sage: #9DBBA8;
+  --board-sage: #4E7A5C;
   --sky: #dcecf8;
   --lilac: #e9e0f6;
   --mint: #d4f0dc;
-  --dark: #2b2620;
+  --dark: #1E3B2A;
+  --pine: #1E3B2A;
+  --pine-deep: #152A1F;
+  --on-pine: #F6F0DC;
+  --leaf: #A9CFB2;
+  --brand-yellow: #F1D876;
+  --cream: #FFF3D6;
+  --accent-wash: #FFF0E4;
+  --selected: #FBEFC3;
   --shadow: rgba(92, 76, 54, 0.18);
   --hand: 'Caveat', cursive;
   --ui: 'Nunito', system-ui, sans-serif;
@@ -29,7 +37,7 @@ img { max-width: 100%; }
 body {
   font-family: var(--ui);
   background: var(--bg);
-  background-image: radial-gradient(rgba(62, 54, 46, 0.05) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(30, 59, 42, 0.07) 1px, transparent 1px);
   background-size: 22px 22px;
   color: var(--ink);
   line-height: 1.6;
@@ -51,15 +59,15 @@ body {
 .section { max-width: 1120px; margin: 0 auto; padding: 4.5rem 1.5rem; }
 .section-tight-bottom { padding-bottom: 1.5rem; }
 .section-tight-top { padding-top: 1.5rem; }
-/* alternating full-bleed bands: wrap a section in .band > .section */
+/* alternating full-bleed bands: light greens on the light-green page */
 .band { padding: 0; }
-.band-cream { background: #F7EFDD; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-.band-white { background: var(--paper); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-.band-sage { background: #EDF3E6; border-top: 1px solid #DCE5D2; border-bottom: 1px solid #DCE5D2; }
+.band-cream { background: #E2EBDD; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.band-white { background: #F2F7EF; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.band-sage { background: #D9E9D5; border-top: 1px solid #C2D6BE; border-bottom: 1px solid #C2D6BE; }
 /* handwritten bridge stitching the pain section to the fix section */
 .section-connector { text-align: center; padding: 0.5rem 1rem 0; color: var(--ink-soft); }
 .section-connector p { font-size: 1.6rem; transform: rotate(-2deg); }
-.connector-arrow { font-size: 1.8rem; color: var(--accent-deep); line-height: 1; }
+.connector-arrow { font-size: 1.8rem; color: var(--board-sage); line-height: 1; }
 .section-title { font-size: clamp(2.4rem, 5vw, 3.6rem); line-height: 1.05; margin-bottom: 1.5rem; }
 .lede { color: var(--ink-soft); font-size: 1.05rem; max-width: 34rem; }
 
@@ -68,19 +76,19 @@ body {
   position: sticky; top: 0; z-index: 50;
   display: flex; align-items: center; gap: 1.5rem;
   padding: 0.8rem 1.5rem;
-  background: rgba(251, 245, 233, 0.9);
+  background: rgba(237, 243, 234, 0.92);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
 }
 .brand { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; color: var(--ink); }
-.brand-pin { width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ff8a6b, #e4572e 70%); box-shadow: 0 2px 3px rgba(0,0,0,.3); }
+.brand-pin { width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #CDE6D2, #4E7A5C 55%, #1E3B2A 85%); box-shadow: 0 2px 3px rgba(0,0,0,.3); }
 .brand-name { font-size: 1.5rem; }
 .nav-links { display: flex; gap: 1.4rem; margin-left: auto; }
 .nav-links a { text-decoration: none; color: var(--ink); font-weight: 600; font-size: 0.95rem; }
-.nav-links a:hover { color: var(--accent-deep); }
+.nav-links a:hover { color: var(--board-sage); }
 
 .btn { display: inline-block; text-decoration: none; font-weight: 800; border-radius: 999px; }
-.btn-dark { background: var(--dark); color: #fff; }
+.btn-dark { background: var(--pine); color: var(--on-pine); }
 .btn-small { padding: 0.5rem 1.1rem; font-size: 0.9rem; }
 
 /* hero — copy panel wider, fridge narrower, same row height */
@@ -97,15 +105,15 @@ body {
 .store-row.center { justify-content: center; }
 .store-btn {
   display: inline-flex; align-items: center; gap: 0.6rem;
-  background: var(--dark); color: #fff; text-decoration: none;
+  background: var(--pine); color: var(--on-pine); text-decoration: none;
   border-radius: 999px; padding: 0.55rem 1.3rem;
-  box-shadow: 0 4px 10px rgba(0,0,0,.25);
+  box-shadow: 0 4px 10px rgba(30, 59, 42, 0.35);
 }
 .store-btn span { display: flex; flex-direction: column; line-height: 1.15; }
 .store-btn small { font-size: 0.65rem; font-weight: 400; opacity: 0.8; }
 .store-btn strong { font-size: 0.95rem; }
 .guest-note { margin-top: 0.9rem; font-size: 0.9rem; color: var(--ink-soft); }
-.tick { color: #6aa84f; font-weight: 800; }
+.tick { color: var(--board-sage); font-weight: 800; }
 
 /* stage: unclipped wrapper around the fridge so intro popups can spill over.
    One unified soft shadow lives here so both doors cast together. */
@@ -120,7 +128,7 @@ body {
   background: transparent;
   border: none;
   box-shadow: none;
-  touch-action: none;
+  touch-action: pan-y;
 }
 /* board tag sits above the doors */
 .board-tag {
@@ -158,7 +166,7 @@ body {
 /* tall dark strip tucked behind both doors — only its middle shows */
 .fridge-seam {
   height: 22px; margin: 0; flex: none;
-  background: #2b2620;
+  background: var(--pine-deep);
   z-index: 1;
 }
 /* shrunken type shared by door notes and lifted (free) notes */
@@ -217,8 +225,8 @@ body {
 .sticky-sky { background: var(--sky); }
 .sticky-blush { background: var(--blush); }
 .sticky-lilac { background: var(--lilac); }
-.sticky-sage { background: var(--board-sage); }
-.drag { user-select: none; }
+.sticky-sage { background: var(--leaf); }
+.drag { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .dragging { cursor: grabbing; z-index: 20; box-shadow: 0 1px 1px rgba(0,0,0,.08), 0 18px 30px rgba(0,0,0,.25); }
 
 /* magnet: fixed app colours, off-centre spot, glint dot */
@@ -304,7 +312,7 @@ body {
    Veil sits exactly on the fridge; the bubbles keep their rightward shift. */
 .chaos-layer::before {
   content: ''; position: absolute; inset: 0; border-radius: 36px 36px 36px 36px;
-  background: rgba(251, 245, 233, 0.45);
+  background: rgba(237, 243, 234, 0.5);
   backdrop-filter: blur(2px);
   opacity: 0; transition: opacity 0.3s;
 }
@@ -316,7 +324,7 @@ body {
   margin-left: 22px;
   display: flex; flex-direction: column; line-height: 1.25;
   max-width: 62%;
-  background: #fff; border-radius: 14px; padding: 0.35rem 0.8rem;
+  background: #F1F7EE; border-radius: 14px; padding: 0.35rem 0.8rem;
   font-size: 0.8rem; font-weight: 700; color: var(--ink);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.22);
   transform: rotate(var(--r, 0deg)) scale(0);
@@ -368,30 +376,30 @@ body {
 /* buried — real moments lost in chat */
 .buried-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; margin-top: 2rem; }
 .buried-card {
-  background: #fff; border: 1px solid var(--border); border-radius: 16px;
+  background: #DFF0DA; border: 1px solid var(--border); border-radius: 16px;
   padding: 1.4rem 1.3rem; box-shadow: 0 8px 20px var(--shadow);
   transform: rotate(var(--br, 0deg));
 }
-.buried-card:nth-child(1) { --br: -0.8deg; }
-.buried-card:nth-child(2) { --br: 0.7deg; }
-.buried-card:nth-child(3) { --br: -0.5deg; }
-.buried-who { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent-deep); margin-bottom: 0.5rem; }
+.buried-card:nth-child(1) { --br: -0.8deg; background: #DDF3D5; }
+.buried-card:nth-child(2) { --br: 0.7deg; background: #D2E8CB; }
+.buried-card:nth-child(3) { --br: -0.5deg; background: #E4F1DE; }
+.buried-who { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--board-sage); margin-bottom: 0.5rem; }
 .buried-text { font-size: 1.5rem; line-height: 1.25; margin-bottom: 0.6rem; }
 .buried-result { font-size: 0.92rem; color: var(--ink-soft); }
 
 /* compare — WhatsApp-style chat mock */
 .compare { display: grid; grid-template-columns: 1fr auto 1fr; gap: 2rem; align-items: center; margin-top: 2rem; }
-.chat-mock { background: #fff; border-radius: 18px; box-shadow: 0 12px 28px var(--shadow); overflow: hidden; }
-.chat-head { display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem 0.9rem; background: #075E54; color: #fff; }
+.chat-mock { background: #E2EDDA; border-radius: 18px; box-shadow: 0 12px 28px var(--shadow); overflow: hidden; }
+.chat-head { display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem 0.9rem; background: var(--pine); color: var(--on-pine); }
 .chat-avatar { width: 34px; height: 34px; border-radius: 50%; background: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; }
 .chat-name { display: flex; flex-direction: column; line-height: 1.2; margin-right: auto; }
 .chat-name strong { font-size: 0.95rem; }
 .chat-name small { font-size: 0.7rem; opacity: 0.8; }
-.unread { background: #25D366; color: #075E54; font-size: 0.72rem; font-weight: 800; border-radius: 999px; padding: 0.1rem 0.5rem; }
+.unread { background: var(--leaf); color: var(--pine); font-size: 0.72rem; font-weight: 800; border-radius: 999px; padding: 0.1rem 0.5rem; }
 .chat-body {
   padding: 0.9rem 0.8rem; display: flex; flex-direction: column; gap: 0.35rem;
-  background-color: #ECE5DD;
-  background-image: radial-gradient(rgba(7, 94, 84, 0.07) 1px, transparent 1px);
+  background-color: #D3E4CC;
+  background-image: radial-gradient(rgba(30, 59, 42, 0.08) 1px, transparent 1px);
   background-size: 18px 18px;
 }
 .chat-day { text-align: center; margin-bottom: 0.3rem; }
@@ -401,12 +409,12 @@ body {
 .wmeta { display: inline-flex; align-items: baseline; gap: 0.25rem; float: right; margin: 0.55rem 0 0 0.6rem; }
 .wtime { font-size: 0.62rem; color: #8696A0; white-space: nowrap; }
 .wticks { font-size: 0.72rem; font-weight: 700; color: #53bdeb; letter-spacing: -2px; }
-.msg small { font-size: 0.68rem; font-weight: 800; color: #00A884; margin: 0 0 0.05rem 0.2rem; }
+.msg small { font-size: 0.68rem; font-weight: 800; color: var(--board-sage); margin: 0 0 0.05rem 0.2rem; }
 .msg.right { align-self: flex-end; align-items: flex-end; }
-.msg.right p { background: #DCF8C6; border-radius: 10px 0 10px 10px; }
-.msg.highlight p { border: 2px solid #F2B134; background: #FFF8E6; }
+.msg.right p { background: #DDF3D5; border-radius: 10px 0 10px 10px; }
+.msg.highlight p { border: 2px solid var(--board-sage); background: #EAF3E8; }
 .chat-mock figcaption, .compare-note figcaption { padding: 0.8rem 1rem 1rem; color: var(--ink-soft); font-size: 0.9rem; }
-.compare-arrow { font-size: 2.5rem; color: var(--accent-deep); }
+.compare-arrow { font-size: 2.5rem; color: var(--board-sage); }
 .compare-note { text-align: center; }
 .big-note { display: inline-block; padding: 2rem 2.4rem 1.4rem; font-size: 1.6rem; }
 .big-note p.hand { font-size: 1.9rem; }
@@ -421,7 +429,7 @@ body {
 .crossed::after { content: ''; position: absolute; left: -2%; right: -2%; top: 52%; height: 4px; background: var(--accent-deep); border-radius: 2px; transform: rotate(-2deg); }
 .kept { color: var(--ink); }
 .kept-noise {
-  background: linear-gradient(transparent 55%, #f3d9c8 55%);
+  background: linear-gradient(transparent 55%, #CBE2C4 55%);
   padding: 0 0.12em;
   font-size: 1.18em;
 }
@@ -439,11 +447,11 @@ body {
 
 /* steps */
 .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4rem; margin-top: 2rem; }
-.step { background: #f6fbfc; border: 1px solid var(--border); border-radius: 18px; padding: 1.6rem; }
+.step { background: #EFF5EB; border: 1px solid var(--border); border-radius: 18px; padding: 1.6rem; }
 .num { display: inline-flex; width: 38px; height: 38px; border-radius: 50%; color: #fff; font-weight: 800; align-items: center; justify-content: center; margin-bottom: 0.8rem; }
-.num-red { background: #c05b4d; }
-.num-yellow { background: #d9a521; }
-.num-teal { background: #1f7a6d; }
+.num-red { background: var(--pine); }
+.num-yellow { background: var(--board-sage); }
+.num-teal { background: #2F4F3A; }
 .step h3 { margin-bottom: 0.3rem; }
 .step p { color: var(--ink-soft); font-size: 0.95rem; }
 
@@ -455,7 +463,7 @@ body {
 .privacy-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem; margin-top: 2rem; }
 .privacy-grid h3 { margin: 0.4rem 0; }
 .privacy-grid p { color: var(--ink-soft); font-size: 0.95rem; }
-.p-icon { font-size: 1.4rem; color: var(--accent-deep); }
+.p-icon { font-size: 1.4rem; color: var(--board-sage); }
 
 /* faq */
 .faq { margin-top: 1rem; }
@@ -465,13 +473,15 @@ body {
 .faq summary span { color: var(--ink-soft); font-weight: 400; }
 .faq details p { color: var(--ink-soft); margin-top: 0.5rem; max-width: 52rem; }
 
-/* cta + footer */
-.cta { text-align: center; padding: 5rem 1.5rem 6rem; }
+/* cta + footer — pine brand block like the app homescreen, green CTAs */
+.cta { text-align: center; padding: 5rem 1.5rem 6rem; background: var(--pine); color: var(--on-pine); }
 .cta h2 { font-size: clamp(2.6rem, 6vw, 4.2rem); }
-.cta .lede { margin: 0.5rem auto 1.6rem; text-align: center; }
+.cta .lede { margin: 0.5rem auto 1.6rem; text-align: center; color: var(--on-pine); opacity: 0.85; }
+.cta .store-btn { background: var(--leaf); color: var(--pine); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); }
 .footer {
   display: flex; justify-content: space-between; align-items: center; gap: 1rem;
-  border-top: 1px solid var(--border); padding: 1.2rem 1.5rem; font-size: 0.9rem; color: var(--ink-soft);
+  border-top: 1px solid var(--pine-deep); padding: 1.2rem 1.5rem; font-size: 0.9rem;
+  background: var(--pine-deep); color: var(--on-pine);
 }
 .footer nav { display: flex; gap: 1.2rem; }
 .footer a { color: inherit; text-decoration: none; }

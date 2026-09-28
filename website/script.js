@@ -22,12 +22,29 @@ document.querySelectorAll('#faq details').forEach((d) => {
     });
   });
 
+  // Touch uses touch & hold to pick a note up: an immediate drag would
+  // hijack vertical page scrolls starting on the fridge. Mouse drags
+  // immediately as before.
+  let suppressMenuUntil = 0;
+
   fridge.querySelectorAll('.paper.drag').forEach((el) => {
+    // Swallow the click synthesized after a real drag (dropping a list
+    // over one of its own tick buttons must not toggle it).
+    let justDragged = false;
+    el.addEventListener('click', (e) => {
+      if (justDragged) { justDragged = false; e.stopPropagation(); e.preventDefault(); }
+    }, true);
+    el.addEventListener('contextmenu', (e) => {
+      if (Date.now() < suppressMenuUntil) e.preventDefault();
+    });
+
     el.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      e.preventDefault();
+      const isTouch = e.pointerType === 'touch';
+      if (!isTouch) e.preventDefault();
       const startX = e.clientX, startY = e.clientY;
-      let lifted = false, grabDX = 0, grabDY = 0, w = 0, h = 0;
+      let lifted = false, moved = false, grabDX = 0, grabDY = 0, w = 0, h = 0;
+      let holdTimer = 0;
 
       const lift = () => {
         const r = el.getBoundingClientRect();
@@ -50,11 +67,31 @@ document.querySelectorAll('#faq details').forEach((d) => {
         lifted = true;
       };
 
+      // While a touch drag is active the page must not scroll under it.
+      const blockScroll = (ev) => { ev.preventDefault(); };
+
+      const cleanup = () => {
+        clearTimeout(holdTimer);
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);
+        window.removeEventListener('touchmove', blockScroll);
+        el.classList.remove('dragging');
+      };
+
       const move = (ev) => {
+        const dist = Math.hypot(ev.clientX - startX, ev.clientY - startY);
+        if (isTouch && !lifted) {
+          // Finger travelling before the hold fires = a page scroll:
+          // stand down and let the browser have the gesture.
+          if (dist > 12) cleanup();
+          return;
+        }
         if (!lifted) {
-          if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 5) return;
+          if (dist < 5) return;
           lift();
         }
+        if (dist > 5) moved = true;
         const f = fridge.getBoundingClientRect();
         const x = Math.max(-24, Math.min(ev.clientX - f.left - grabDX, f.width - w + 24));
         const y = Math.max(-24, Math.min(ev.clientY - f.top - grabDY, f.height - h + 24));
@@ -63,16 +100,30 @@ document.querySelectorAll('#faq details').forEach((d) => {
       };
 
       const up = () => {
-        window.removeEventListener('pointermove', move);
-        window.removeEventListener('pointerup', up);
-        window.removeEventListener('pointercancel', up);
-        el.classList.remove('dragging');
+        cleanup();
+        if (lifted && moved) justDragged = true;
       };
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup', up);
       window.addEventListener('pointercancel', up);
+
+      if (isTouch) {
+        holdTimer = setTimeout(() => {
+          lift();
+          if (navigator.vibrate) navigator.vibrate(10);
+          suppressMenuUntil = Date.now() + 1500;
+          window.addEventListener('touchmove', blockScroll, { passive: false });
+        }, 350);
+      }
     });
   });
+
+  // Coarse pointers get a hint that matches the gesture.
+  if (window.matchMedia('(pointer: coarse)').matches) {
+    document.querySelectorAll('.hero-board .scribble').forEach((s) => {
+      s.innerHTML = '<span class="scribble-arrow">⤴</span> touch &amp; hold to move them';
+    });
+  }
 })();
 
 // Hero intro: fridge starts empty -> chats pop -> struck off ->
