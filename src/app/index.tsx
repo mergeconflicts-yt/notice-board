@@ -31,7 +31,7 @@ export default function StartScreen() {
   const pathname = usePathname();
   const setDisplayName = useSession((s) => s.setDisplayName);
   const { boards, loading: boardsLoading, error: boardsError } = useMyBoards();
-  const [identityFor, setIdentityFor] = useState<'create' | 'join' | null>(null);
+  const [identityFor, setIdentityFor] = useState<'join' | null>(null);
   const [identitySaving, setIdentitySaving] = useState(false);
   const [identityError, setIdentityError] = useState<string | null>(null);
   const [showSavePrompt, setShowSavePrompt] = useState(false);
@@ -82,11 +82,9 @@ export default function StartScreen() {
   const needsName = !user || user.displayName === 'Someone';
 
   const startCreate = () => {
-    if (user && !needsName) router.push('/create');
-    else {
-      setIdentityError(null);
-      setIdentityFor('create');
-    }
+    // The create screen collects a missing display name inline, so no
+    // "Who are you?" stop is needed first.
+    router.push('/create');
   };
   const startJoin = () => {
     if (user && !needsName) router.push('/join');
@@ -97,7 +95,6 @@ export default function StartScreen() {
   };
 
   const handleIdentity = async (name: string) => {
-    const target = identityFor;
     if (identitySaving) return;
     setIdentitySaving(true);
     setIdentityError(null);
@@ -110,8 +107,7 @@ export default function StartScreen() {
     }
     setIdentitySaving(false);
     setIdentityFor(null);
-    if (target === 'create') router.push('/create');
-    else if (target === 'join') router.push('/join');
+    router.push('/join');
   };
 
   return (

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Platform, ActivityIndicator, Image } from 'react-native';
+import type { ReactNode } from 'react';
+import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, Platform, ActivityIndicator, Image, Animated, AccessibilityInfo, KeyboardAvoidingView } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -90,6 +92,60 @@ const TYPE_BADGE: Record<ShowcasePost['kind'], string> = {
 const SHOWCASE_PHOTO_URL =
   'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80&auto=format&fit=crop';
 
+/** Staggered pop-in for the showcase cards, like posts pinning onto a board.
+ *  Skipped when the OS asks for reduced motion. */
+function AnimatedShowcaseCard({
+  index,
+  rotate,
+  style,
+  children,
+}: {
+  index: number;
+  rotate: string;
+  style: StyleProp<ViewStyle>;
+  children: ReactNode;
+}) {
+  const pop = useState(() => new Animated.Value(0))[0];
+  useEffect(() => {
+    let alive = true;
+    const run = (reduced: boolean) => {
+      if (!alive) return;
+      if (reduced) {
+        pop.setValue(1);
+        return;
+      }
+      Animated.spring(pop, {
+        toValue: 1,
+        delay: 150 + index * 130,
+        useNativeDriver: true,
+      }).start();
+    };
+    void AccessibilityInfo.isReduceMotionEnabled()
+      .then(run)
+      .catch(() => run(false));
+    return () => {
+      alive = false;
+    };
+  }, [index, pop]);
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: pop,
+          transform: [
+            { rotate },
+            { scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) },
+            { translateY: pop.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) },
+          ],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
 /** Body of a showcase card: the same realistic per-type content. */
 function ShowcaseBody({ post }: { post: ShowcasePost }) {
   const palette = noteColors[post.color];
@@ -158,6 +214,7 @@ const GUEST_WARNING =
 
 export function Welcome({ mode, inviteToken }: Props) {
   const continueAsGuest = useSession((s) => s.continueAsGuest);
+  const setDisplayName = useSession((s) => s.setDisplayName);
   const continueWithProvider = useSession((s) => s.continueWithProvider);
   const sendEmailCode = useSession((s) => s.sendEmailCode);
   const verifyEmailCode = useSession((s) => s.verifyEmailCode);
@@ -168,6 +225,8 @@ export function Welcome({ mode, inviteToken }: Props) {
   const [preview, setPreview] = useState<InvitePreview | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [inviteCap, setInviteCap] = useState<string | null>(null);
+  const [guestName, setGuestName] = useState('');
+  const [guestCap, setGuestCap] = useState<string | null>(null);
   const isInvite = Boolean(inviteToken);
 
   // Token preview is public (token-only), so the invite screen can name the
@@ -184,6 +243,29 @@ export function Welcome({ mode, inviteToken }: Props) {
       alive = false;
     };
   }, [inviteToken]);
+
+  const runAuthed = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+      await afterAuth();
+    } catch (e) {
+      if (!(e instanceof AuthCancelledError)) setError(friendlyMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Guest entry: sign in anonymously, then claim the entered name so posts
+  // are attributed. The create screen keeps a fallback name field in case
+  // the rename fails (offline right after sign-up).
+  const continueGuest = () =>
+    runAuthed(async () => {
+      await continueAsGuest(guestCap ?? undefined);
+      const n = guestName.trim();
+      if (n) await setDisplayName(n);
+    });
 
   /** After any successful auth, join the linked board if this came from an
    *  invite. (The one-time name step is owned by the gate's `name` status.) */
@@ -204,19 +286,6 @@ export function Welcome({ mode, inviteToken }: Props) {
       router.replace(`/board/${boardId}`);
     } catch (e) {
       setJoinError(friendlyMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const runAuthed = async (fn: () => Promise<void>) => {
-    setBusy(true);
-    setError(null);
-    try {
-      await fn();
-      await afterAuth();
-    } catch (e) {
-      if (!(e instanceof AuthCancelledError)) setError(friendlyMessage(e));
     } finally {
       setBusy(false);
     }
@@ -255,11 +324,13 @@ export function Welcome({ mode, inviteToken }: Props) {
             {SHOWCASE.map((post, i) => {
               const palette = noteColors[post.color];
               return (
-                <View
+                <AnimatedShowcaseCard
                   key={post.kind}
+                  index={i}
+                  rotate={post.rotate}
                   style={[
                     styles.gridCard,
-                    { backgroundColor: palette.bg, borderColor: palette.edge, transform: [{ rotate: post.rotate }] },
+                    { backgroundColor: palette.bg, borderColor: palette.edge },
                   ]}
                 >
                   <View
@@ -268,7 +339,7 @@ export function Welcome({ mode, inviteToken }: Props) {
                   <Text style={styles.cardBadge}>{TYPE_BADGE[post.kind]}</Text>
                   <ShowcaseBody post={post} />
                   <Text style={[styles.cardMeta, { color: palette.ink }]}>{post.meta}</Text>
-                </View>
+                </AnimatedShowcaseCard>
               );
             })}
           </View>
@@ -388,7 +459,16 @@ export function Welcome({ mode, inviteToken }: Props) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.bodyScroll} bounces={false}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.flex}
+      >
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.bodyScroll}
+        bounces={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {step === 'options' ? (
           <>
             {header}
@@ -401,22 +481,32 @@ export function Welcome({ mode, inviteToken }: Props) {
 
         {step === 'guest' ? (
           <>
-            <Text style={styles.title}>Use as guest?</Text>
-            <Text style={styles.subtitle}>{GUEST_WARNING}</Text>
+            <Text style={styles.title}>Who are you?</Text>
+            <Text style={styles.subtitle}>What do people on the fridge call you?</Text>
+            <TextInput
+              style={styles.nameInput}
+              placeholder="Your name"
+              placeholderTextColor={colors.onPineFaint}
+              value={guestName}
+              onChangeText={setGuestName}
+              maxLength={40}
+              autoFocus
+            />
+            <Text style={styles.warning}>{GUEST_WARNING}</Text>
             {turnstileSiteKey ? (
               <View style={styles.captcha}>
                 <Turnstile
                   siteKey={turnstileSiteKey}
-                  onToken={(t) => void runAuthed(() => continueAsGuest(t))}
-                  onError={() => setError('Couldn’t load the check. Try again.')}
+                  onToken={setGuestCap}
+                  onError={() => setGuestCap(null)}
                 />
               </View>
             ) : null}
             <Button
               label="Continue as guest"
               variant="accent"
-              onPress={() => void runAuthed(() => continueAsGuest())}
-              disabled={busy}
+              onPress={() => void continueGuest()}
+              disabled={busy || !guestName.trim()}
               style={styles.primaryGap}
             />
             <Pressable onPress={() => setStep('options')} hitSlop={8} style={styles.backLink}>
@@ -446,88 +536,90 @@ export function Welcome({ mode, inviteToken }: Props) {
         ) : null}
         {error && step === 'options' ? <Text style={styles.error}>{error}</Text> : null}
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.pine },
+  flex: { flex: 1 },
   body: { flex: 1, paddingHorizontal: 24, justifyContent: 'center' },
   scroll: { flex: 1 },
   bodyScroll: { flexGrow: 1, paddingHorizontal: 24, justifyContent: 'center', paddingVertical: 24, paddingBottom: 32 },
   spinner: { marginTop: 16 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10, marginBottom: 16 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8, marginBottom: 12 },
   gridCard: {
     width: '48%',
     flexGrow: 1,
     borderRadius: 4,
     borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingTop: 18,
-    paddingBottom: 10,
+    paddingHorizontal: 10,
+    paddingTop: 12,
+    paddingBottom: 8,
     boxShadow: '0 1px 1px rgba(0,0,0,0.08), 0 10px 18px -8px rgba(20,30,25,0.45)',
   },
   gridMagnet: {
     position: 'absolute',
-    top: -7,
+    top: -6,
     left: '50%',
-    marginLeft: -7,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+    marginLeft: -6,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
   },
   cardBadge: {
     fontFamily: fonts.ui.bold,
-    fontSize: 10,
+    fontSize: 9,
     letterSpacing: 1.5,
     color: colors.inkFaint,
-    marginBottom: 6,
-  },
-  cardNote: { fontFamily: fonts.hand.semibold, fontSize: 20, lineHeight: 25 },
-  cardListTitle: {
-    fontFamily: fonts.hand.regular,
-    fontSize: 21,
-    lineHeight: 25,
-    textDecorationLine: 'underline',
     marginBottom: 4,
   },
-  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 2 },
+  cardNote: { fontFamily: fonts.hand.semibold, fontSize: 21, lineHeight: 26 },
+  cardListTitle: {
+    fontFamily: fonts.hand.regular,
+    fontSize: 22,
+    lineHeight: 26,
+    textDecorationLine: 'underline',
+    marginBottom: 3,
+  },
+  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 1 },
   cardBox: {
-    width: 15,
-    height: 15,
-    borderRadius: 8,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     borderWidth: 1.5,
     borderColor: colors.ink,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cardBoxDone: { backgroundColor: colors.ink },
-  cardTick: { color: colors.paper, fontSize: 10, fontWeight: '800', marginTop: -1 },
-  cardRowText: { fontFamily: fonts.hand.regular, fontSize: 17, lineHeight: 21 },
+  cardTick: { color: colors.paper, fontSize: 8, fontWeight: '800', marginTop: -1 },
+  cardRowText: { fontFamily: fonts.hand.regular, fontSize: 18, lineHeight: 22 },
   cardRowDone: { textDecorationLine: 'line-through', opacity: 0.55 },
-  cardTicket: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
-  cardCal: { alignItems: 'center', minWidth: 40 },
+  cardTicket: { flexDirection: 'row', gap: 6, alignItems: 'flex-start' },
+  cardCal: { alignItems: 'center', minWidth: 34 },
   cardDow: { fontFamily: fonts.ui.bold, fontSize: 10, letterSpacing: 0.5, color: colors.danger },
-  cardDay: { fontFamily: fonts.hand.bold, fontSize: 28.5, lineHeight: 30 },
+  cardDay: { fontFamily: fonts.hand.bold, fontSize: 30, lineHeight: 31 },
   cardMon: { fontFamily: fonts.ui.semibold, fontSize: 10, opacity: 0.7 },
   cardTicketMain: { flex: 1, minWidth: 0 },
-  cardDateTitle: { fontFamily: fonts.hand.bold, fontSize: 21, lineHeight: 25 },
-  cardDateTime: { fontFamily: fonts.hand.bold, fontSize: 17, lineHeight: 21, marginTop: 2 },
-  cardPlace: { fontFamily: fonts.ui.semibold, fontSize: 12, marginTop: 4, opacity: 0.85 },
+  cardDateTitle: { fontFamily: fonts.hand.bold, fontSize: 22, lineHeight: 26 },
+  cardDateTime: { fontFamily: fonts.hand.bold, fontSize: 18, lineHeight: 22, marginTop: 2 },
+  cardPlace: { fontFamily: fonts.ui.semibold, fontSize: 12, marginTop: 2, opacity: 0.85 },
   cardPhoto: {
     width: '100%',
-    aspectRatio: 4 / 3,
+    aspectRatio: 16 / 9,
     borderRadius: 6,
     overflow: 'hidden',
     backgroundColor: 'rgba(0,0,0,0.06)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   cardPhotoImg: { width: '100%', height: '100%' },
-  cardCaption: { fontFamily: fonts.hand.semibold, fontSize: 18, lineHeight: 23, textAlign: 'center' },
+  cardCaption: { fontFamily: fonts.hand.semibold, fontSize: 19, lineHeight: 23, textAlign: 'center' },
   cardMeta: {
-    marginTop: 8,
+    marginTop: 6,
     fontFamily: fonts.ui.semibold,
     fontSize: 10,
     opacity: 0.65,
@@ -535,6 +627,22 @@ const styles = StyleSheet.create({
   },
   title: { fontFamily: fonts.hand.bold, fontSize: 40, lineHeight: 42, color: colors.onPine },
   subtitle: { fontFamily: fonts.ui.regular, fontSize: 15, color: colors.onPineSoft, marginTop: 8 },
+  nameInput: {
+    height: 56,
+    backgroundColor: colors.surface,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    fontFamily: fonts.ui.semibold,
+    fontSize: 18,
+    color: colors.ink,
+    marginTop: 16,
+  },
+  warning: {
+    fontFamily: fonts.ui.regular,
+    fontSize: 13,
+    color: colors.onPineSoft,
+    marginTop: 12,
+  },
   providerBtn: {
     flexDirection: 'row',
     alignItems: 'center',

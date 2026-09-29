@@ -2,93 +2,40 @@ import { useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { offeredBoardColors, boardColors, colors, doorInk, fonts } from '../theme';
+import { offeredBoardColors, boardColors, colors, fonts } from '../theme';
 import { Button } from '../components/Button';
 import { ScreenHeader } from '../components/ScreenHeader';
-import { FridgeDoor } from '../components/FridgeDoor';
-import { NotePaper } from '../components/NotePaper';
 import { createBoard, friendlyMessage } from '../lib/api';
-import { BoardColor, ItemWithAuthor, ListEntry } from '../types';
-
-// Sample posts for the live fridge preview: a note and a list, like the
-// website hero. Static (no ticking, no dragging) — just what the door
-// will look like in the picked colour.
-const hoursAgoIso = (h: number) => new Date(Date.now() - h * 3600 * 1000).toISOString();
-
-const PREVIEW_AUTHOR = {
-  id: 'preview',
-  displayName: 'Mum',
-  avatarPath: null,
-  createdAt: hoursAgoIso(3),
-};
-
-const PREVIEW_NOTE: ItemWithAuthor = {
-  id: 'preview-note',
-  boardId: 'preview',
-  type: 'note',
-  color: 'butter',
-  body: 'Wi-Fi: HomeNet\nsunflower22',
-  title: null,
-  eventAt: null,
-  place: null,
-  photoPath: null,
-  layout: null,
-  pinned: false,
-  keepUntil: null,
-  doneAt: null,
-  doneBy: null,
-  createdBy: 'preview',
-  updatedBy: null,
-  deletedAt: null,
-  deletedBy: null,
-  version: 1,
-  createdAt: hoursAgoIso(2),
-  updatedAt: hoursAgoIso(2),
-  author: PREVIEW_AUTHOR,
-};
-
-const PREVIEW_LIST: ItemWithAuthor = {
-  id: 'preview-list',
-  boardId: 'preview',
-  type: 'list',
-  color: 'paper',
-  body: null,
-  title: 'Groceries',
-  eventAt: null,
-  place: null,
-  photoPath: null,
-  layout: null,
-  pinned: false,
-  keepUntil: null,
-  doneAt: null,
-  doneBy: null,
-  createdBy: 'preview',
-  updatedBy: null,
-  deletedAt: null,
-  deletedBy: null,
-  version: 1,
-  createdAt: hoursAgoIso(1),
-  updatedAt: hoursAgoIso(1),
-  author: { ...PREVIEW_AUTHOR, displayName: 'Dad' },
-};
-
-const PREVIEW_ENTRIES: ListEntry[] = [
-  { id: 'e1', itemId: 'preview-list', boardId: 'preview', text: 'Milk', position: 0, checkedAt: hoursAgoIso(1), checkedBy: 'preview', createdBy: 'preview', createdAt: hoursAgoIso(1), updatedAt: hoursAgoIso(1) },
-  { id: 'e2', itemId: 'preview-list', boardId: 'preview', text: 'Bread', position: 1, checkedAt: null, checkedBy: null, createdBy: 'preview', createdAt: hoursAgoIso(1), updatedAt: hoursAgoIso(1) },
-  { id: 'e3', itemId: 'preview-list', boardId: 'preview', text: 'Eggs', position: 2, checkedAt: null, checkedBy: null, createdBy: 'preview', createdAt: hoursAgoIso(1), updatedAt: hoursAgoIso(1) },
-];
+import { useSession } from '../store/session';
+import { BoardColor } from '../types';
 
 export default function CreateBoardScreen() {
   const [name, setName] = useState('');
   const [color, setColor] = useState<BoardColor>('sage');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Nameless guests answer "who are you?" right here instead of a separate
+  // sheet, so creating a first fridge is one screen.
+  const user = useSession((s) => s.user);
+  const setDisplayName = useSession((s) => s.setDisplayName);
+  const [yourName, setYourName] = useState('');
+  const needsName = !user || user.displayName === 'Someone';
 
   const create = async () => {
     if (!name.trim() || creating) return;
+    if (needsName && !yourName.trim()) return;
     setCreating(true);
     setError(null);
     try {
+      if (needsName) {
+        try {
+          await setDisplayName(yourName.trim());
+        } catch {
+          setError('Couldn’t save your name. Check your connection and try again.');
+          setCreating(false);
+          return;
+        }
+      }
       // The board's time zone drives date expiry (day after the event).
       const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
       const board = await createBoard(name.trim(), color, timeZone);
@@ -121,6 +68,19 @@ export default function CreateBoardScreen() {
             maxLength={60}
             autoFocus
           />
+          {needsName ? (
+            <>
+              <Text style={[styles.label, styles.colorLabel]}>Your name</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="What do people call you?"
+                placeholderTextColor={colors.inkFaint}
+                value={yourName}
+                onChangeText={setYourName}
+                maxLength={40}
+              />
+            </>
+          ) : null}
           <Text style={[styles.label, styles.colorLabel]}>Colour</Text>
           <View
             style={styles.swatchesWrap}
@@ -139,23 +99,11 @@ export default function CreateBoardScreen() {
               />
             ))}
           </View>
-          <Text style={[styles.label, styles.previewLabel]}>Preview</Text>
-          <View style={styles.preview}>
-            <FridgeDoor color={color} placement="top">
-              <Text style={[styles.previewName, { color: doorInk(color) }]} numberOfLines={1}>
-                {name.trim() || 'Your fridge'}
-              </Text>
-              <View style={styles.previewStack}>
-                <NotePaper item={PREVIEW_NOTE} compact />
-                <NotePaper item={PREVIEW_LIST} entries={PREVIEW_ENTRIES} compact />
-              </View>
-            </FridgeDoor>
-          </View>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <Button
             label="Create"
             onPress={create}
-            disabled={!name.trim() || creating}
+            disabled={!name.trim() || (needsName && !yourName.trim()) || creating}
             style={styles.create}
           />
         </ScrollView>
@@ -183,17 +131,6 @@ const styles = StyleSheet.create({
   },
   swatches: { flexDirection: 'row', gap: 12 },
   swatchesWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  previewLabel: { marginTop: 24 },
-  preview: { height: 340, marginTop: 10 },
-  previewName: {
-    fontFamily: fonts.ui.extraBold,
-    fontSize: 15,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  previewStack: { gap: 10 },
   swatch: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: 'transparent' },
   swatchActive: { borderColor: colors.accent },
   error: { fontFamily: fonts.ui.regular, color: colors.danger, fontSize: 13, marginTop: 12 },
