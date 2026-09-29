@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { ScrollView } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, doorSoft, fonts, noteColors } from '../theme';
@@ -116,7 +117,7 @@ function PhotoCard({ url, caption }: { url: string | null; caption: string | nul
         <Image
           source={{ uri: url }}
           style={styles.photo}
-          resizeMode="cover"
+          contentFit="cover"
           accessible
           accessibilityLabel={caption?.trim() || 'Pinned photo'}
         />

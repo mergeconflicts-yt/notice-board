@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, Platform, ActivityIndicator, Image, Animated, AccessibilityInfo, KeyboardAvoidingView } from 'react-native';
+import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, Platform, ActivityIndicator, Animated, AccessibilityInfo, KeyboardAvoidingView } from 'react-native';
+import { Image } from 'expo-image';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -197,7 +198,7 @@ function ShowcaseBody({ post }: { post: ShowcasePost }) {
           <Image
             source={{ uri: SHOWCASE_PHOTO_URL }}
             style={styles.cardPhotoImg}
-            resizeMode="cover"
+            contentFit="cover"
             onError={() => setImgFailed(true)}
             accessibilityRole="image"
             accessibilityLabel={post.caption}

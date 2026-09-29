@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { View, Text, TextInput, ScrollView, Pressable, StyleSheet, Alert, Share, Image } from 'react-native';
+import { View, Text, TextInput, ScrollView, Pressable, StyleSheet, Alert, Share } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';

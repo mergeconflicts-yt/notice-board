@@ -1,5 +1,6 @@
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+import { File, UploadType, type UploadResult } from 'expo-file-system';
 import { supabase } from './supabase';
 import { preparePhoto } from './photos';
 import {
@@ -842,27 +843,41 @@ export async function uploadPhoto(boardId: string, itemId: string, fileUri: stri
   if (intentError) raise(intentError);
   if (!path) raise({ message: 'invalid_input' });
   const preparedUri = await preparePhoto(fileUri);
-  const form = new FormData();
-  form.append('path', path);
-  form.append('file', {
-    uri: preparedUri,
-    name: 'photo.jpg',
-    type: 'image/jpeg',
-  } as unknown as Blob);
-  const { error, response } = await supabase.functions.invoke('upload-photo', {
-    body: form,
-  });
-  if (error) {
+  // The bytes travel via expo-file-system's native multipart upload, NOT via
+  // fetch + FormData: React Native's fetch rejects the `{ uri, name, type }`
+  // file-part convention ("Unsupported FormDataPart implementation"), so
+  // functions.invoke can never send the file from a device.
+  const functionsUrl = `${(process.env.EXPO_PUBLIC_SUPABASE_URL ?? '').replace(/\/+$/, '')}/functions/v1/upload-photo`;
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  let result: UploadResult;
+  try {
+    result = await new File(preparedUri).upload(functionsUrl, {
+      uploadType: UploadType.MULTIPART,
+      fieldName: 'file',
+      mimeType: 'image/jpeg',
+      parameters: { path },
+      headers: {
+        apikey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
+        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      },
+    });
+  } catch (e) {
+    // The native transfer failed before any HTTP response (offline, DNS,
+    // unreadable file) — the same network signal the fetch path produced.
+    throw new ApiError('network', (e as { message?: string })?.message ?? 'upload failed');
+  }
+  if (result.status < 200 || result.status >= 300) {
     // Same error translation as delete-account: the function answers
     // failures as stable plain-text strings (`invalid_input`, `not_member`,
     // `could not upload photo`).
-    let bodyText = '';
-    try {
-      bodyText = response instanceof Response ? await response.text() : '';
-    } catch {
-      // Unreadable body — fall back to status-based classification below.
-    }
-    raise(functionError(error, response, bodyText));
+    const bodyText = result.body ?? '';
+    console.error('[uploadPhoto] upload failed:', {
+      status: result.status,
+      body: bodyText.slice(0, 200),
+    });
+    raise(functionError({ message: 'upload failed' }, { status: result.status }, bodyText));
   }
   return path;
 }

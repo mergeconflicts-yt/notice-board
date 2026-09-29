@@ -1,4 +1,5 @@
-import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { ItemWithAuthor, ListEntry } from '../types';
 import { colors, noteColors, fonts } from '../theme';
 import { FastenerView, fastenerForItem } from './Pin';
@@ -108,7 +109,7 @@ export function NotePaper({
           <Image
             source={{ uri: photoUrl }}
             style={[styles.image, { borderRadius: 2, aspectRatio: 4 / 3 }]}
-            resizeMode="cover"
+            contentFit="cover"
             accessible
             accessibilityLabel={item.body?.trim() ? item.body.trim() : 'Attached photo'}
             accessibilityRole="image"

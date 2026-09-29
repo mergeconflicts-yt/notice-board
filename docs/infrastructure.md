@@ -29,10 +29,12 @@ supabase db lint --level warning
 supabase functions serve   # run Edge Functions locally (separate terminal!)
 ```
 
-`supabase start` does **not** serve Edge Functions. Guest sign-out and
-account deletion call the `delete-account` function, so without
-`supabase functions serve` running alongside, both fail with a network error.
-Keep both processes up during development.
+`supabase start` does **not** serve Edge Functions. Photo uploads go through
+the `upload-photo` function, and guest sign-out / account deletion call the
+`delete-account` function, so without `supabase functions serve` running
+alongside, photo uploads fail with "Can't reach the fridge" and the account
+flows fail with a network error — while everything else (notes, lists,
+invites) keeps working. Keep both processes up during development.
 
 ### App wiring
 

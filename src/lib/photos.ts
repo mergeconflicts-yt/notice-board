@@ -13,20 +13,27 @@ const QUALITY = 0.8;
  * could upload an over-limit file, so the probe is unconditional.
  */
 export async function preparePhoto(uri: string): Promise<string> {
-  const probe = await ImageManipulator.manipulate(uri).renderAsync();
-  const width = probe.width ?? 0;
-  const height = probe.height ?? 0;
-  const longest = Math.max(width, height);
-  if (longest > MAX_SIDE) {
-    const scale = MAX_SIDE / longest;
-    const resized = ImageManipulator.manipulate(uri).resize({
-      width: Math.round(width * scale),
-      height: Math.round(height * scale),
-    });
-    const image = await resized.renderAsync();
-    const result = await image.saveAsync({ compress: QUALITY, format: SaveFormat.JPEG });
+  try {
+    const probe = await ImageManipulator.manipulate(uri).renderAsync();
+    const width = probe.width ?? 0;
+    const height = probe.height ?? 0;
+    const longest = Math.max(width, height);
+    if (longest > MAX_SIDE) {
+      const scale = MAX_SIDE / longest;
+      const resized = ImageManipulator.manipulate(uri).resize({
+        width: Math.round(width * scale),
+        height: Math.round(height * scale),
+      });
+      const image = await resized.renderAsync();
+      const result = await image.saveAsync({ compress: QUALITY, format: SaveFormat.JPEG });
+      return result.uri;
+    }
+    const result = await probe.saveAsync({ compress: QUALITY, format: SaveFormat.JPEG });
     return result.uri;
+  } catch (e) {
+    // Stage tag for Metro logs: distinguishes a local prepare failure from an
+    // upload failure (both would otherwise surface as a generic toast).
+    console.error('[preparePhoto] failed:', e);
+    throw e;
   }
-  const result = await probe.saveAsync({ compress: QUALITY, format: SaveFormat.JPEG });
-  return result.uri;
 }

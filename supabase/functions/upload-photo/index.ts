@@ -97,22 +97,39 @@ Deno.serve(async (req: Request) => {
   if (file.size <= 0 || file.size > MAX_INPUT_BYTES) return bad('invalid_input');
 
   // Decode: rejects anything that is not image data (arbitrary bytes labelled
-  // as JPEG fail here). Strict mode — no tolerant partial decode. NOTE: the
-  // options object is the SECOND argument (format-or-options); a third
-  // argument would be silently ignored and tolerant decoding would stay on.
+  // as JPEG fail here). JPEGs go through jpeg-js, NOT @cross/image's
+  // built-in JPEG decoder: cross corrupts iOS-encoder output (optimized
+  // Huffman tables + restart intervals) — strict mode throws "Invalid
+  // Huffman code", tolerant mode emits stride-shifted color bands (repro
+  // 2026-09-29 via the debug-photo route: psychedelic horizontal bands).
+  // jpeg-js handles both correctly. Every other format keeps the cross
+  // decoder (PNG round-trips byte-clean). NOTE: the options object is the
+  // SECOND argument (format-or-options); a third argument would be silently
+  // ignored and tolerant decoding would stay on.
   let image;
   try {
-    image = await Image.decode(new Uint8Array(await file.arrayBuffer()), {
-      tolerantDecoding: false,
-      runtimeDecoding: 'never',
-    });
-  } catch {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (bytes.length > 2 && bytes[0] === 0xff && bytes[1] === 0xd8) {
+      // Dynamic import: the static CJS interop hits a TDZ cycle
+      // ("Cannot access 'jpeg' before initialization") under the edge bundler.
+      const { default: jpeg } = await import('npm:jpeg-js@0.4.4');
+      const decoded = jpeg.decode(bytes);
+      image = Image.fromRGBA(decoded.width, decoded.height, new Uint8Array(decoded.data));
+    } else {
+      image = await Image.decode(bytes, {
+        tolerantDecoding: true,
+        runtimeDecoding: 'never',
+      });
+    }
+  } catch (e) {
+    console.error('upload-photo decode failed:', (e as Error)?.message ?? String(e));
     return bad('invalid_input');
   }
 
   // Strip all metadata (EXIF/GPS) BEFORE resize: resize preserves metadata
   // and encode writes it back, so clearing must happen first. A fresh empty
-  // object with merge=false replaces rather than merges.
+  // object with merge=false replaces rather than merges. (Images built from
+  // raw pixels above carry no metadata; the wipe is for the PNG path.)
   image.setMetadata({}, false);
 
   // Downsize to the same 2048px longest side the client targets, then

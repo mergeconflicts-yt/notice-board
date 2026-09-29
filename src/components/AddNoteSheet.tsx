@@ -5,13 +5,13 @@ import {
   Text,
   TextInput,
   Pressable,
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { DateTimePopup } from './DateTimePopup';
@@ -206,7 +206,10 @@ export function AddNoteSheet({
   const pickImage = async () => {
     setPicking(true);
     try {
-      const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+      // Request the original (quality: 1 = no pre-compress) so the single
+      // client-side lossy encode happens in preparePhoto (2048px / JPEG
+      // 0.8), keeping maximum fidelity into the upload pipeline.
+      const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
       if (!res.canceled && res.assets[0]) {
         setPhotoUri(res.assets[0].uri);
         setTab('photo');
@@ -397,7 +400,7 @@ export function AddNoteSheet({
                     <Image
                       source={{ uri: photoUri ?? photoUrl ?? undefined }}
                       style={styles.preview}
-                      resizeMode="cover"
+                      contentFit="cover"
                     />
                     {photoUri ? (
                       <Pressable style={styles.remove} onPress={() => setPhotoUri(null)}>
