@@ -9,8 +9,7 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.fridgeboard.app",
-      "usesAppleSignIn": true
+      "bundleIdentifier": "com.fridgeboard.app"
     },
     "android": {
       "adaptiveIcon": {

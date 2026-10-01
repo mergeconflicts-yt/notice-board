@@ -282,7 +282,7 @@ The app shows these words (the mockup `design-mockups/fridge-board-redesign.html
 - Client before upload: `expo-image-manipulator` resize (longest side 2048) and re-encode as JPEG, quality 0.8. **This strips EXIF, including GPS location.** Never upload the original file.
 - Upload order: upload the file, then `post_item` with `photo_path`. If `post_item` fails, the orphan file is removed by the nightly job (files with no matching item older than 24h).
 - Display: `createSignedUrl` with 1h expiry; cache by path in memory.
-- Avatars: separate private bucket `avatars`, path `<user_id>/<uuid>.jpg`. Readable if you share a board with that user; writable only by the user.
+- Avatars: separate private bucket `avatars`, path `<user_id>/<uuid>.jpg`. Readable if you share a board with that user. Uploads were never shipped, so the client write policies are dropped (only the service-role purge job touches the bucket).
 
 ## 8. Auth and sessions (app side)
 

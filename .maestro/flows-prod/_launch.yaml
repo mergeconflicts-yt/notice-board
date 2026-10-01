@@ -1,0 +1,10 @@
+appId: com.fridgeboard.app
+---
+# Signed-build launch: fresh state, launch the real app, wait for Welcome.
+# Unlike the Expo Go helper this does NOT open exp:// or dismiss a dev menu —
+# neither exists in a production binary.
+- clearState
+- launchApp
+- extendedWaitUntil:
+    visible: "Use as guest"
+    timeout: 60000

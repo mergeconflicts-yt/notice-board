@@ -1,2 +1,6 @@
-# Invite links: /j/<token> serves the fallback page (a rewrite, not a redirect).
-/j/*  /j.html  200
+# Invite links: serve the fallback page at the ORIGINAL /j/<token> URL.
+# This must be a rewrite (200), not a 3xx redirect — a redirect to /j drops the
+# token and breaks cold-start joining. If a Cloudflare dashboard Redirect Rule
+# also matches /j/*, remove it or make it a rewrite so it can't shadow these.
+/j      /j.html  200
+/j/*    /j.html  200

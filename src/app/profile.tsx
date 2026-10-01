@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, Alert, Linking, Platform } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
@@ -161,12 +161,6 @@ export default function ProfileScreen() {
                 ? `Keep your ${boards.length} ${boards.length === 1 ? 'fridge' : 'fridges'} if you change phones.`
                 : 'Keep your fridges if you change phones.'}
             </Text>
-            {Platform.OS === 'ios' ? (
-            <Pressable style={[styles.saveBtnRow, styles.appleRow]} onPress={() => void link('apple')}>
-              <MaterialCommunityIcons name="apple" size={20} color={colors.white} />
-              <Text style={styles.appleRowText}>Save with Apple</Text>
-            </Pressable>
-            ) : null}
             <Pressable style={styles.saveBtnRow} onPress={() => void link('google')}>
               <MaterialCommunityIcons name="google" size={20} color={colors.pine} />
               <Text style={styles.saveRowText}>Save with Google</Text>
@@ -254,8 +248,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   saveRowText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.pine },
-  appleRow: { backgroundColor: colors.accent, borderColor: colors.accent },
-  appleRowText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.white },
   signOutRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
   signOutText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.ink },
   dangerRow: { marginTop: 6, paddingVertical: 12 },

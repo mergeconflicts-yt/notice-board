@@ -1,5 +1,5 @@
 Product behaviourFirst launch (no session, no identity marker) shows a Welcome screen:
-1. Continue with Apple (iOS only)
+1. Continue with Apple (iOS only) — DEFERRED this release (no Apple account); the button is hidden until Apple is configured.
 2. Continue with Google
 3. Continue with email → enter email → enter the 6-digit code from the email
 4. Use as guest (secondary, text button) → one-line warning: "Your boards live on this phone only. If you delete the appor lose the phone, they're gone. You can save your account later."
@@ -77,6 +77,6 @@ Tests
 5. Invite link on a fresh install → preview → join as guest, and join with Google.
 6. Signed-up user signs out → Welcome, not a new guest.
 Store notes
-• iOS: Sign in with Apple entitlement (ios.usesAppleSignIn: true in app.json) and an Apple Services ID for Supabase.
+• iOS: Sign in with Apple entitlement and an Apple Services ID for Supabase. DEFERRED for this release (no paid Apple Developer account): the Apple buttons and `ios.usesAppleSignIn` were removed from Welcome/Profile/app.json, leaving Google + email + guest. Re-add the entitlement and provider together before offering Apple again; note App Store Guideline 4.8 (offer Apple when Google is offered).
 • Android: Google Auth client for the release SHA-1 (and the Play App Signing key).
 • Privacy policy must now mention email addresses and Apple/Google identity data.

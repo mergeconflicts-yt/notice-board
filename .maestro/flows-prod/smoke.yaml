@@ -1,0 +1,22 @@
+appId: com.fridgeboard.app
+---
+# Real-device smoke: Welcome -> guest name -> home. This is the launch point
+# for the device-only journeys the Expo Go suite cannot cover (external
+# Google/email auth, real photo picking, backgrounding, sign-out/deletion) —
+# add them beside this flow as flows-prod/*.yaml.
+#
+# Guest sign-in is Turnstile-gated in production: on a high-risk device the
+# widget may need a challenge before "Continue as guest" succeeds.
+- runFlow: _launch.yaml
+- tapOn:
+    text: "Use as guest"
+    retryTapIfNoChange: true
+- tapOn:
+    id: guest-name
+- inputText: "E2E Device"
+- tapOn:
+    text: "Continue as guest"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Create a fridge"
+    timeout: 60000

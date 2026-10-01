@@ -107,7 +107,7 @@ the last two entries can't both recompute `keep_until` from stale state.
 ### Photo uploads
 | Function | Access | Notes |
 |---|---|---|
-| `start_photo_upload(p_board_id, p_item_id)` → path | member | issues a one-time intent path; 20 intents/hour/account, ≤20 pending/user, ≤500 live photos/board, 1 GB/account |
+| `start_photo_upload(p_board_id, p_item_id)` → path | member | issues a one-time intent path; 20 intents/hour/account, ≤20 pending/user, ≤500 live photos/board, 256 MB/account |
 
 Every photo upload is bound to a server-issued intent and the bytes go
 through the `upload-photo` Edge Function — never a direct storage write (the

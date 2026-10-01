@@ -71,17 +71,42 @@ const jHtml = `<!doctype html>
   <body>
     <main>
       <h1>You’re invited</h1>
-      <p>Open this invite in the Fridge Board app.</p>
-      <a class="btn" id="open" href="#">Open in the app</a>
+      <p id="lead">Open this invite in the Fridge Board app.</p>
+      <a class="btn" id="open" href="#" style="display:none">Open in the app</a>
       <a class="secondary" href="https://apps.apple.com/app/id${APP_STORE_ID}">Get it on the App Store</a>
       <a class="secondary" href="https://play.google.com/store/apps/details?id=${ANDROID_PACKAGE}">Get it on Google Play</a>
     </main>
     <script>
-      var parts = window.location.pathname.split('/').filter(Boolean);
-      var token = parts[parts.length - 1] || '';
-      var deepLink = 'fridgeboard://j/' + encodeURIComponent(token);
-      document.getElementById('open').href = deepLink;
-      window.location.replace(deepLink);
+      (function () {
+        // Read the token from …/j/<token>. Never take the bare route segment:
+        // if a redirect ever strips the token, parts is just ['j'] and the old
+        // code built a bogus fridgeboard://j/j. Fall back to ?t=/?token= so a
+        // query-preserving host still works.
+        function tokenFromLocation() {
+          var parts = window.location.pathname.split('/').filter(Boolean);
+          for (var i = 0; i < parts.length - 1; i++) {
+            if (parts[i] === 'j') return parts[i + 1];
+          }
+          var params = new URLSearchParams(window.location.search);
+          return params.get('t') || params.get('token') || '';
+        }
+
+        var token = tokenFromLocation();
+        var lead = document.getElementById('lead');
+        var open = document.getElementById('open');
+
+        // Invite tokens are opaque but never 1–5 chars; reject the empty or
+        // truncated case instead of routing to a broken invite.
+        if (!/^[A-Za-z0-9_-]{6,}$/.test(token)) {
+          lead.textContent = 'This invite link isn’t working. Ask for a fresh link.';
+          return;
+        }
+
+        var deepLink = 'fridgeboard://j/' + encodeURIComponent(token);
+        open.href = deepLink;
+        open.style.display = 'inline-block';
+        window.location.replace(deepLink);
+      })();
     </script>
   </body>
 </html>
@@ -96,7 +121,14 @@ writeFileSync(join(out, 'j.html'), jHtml);
 // Cloudflare, not Vercel): rewrite /j/<token> to j.html and keep the link
 // routes + association files tuned. The noindex is scoped to /j/* only, so a
 // marketing site sharing the domain stays indexable.
-writeFileSync(join(out, '_redirects'), '/j/*  /j.html  200\n');
+// Must be a 200 rewrite (serve j.html at the original URL), never a 30x: a
+// redirect to /j would drop the token and break cold-start joining.
+writeFileSync(
+  join(out, '_redirects'),
+  '# Invite links: rewrite, never redirect (a 30x drops the token).\n' +
+    '/j      /j.html  200\n' +
+    '/j/*    /j.html  200\n',
+);
 writeFileSync(
   join(out, '_headers'),
   '/.well-known/*\n' +
@@ -161,7 +193,7 @@ const privacyBody = `
 <ul>
 <li>Notes leave after a week, photos after two weeks, dates the day after the event, lists two days after everything is ticked. Pinned posts stay until unpinned.</li>
 <li>Removed posts stay restorable for 30 days, then are permanently deleted with their photos.</li>
-<li>Orphaned uploads (photos never attached to a post) are deleted within 24 hours.</li>
+<li>Orphaned uploads (photos never attached to a post) are deleted within 48 hours.</li>
 </ul>
 <h2>Deleting your account</h2>
 <p>Delete your account any time from the app (You → Delete account). Signing out as a guest also deletes the guest account. Shared boards keep your posts, shown as “Former member”; fridges where you were the only person are removed. Guest accounts lost through uninstall or device loss are deleted after 90 days of inactivity (30 days if they never joined a board).</p>

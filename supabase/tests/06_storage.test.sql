@@ -82,11 +82,13 @@ select throws_ok(
     values ('board-photos', 'b0000000-0000-0000-0000-000000000051/i2/spoof.jpg',
             'a0000000-0000-0000-0000-000000000053')$$,
   '42501', null, 'cannot spoof the object owner');
-select lives_ok(
+-- Avatar uploads are never shipped, so no client role may write the bucket
+-- (the client write policies were dropped in 20260930000016).
+select throws_ok(
   $$insert into storage.objects (bucket_id, name, owner)
     values ('avatars', 'a0000000-0000-0000-0000-000000000051/new.jpg',
             'a0000000-0000-0000-0000-000000000051')$$,
-  'owner writes own avatar');
+  '42501', null, 'client avatar writes are disabled');
 select throws_ok(
   $$insert into storage.objects (bucket_id, name, owner)
     values ('avatars', 'a0000000-0000-0000-0000-000000000052/x.jpg',

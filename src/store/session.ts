@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { KeychainError, LargeSecureStore } from '../lib/secureStore';
 import { forgetBoard } from '../lib/lastBoard';
+import { resetAllBoardStores } from '../lib/boardStores';
 import {
   ApiError,
   deleteAccount as apiDeleteAccount,
@@ -342,6 +343,8 @@ export const useSession = create<SessionState>((set) => ({
       // (rather than silently mint a new user).
       await clearMarker();
       await forgetBoard();
+      // Drop every cached board store so the next account starts clean.
+      resetAllBoardStores();
       set({ user: null, status: 'loading', error: null, markerAnon: null });
     } finally {
       // Always clear the flag — if it stayed set, the next real sign-out would
@@ -361,6 +364,7 @@ export const useSession = create<SessionState>((set) => ({
       await supabase.auth.signOut({ scope: 'local' });
       await clearMarker();
       await forgetBoard();
+      resetAllBoardStores();
       await useSession.getState().init();
     } finally {
       intentionalSignOut = false;
@@ -374,6 +378,7 @@ export const useSession = create<SessionState>((set) => ({
       // The account is gone: clear the marker so init() starts a fresh identity.
       await clearMarker();
       await forgetBoard();
+      resetAllBoardStores();
     } finally {
       intentionalSignOut = false;
     }
@@ -405,6 +410,9 @@ supabase.auth.onAuthStateChange((event, session) => {
     return;
   }
   if (event === 'SIGNED_OUT') {
+    // Never let a cached board survive a session ending, even one we didn't
+    // initiate (a failed refresh).
+    resetAllBoardStores();
     if (intentionalSignOut) {
       intentionalSignOut = false;
       return;

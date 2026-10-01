@@ -35,6 +35,30 @@ type Props = {
 /** How long a note must be held before it can be picked up and dragged. */
 const LIFT_MS = 260;
 
+/** Screen-reader description for a board note, so a note is a labelled,
+ *  activatable element rather than an unlabelled gesture target. */
+function noteAccessibilityLabel(item: ItemWithAuthor, entries: ListEntry[]): string {
+  switch (item.type) {
+    case 'note': {
+      const body = (item.body ?? '').trim();
+      const short = body.length > 80 ? `${body.slice(0, 80)}…` : body;
+      return item.author?.displayName
+        ? `Note by ${item.author.displayName}: ${short}`
+        : `Note: ${short}`;
+    }
+    case 'list': {
+      const done = entries.filter((e) => e.checkedAt).length;
+      return `List: ${item.title ?? 'Untitled'}, ${done} of ${entries.length} done`;
+    }
+    case 'date':
+      return `Date: ${item.title ?? 'Untitled'}`;
+    case 'photo':
+      return item.body ? `Photo: ${item.body}` : 'Photo';
+    default:
+      return 'Post';
+  }
+}
+
 /**
  * A pinned paper. A quick tap opens it; holding picks it up and drags it,
  * reporting the drop point so the board can persist the new spot. List rows
@@ -196,7 +220,17 @@ export function BoardNote({
       onLayout={(e) => onMeasure?.(item.id, e.nativeEvent.layout.height)}
     >
       <GestureDetector gesture={gesture}>
-        <Animated.View>
+        <Animated.View
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel={noteAccessibilityLabel(item, entries)}
+          accessibilityHint="Opens the post"
+          accessibilityActions={[{ name: 'activate', label: 'Open post' }]}
+          onAccessibilityAction={(e) => {
+            if (e.nativeEvent.actionName === 'activate') onPress(item);
+          }}
+          onAccessibilityTap={() => onPress(item)}
+        >
           <NotePaper
             item={item}
             minHeight={minHeight}

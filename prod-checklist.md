@@ -21,11 +21,16 @@
   ships the fix in a CJS-compatible release.
 
 ## 2. Device tests on a production build, not Expo Go:
-- Apple and Google linking, and signing in on a second phone
-- the magic link on a phone that already has a session
+Start from `npm run build:prod` (signed IPA + AAB) and run the device suite:
+`npm run test:e2e:prod` (`.maestro/flows-prod/`, appId `com.fridgeboard.app`).
+Cover at least:
+- Google linking, email sign-in (6-digit code), and signing in on a second phone
+  (Apple is deferred this release — buttons + entitlement removed)
+- real photo picking through the system picker (permission dialog + library),
+  then the upload landing on the board
 - Turnstile
-- invite and board links on a cold start
-- relaunching with the phone locked
+- invite and board links on a cold start, both platforms
+- backgrounding / relaunching with the phone locked
 - deleting an account
 - guest sign-out (deletes the guest account — confirm the boards are gone and
   no error toast appears)
@@ -45,14 +50,18 @@
 - a check of `http_failures()` the next day to confirm the nightly jobs ran
 - photo uploads go through the `upload-photo` Edge Function (server-side
   decode, non-image rejection, 2048px downsize, JPEG re-encode stripping
-  EXIF/GPS; quotas 20 intents/hour/account, 1 GB/account). It deploys with
+  EXIF/GPS; quotas 20 intents/hour/account, 256 MB/account). It deploys with
   the other functions in deploy.yml; local dev needs `supabase functions
   serve` running or photo posts fail with a network error.
 
 ## 4. Store requirements:
 - Store builds run through `eas.json` (`development` for a dev client,
-  `preview` for internal device testing, `production` for the release build:
-  `eas build --profile production`). Set the four public env vars
+  `preview` for internal device testing, `production` for the release build).
+  Run `npm run build:prod` (signed IPA + AAB, `eas build --platform all
+  --profile production`; `build:prod:ios` / `build:prod:android` for one
+  platform) and `npm run submit:prod` (`eas submit --platform all`). The
+  production profile pins `ios.buildConfiguration: Release` and
+  `android.buildType: app-bundle` with remote credentials. Set the four public env vars
   (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`,
   `EXPO_PUBLIC_INVITE_BASE_URL`, `EXPO_PUBLIC_TURNSTILE_SITE_KEY`) as EAS
   project environment variables for the production profile — a production

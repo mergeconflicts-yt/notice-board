@@ -98,7 +98,6 @@ export function Welcome({ inviteToken }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<InvitePreview | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
-  const [inviteCap, setInviteCap] = useState<string | null>(null);
   const [guestName, setGuestName] = useState('');
   const [guestCap, setGuestCap] = useState<string | null>(null);
   const isInvite = Boolean(inviteToken);
@@ -219,17 +218,6 @@ export function Welcome({ inviteToken }: Props) {
 
   const accountButtons = (
     <View style={styles.roundRow}>
-      {Platform.OS === 'ios' ? (
-        <Pressable
-          style={[styles.round, styles.leafBtn]}
-          onPress={() => void runAuthed(() => continueWithProvider('apple'))}
-          disabled={busy}
-          accessibilityRole="button"
-          accessibilityLabel="Continue with Apple"
-        >
-          <MaterialCommunityIcons name="apple" size={22} color={colors.pine} />
-        </Pressable>
-      ) : null}
       <Pressable
         style={[styles.round, styles.leafBtn]}
         onPress={() => void runAuthed(() => continueWithProvider('google'))}
@@ -253,15 +241,6 @@ export function Welcome({ inviteToken }: Props) {
 
   const roundAccounts = (
     <View style={styles.roundRow}>
-      {Platform.OS === 'ios' ? (
-        <Pressable
-          style={[styles.round, styles.leafBtn]}
-          onPress={() => void runAuthed(() => continueWithProvider('apple'))}
-          disabled={busy}
-        >
-          <MaterialCommunityIcons name="apple" size={22} color={colors.pine} />
-        </Pressable>
-      ) : null}
       <Pressable
         style={[styles.round, styles.leafBtn]}
         onPress={() => void runAuthed(() => continueWithProvider('google'))}
@@ -285,28 +264,15 @@ export function Welcome({ inviteToken }: Props) {
       <SafeAreaView style={styles.safe}>
         <View style={styles.body}>
           {header}
+          {/* Name is collected on the guest step (same as the non-invite
+              path), so a cold-start invite never joins as "Someone". */}
           <Button
             label="Join as guest"
             variant="accent"
-            onPress={() => {
-              if (turnstileSiteKey && !inviteCap) {
-                setError('Complete the human check first.');
-                return;
-              }
-              void runAuthed(() => continueAsGuest(inviteCap ?? undefined));
-            }}
+            onPress={() => setStep('guest')}
             disabled={busy}
             style={styles.joinBig}
           />
-          {turnstileSiteKey ? (
-            <View style={styles.captcha}>
-              <Turnstile
-                siteKey={turnstileSiteKey}
-                onToken={setInviteCap}
-                onError={() => setInviteCap(null)}
-              />
-            </View>
-          ) : null}
           <Text style={styles.or}>or join with an account</Text>
           {roundAccounts}
           <Text style={styles.helper}>You’ll see the fridge after you join.</Text>
@@ -376,6 +342,9 @@ export function Welcome({ inviteToken }: Props) {
               disabled={busy || !guestName.trim()}
               style={styles.primaryGap}
             />
+            {error || joinError ? (
+              <Text style={styles.error}>{error ?? joinError}</Text>
+            ) : null}
             <Pressable onPress={() => setStep('options')} hitSlop={8} style={styles.backLink}>
               <Text style={styles.backText}>Go back</Text>
             </Pressable>

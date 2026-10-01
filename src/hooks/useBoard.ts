@@ -30,6 +30,7 @@ import {
 } from '../lib/api';
 import { useToast } from '../store/toast';
 import { useSession } from '../store/session';
+import { createBoardStoreRegistry, registerBoardStoreReset } from '../lib/boardStores';
 import { Board, BoardMember, ItemWithAuthor, ListEntry } from '../types';
 
 export function randomId(): string {
@@ -84,6 +85,24 @@ function mapRealtimeEntry(row: Record<string, unknown>): ListEntry {
     updatedAt: (row.updated_at as string) ?? (row.created_at as string),
   };
 }
+
+/** A failed read that means the caller can no longer see the board. Losing
+ *  access must wipe the cached contents rather than leave the previous
+ *  account's board on screen while only showing an error. */
+function isAccessLost(e: unknown): boolean {
+  return (
+    e instanceof ApiError &&
+    (e.code === 'not_member' || e.code === 'not_authenticated' || e.code === 'not_found')
+  );
+}
+
+/** A blank store, used when a read proves access is gone. */
+const EMPTY_BOARD_STATE: {
+  board: Board | null;
+  members: BoardMember[];
+  items: ItemWithAuthor[];
+  entries: ListEntry[];
+} = { board: null, members: [], items: [], entries: [] };
 
 /** How far behind the cursor a delta read looks, in ms. `updated_at` is set
  *  when a transaction starts, so a write committing just after the cursor was
@@ -249,7 +268,15 @@ function createBoardStore(boardId: string) {
           lastSeen = advanceCursor(lastSeen, content.items, content.entries);
           loaded = true;
         } catch (e) {
-          set({ error: friendlyMessage(e) });
+          if (isAccessLost(e)) {
+            // Access is gone: drop the cache so it cannot survive into the
+            // next account, and force the next read to load from scratch.
+            loaded = false;
+            lastSeen = null;
+            set({ ...EMPTY_BOARD_STATE, error: friendlyMessage(e) });
+          } else {
+            set({ error: friendlyMessage(e) });
+          }
         } finally {
           set({ loading: false });
         }
@@ -268,8 +295,10 @@ function createBoardStore(boardId: string) {
             members: nextMembers,
             items: s.items.map((i) => resolveAuthor(i, nextMembers)),
           }));
-        } catch {
-          // Keep the current view; the next focus/reload will retry.
+        } catch (e) {
+          // Access lost: don't keep showing a board the caller can't read.
+          // Any other failure keeps the current view; focus/reload retries.
+          if (isAccessLost(e)) set(EMPTY_BOARD_STATE);
         }
       },
 
@@ -577,47 +606,26 @@ function startBoard(store: BoardStoreApi, boardId: string): () => void {
   };
 }
 
-type RegistryEntry = { store: BoardStoreApi; refs: number; stop: (() => void) | null };
-const registry = new Map<string, RegistryEntry>();
-
-function storeFor(boardId: string): BoardStoreApi {
-  let entry = registry.get(boardId);
-  if (!entry) {
-    entry = { store: createBoardStore(boardId), refs: 0, stop: null };
-    registry.set(boardId, entry);
-  }
-  return entry.store;
-}
-
-/** Register one mounted screen for a board. The first registration starts the
- *  channel/load; the returned disposer tears it down when the last unmounts.
- *  Mutates the module-level registry (not a hook value). */
-function acquire(boardId: string): () => void {
-  let entry = registry.get(boardId);
-  if (!entry) {
-    entry = { store: createBoardStore(boardId), refs: 0, stop: null };
-    registry.set(boardId, entry);
-  }
-  const current = entry;
-  current.refs += 1;
-  if (current.refs === 1 && !current.stop) current.stop = startBoard(current.store, boardId);
-  return () => {
-    current.refs -= 1;
-    if (current.refs === 0 && current.stop) {
-      current.stop();
-      current.stop = null;
-    }
-  };
-}
+const registry = createBoardStoreRegistry<BoardStoreApi>();
+// Every identity change (sign-out, account deletion, "start fresh", account
+// switch) tears these stores down, so a previous account's board cache can
+// never be shown to the next one. Errors during reset must not block sign-out.
+registerBoardStoreReset(() => registry.reset());
 
 /** Shared, per-board hook: every screen for a board uses the same store (and
  *  therefore the same channel/load), so changes propagate everywhere and undo
  *  never runs through an unmounted hook. */
 export function useBoard(boardId: string): BoardStore {
-  const store = useMemo(() => storeFor(boardId), [boardId]);
+  const store = useMemo(
+    () => registry.getOrCreate(boardId, () => createBoardStore(boardId)).store,
+    [boardId],
+  );
   const state = useStore(store);
 
-  useEffect(() => acquire(boardId), [boardId]);
+  useEffect(
+    () => registry.acquire(boardId, () => createBoardStore(boardId), startBoard),
+    [boardId],
+  );
 
   // Focus refresh keeps the member list current (board_members is not on
   // Realtime) and re-resolves authors for members who arrived late.

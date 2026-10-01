@@ -6,7 +6,10 @@
 // Candidate selection runs in SQL (inactive_anonymous_user_ids), joining
 // auth.users against board_members so it scales and sees boards joined
 // mid-run; activity includes token refreshes, not just last_sign_in_at. Each
-// id is re-checked (is_inactive_anonymous_user) immediately before deletion.
+// id is handed to cleanup_anonymous_user, which re-checks inactivity and
+// tidies the target's boards (soft-delete memberless boards, promote a
+// surviving owner, clear the avatar) before the auth user is deleted — so a
+// board can never be orphaned without members.
 import { createClient } from 'jsr:@supabase/supabase-js@2.116.0';
 import { authorized } from '../_shared/auth.ts';
 
@@ -25,13 +28,14 @@ Deno.serve(async (req: Request) => {
 
   let deleted = 0;
   for (const id of ids ?? []) {
-    // Re-check in the database right before deleting: a board joined or a
-    // session refreshed since the candidate query must win.
-    const { data: stillIdle, error: checkError } = await admin.rpc(
-      'is_inactive_anonymous_user',
+    // Tidy board state and re-check inactivity in one atomic step; false
+    // means a board was joined or a session refreshed since the candidate
+    // query, so the account must be left alone.
+    const { data: cleaned, error: cleanupError } = await admin.rpc(
+      'cleanup_anonymous_user',
       { p_id: id },
     );
-    if (checkError || stillIdle !== true) continue;
+    if (cleanupError || cleaned !== true) continue;
     const { error: delError } = await admin.auth.admin.deleteUser(id);
     if (!delError) deleted += 1;
   }

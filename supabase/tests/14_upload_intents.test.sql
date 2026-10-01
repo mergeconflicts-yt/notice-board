@@ -2,7 +2,7 @@
 -- O owns a board; M is a co-member; S is a stranger.
 -- Only the upload-photo Edge Function (service role) writes bytes; the
 -- storage policy admits no client uploads. Quotas: 20 intents/hour/account,
--- 20 pending per user, 500 live photos per board, 1 GB per account.
+-- 20 pending per user, 500 live photos per board, 256 MB per account.
 begin;
 select plan(22);
 
@@ -123,17 +123,17 @@ select ok(not has_function_privilege('authenticated',
 select ok(not has_function_privilege('authenticated',
   'public.purge_stale_upload_intents()', 'execute'), 'purge_stale_upload_intents is closed');
 
--- Per-account storage cap: M with 1 GB already stored cannot start another.
+-- Per-account storage cap: M already at 256 MB cannot start another.
 insert into public.photo_upload_intents (path, board_id, item_id, user_id, byte_size) values
   ('b0000000-0000-0000-0000-000000000081/c0000000-0000-0000-0000-000000000090/full.jpg',
    'b0000000-0000-0000-0000-000000000081', 'c0000000-0000-0000-0000-000000000090',
-   'a0000000-0000-0000-0000-000000000082', 1073741824);
+   'a0000000-0000-0000-0000-000000000082', 268435456);
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000082', true);
 set role authenticated;
 select throws_ok(
   $$select public.start_photo_upload('b0000000-0000-0000-0000-000000000081',
     'c0000000-0000-0000-0000-000000000091')$$,
-  'P0001', 'rate_limited', 'account at 1 GB storage cap refused');
+  'P0001', 'rate_limited', 'account at 256 MB storage cap refused');
 reset role;
 
 -- Soft-deleted photos keep counting: link M's full intent to an item, remove

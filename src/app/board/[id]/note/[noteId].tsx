@@ -228,7 +228,7 @@ export default function ItemDetailScreen() {
           <View style={{ height: belowTop }} />
         )}
 
-        <View style={styles.actionBar}>
+        <View style={[styles.actionBar, { maxWidth: screenW - 48 }]}>
           {canMarkDone ? (
             <ActionButton
               icon={done ? 'undo' : 'check-circle-outline'}
@@ -326,7 +326,7 @@ function ActionButton({
       testID={testID}
     >
       <View style={[styles.actionIconWrap, active && styles.actionIconActive]}>
-        <MaterialCommunityIcons name={icon} size={22} color={tint} />
+        <MaterialCommunityIcons name={icon} size={20} color={tint} />
       </View>
       <Text style={[styles.actionLabel, { color: tint }]}>{label}</Text>
     </Pressable>
@@ -360,12 +360,15 @@ const styles = StyleSheet.create({
   doneChipText: { fontFamily: fonts.ui.bold, fontSize: 12, color: colors.accentDeep },
   actionBar: {
     flexDirection: 'row',
+    // Wrap to a second centered row rather than clipping when five buttons
+    // don't fit a 360/375dp screen.
+    flexWrap: 'wrap',
     alignItems: 'stretch',
     justifyContent: 'center',
     gap: 2,
     marginTop: 12,
     marginHorizontal: 24,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 6,
     borderRadius: 20,
     backgroundColor: colors.overlay,
@@ -373,10 +376,21 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     boxShadow: '0 8px 20px -8px rgba(20,30,25,0.35)',
   },
-  actionBtn: { alignItems: 'center', justifyContent: 'center', gap: 3, minWidth: 62, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 14 },
-  actionIconWrap: { alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 20, backgroundColor: colors.accentWash },
+  actionBtn: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 54,
+    minWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: 14,
+  },
+  actionIconWrap: { alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 18, backgroundColor: colors.accentWash },
   actionIconActive: { backgroundColor: colors.selected },
-  actionLabel: { fontFamily: fonts.ui.bold, fontSize: 11 },
+  actionLabel: { fontFamily: fonts.ui.bold, fontSize: 10 },
   actionBtnBusy: { opacity: 0.6 },
   goneTitle: { fontFamily: fonts.hand.bold, fontSize: 30, color: colors.ink },
   goneSub: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.inkSoft, marginTop: 6 },

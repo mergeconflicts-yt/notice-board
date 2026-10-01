@@ -1,0 +1,15 @@
+# Production-build Maestro workspace. Targets the signed app
+# (com.fridgeboard.app) on a real device or device farm — NOT Expo Go.
+#
+# Run:  npm run test:e2e:prod
+#       (maestro test --config .maestro/config.prod.yaml .maestro/flows-prod)
+#
+# Flows in flows-prod/ must not `openLink exp://` or dismiss an Expo dev menu;
+# they launch the installed production app directly. See README.md.
+appId: com.fridgeboard.app
+
+platform:
+  ios:
+    disableAnimations: true
+  android:
+    disableAnimations: true

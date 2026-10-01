@@ -99,7 +99,7 @@ It is rebuilt in `..._item_position` so its expanded columns also carry
 | Bucket | Visibility | Access |
 |---|---|---|
 | `board-photos` | private | path `<board_id>/<item_id>/<uuid>.jpg`; read = board member; insert = board member **and** `owner = auth.uid()`; no update/delete |
-| `avatars` | private | path `<user_id>/<uuid>.jpg`; read = self or someone sharing a board; write = self |
+| `avatars` | private | path `<user_id>/<uuid>.jpg`; read = self or someone sharing a board; no client writes (write policies dropped — uploads unused) |
 
 Photo bytes are resized/re-encoded client-side (stripping EXIF) before upload.
 Display uses 24h signed URLs (re-signed every 12h / on foreground, so images

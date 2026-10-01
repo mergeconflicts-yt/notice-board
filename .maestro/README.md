@@ -25,6 +25,22 @@ maestro test .maestro/flows/note.yaml   # one flow
 `flows/` holds the suites; `helpers/` (`_`-prefixed) holds shared
 setup/teardown and never runs standalone.
 
+## Production builds (real device / device farm)
+
+The suite above runs in **Expo Go**. A real release needs the signed app
+(`com.fridgeboard.app`), a different launch (`launchApp`, no `exp://`, no dev
+menu), and real external auth/photo flows. That lives in `flows-prod/`:
+
+```bash
+npm run test:e2e:prod   # maestro --config .maestro/config.prod.yaml .maestro/flows-prod
+```
+
+`flows-prod/` currently has `_launch.yaml` (signed-build launch) and
+`smoke.yaml` (Welcome → guest → home). Add the device-only journeys — external
+Google/email auth, real photo picking, backgrounding, sign-out/account deletion
+— beside them. Maestro flow headers cannot read env vars, so `appId` is fixed
+per directory: keep Expo Go flows in `flows/` and prod flows in `flows-prod/`.
+
 ## What is covered
 
 | Flow | Journey |
@@ -44,13 +60,16 @@ setup/teardown and never runs standalone.
   permission alert and library grid have no stable selectors. The composer UI
   is locked by `photo-composer`; the server upload path was verified
   end-to-end during development.
-- **Apple/Google/email sign-in** (human/captcha gated) stays manual — guest
-  signup stands in for auth in every flow.
+- **Google/email sign-in** (human/captcha gated) stays manual — guest signup
+  stands in for auth in every flow. Apple is not shipped this release (no
+  Apple Developer account; buttons + entitlement removed).
 - `join-invite` leaves the owner's emptied board behind (the joiner leaves,
   only owners can delete). Local nightly cleanup jobs remove the debris;
   reruns are unaffected since every flow uses fixed names on fresh guests.
-- Flows target iOS Simulator + Expo Go. EAS device-farm runs
-  (`eas build` + Maestro cloud) are a future step, not wired here.
+- `flows/` targets iOS Simulator + Expo Go. For signed builds use `flows-prod/`
+  (`npm run test:e2e:prod`); EAS device-farm/cloud wiring is still a future
+  step — build the IPA/AAB first (`npm run build:prod`), then run the prod
+  flows on a device or upload them to Maestro cloud.
 
 ## Selectors
 

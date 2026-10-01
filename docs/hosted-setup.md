@@ -34,7 +34,7 @@ Repeat per hosted project (`Fridge-Board-dev` first, then the prod twin).
 - [x] SMTP via Resend (key + subdomain + sender + 1s interval) + `{{ .Token }}` in 3 templates mirrored + Confirm email ON verified 2026-09-28.
 - [x] Turnstile CAPTCHA on (Managed, pre-clearance OFF, `fridge-board.kranehx.com`) + site key in EAS env (2026-09-28).
 - [x] Google OAuth: Web ID/secret + callback in Supabase; iOS + Android clients created (EAS SHA-1) — free, no Apple account needed (2026-09-28).
-- [ ] Apple (Services ID + `.p8`) — DEFERRED: no Apple Developer account. Blocks link-site `APPLE_TEAM_ID`/`APP_STORE_ID` too.
+- [ ] Apple (Services ID + `.p8`) — DEFERRED: no Apple Developer account. Blocks link-site `APPLE_TEAM_ID`/`APP_STORE_ID` too. The Apple buttons and `ios.usesAppleSignIn` were removed from the release (Welcome/Profile/app.json) so iOS ships Google + email + guest; re-add the entitlement and provider together. Watch App Store Guideline 4.8 (Apple must be offered when Google is).
 - [x] Run Deploy workflow → `SUPABASE-Dev` green 2026-09-28 (12 migrations, 4 functions, `JOB_SECRET`, lint, verify posture all pass).
 - [x] CI manual-only (2026-09-28): `ci.yml` is `workflow_dispatch` — nothing runs on push/merge/PR; dispatch `check` + `database` from Actions only when needed.
 - [ ] Link site — PARTIAL: Cloudflare serves `website/` directly, so the invite fallback is merged into it (`website/j.html`, `website/_redirects` `/j/* → /j.html`, and link-scoped rules in `website/_headers`). Still pending Apple IDs: `.well-known/apple-app-site-association` + `.well-known/assetlinks.json` (run `web/build.mjs` and copy `.well-known/*` in once `APPLE_TEAM_ID`/`ANDROID_SHA256`/`APP_STORE_ID` exist). Interim `EXPO_PUBLIC_INVITE_BASE_URL=https://fridge-board.kranehx.com`. `web/vercel.json` is the ignored historical equivalent.
@@ -285,10 +285,13 @@ Open:
 
 ## Backend shape (what the deploy pushes)
 
-- 12 migrations (`20260925…00_init` → `…11_vintage_fridge_colors`): tables,
-  RPC-only writes, membership-scoped RLS, invites, storage policies,
-  accounts, pg_cron/pg_net jobs, realtime, service-role hardening, extra
-  fridge colours. Migration history on hosted is empty — first push is clean.
+- Hosted history records the first 12 migrations (`20260925…00_init` →
+  `…11_vintage_fridge_colors`); the repo now also carries `…12_vintage_pastels`,
+  `…13–15_keep_cycle*`, `…16_storage_abuse_limits` (avatar write policies
+  dropped, 256 MB/account photo cap) and `…17_service_cleanup_accounts`
+  (service-only `cleanup_anonymous_user`). Repo = 18 migrations; pending
+  deploy via the Deploy workflow, which pushes all additive migrations before
+  redeploying the functions (so the RPC exists before `cleanup-users` calls it).
 - 4 Edge Functions: `delete-account` (`verify_jwt = true`, admin deletes the
   auth user), `upload-photo` (`verify_jwt = true`, sole writer of
   `board-photos` bytes), `purge` + `cleanup-users` (`verify_jwt = false`,
