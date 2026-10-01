@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, usePathname } from 'expo-router';
-import { colors, fonts, noteColors, fastenerColors } from '../theme';
+import { colors, fonts } from '../theme';
 import { Button } from '../components/Button';
 import { IdentitySheet } from '../components/IdentitySheet';
 import { useSession } from '../store/session';
@@ -13,17 +13,6 @@ import { forgetBoard, recallBoard } from '../lib/lastBoard';
 // Restore the last board only once per app launch: doing it on every mount of
 // home would trap the user (pressing Back would bounce straight back in).
 let restoredThisLaunch = false;
-
-type Deco = { text: string; color: keyof typeof noteColors; top: string; left: string; rotate: string; size: number };
-
-const DECOS: Deco[] = [
-  // Stationery collage, not stickers: paper notes overlapping like the
-  // reference — paint order is array order (last on top).
-  { text: 'Dentist — Thu\n10:30', color: 'sky', top: '0%', left: '4%', rotate: '-5deg', size: 15 },
-  { text: 'Dinner is in\nthe fridge', color: 'butter', top: '8%', left: '48%', rotate: '6deg', size: 15 },
-  { text: 'Milk · Bread\nCoffee', color: 'paper', top: '34%', left: '60%', rotate: '4deg', size: 14 },
-  { text: 'Grandma visits\nSaturday', color: 'blush', top: '40%', left: '16%', rotate: '-3deg', size: 15 },
-];
 
 export default function StartScreen() {
   const user = useSession((s) => s.user);
@@ -114,29 +103,6 @@ export default function StartScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scroll} bounces={false}>
         <View style={styles.hero}>
-          {DECOS.map((d, i) => (
-            <View
-              key={d.text}
-              style={[
-                styles.deco,
-                {
-                  backgroundColor: noteColors[d.color].bg,
-                  borderColor: noteColors[d.color].edge,
-                  top: d.top as `${number}%`,
-                  left: d.left as `${number}%`,
-                  transform: [{ rotate: d.rotate }],
-                },
-              ]}
-            >
-              <View
-                style={[styles.decoMagnet, { backgroundColor: fastenerColors.magnets[i % fastenerColors.magnets.length] }]}
-              />
-              <Text style={[styles.decoText, { fontSize: d.size, color: noteColors[d.color].ink }]}>
-                {d.text}
-              </Text>
-            </View>
-          ))}
-
           <View style={styles.heroTextWrap}>
             <Text style={styles.kicker}>Fridge Board</Text>
             <Text style={styles.headline}>A fridge for{'\n'}your people.</Text>
@@ -209,29 +175,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.pine },
   scroll: { flexGrow: 1, justifyContent: 'space-between', paddingHorizontal: 24 },
   hero: { flex: 1, justifyContent: 'center', paddingVertical: 40 },
-  deco: {
-    position: 'absolute',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    shadowColor: colors.pineDeep,
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
-  },
-  decoMagnet: {
-    position: 'absolute',
-    top: -7,
-    left: '50%',
-    marginLeft: -7,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-  },
-  decoText: { fontFamily: fonts.hand.semibold, textAlign: 'center', lineHeight: 20 },
-  heroTextWrap: { paddingHorizontal: 4 },
+  heroTextWrap: { paddingHorizontal: 4, paddingTop: 48 },
   kicker: {
     fontFamily: fonts.ui.bold,
     fontSize: 13,

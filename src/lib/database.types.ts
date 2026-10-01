@@ -704,6 +704,7 @@ export type Database = {
       }
       invite_key: { Args: never; Returns: string }
       is_member: { Args: { p_board: string }; Returns: boolean }
+      keep_cycle: { Args: { p_id: string }; Returns: undefined }
       keep_longer: { Args: { p_id: string }; Returns: undefined }
       leave_board: { Args: { p_board_id: string }; Returns: undefined }
       list_removed_items: {

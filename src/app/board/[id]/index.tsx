@@ -288,9 +288,9 @@ export default function BoardScreen() {
         pinned: draft.pinned,
         entries: draft.type === 'list' ? draft.entries : undefined,
       });
-      // Extra keep time the composer asked for: one keep_longer call per +7d.
+      // Extra keep time the composer asked for: one Keep application per +7d.
       // Pinned and list posts are excluded — the server keeps pinned items
-      // forever and rejects keep_longer for lists.
+      // forever and rejects Keep for lists.
       if (draft.keepExtra > 0 && !draft.pinned && draft.type !== 'list') {
         for (let i = 0; i < draft.keepExtra; i++) {
           try {

@@ -50,6 +50,7 @@ export function DateTimePopup({
 }: Props) {
   const tint = doorTints[doorColor];
   const shadeInk = onTint(tint.shade);
+  const tintInk = onTint(tint.light);
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.wrap}>
@@ -70,9 +71,9 @@ export function DateTimePopup({
                   <MaterialCommunityIcons
                     name={m === 'date' ? 'calendar-month-outline' : 'clock-outline'}
                     size={18}
-                    color={active ? shadeInk : colors.ink}
+                    color={active ? shadeInk : tintInk}
                   />
-                  <Text style={[styles.tabText, active && { color: shadeInk }]}>
+                  <Text style={[styles.tabText, { color: active ? shadeInk : tintInk }]}>
                     {m === 'date' ? 'Date' : 'Time'}
                   </Text>
                 </Pressable>
@@ -168,7 +169,7 @@ function DateGrid({
                 key={`day-${day}`}
                 disabled={disabled}
                 onPress={() => pickDay(day)}
-                style={[styles.day, selected && { backgroundColor: tint.shade }]}
+                style={styles.day}
               accessibilityRole="button"
               accessibilityLabel={date.toLocaleDateString(undefined, {
                 weekday: 'long',
@@ -177,18 +178,20 @@ function DateGrid({
               })}
               accessibilityState={{ selected, disabled }}
             >
-              <Text
-                style={[
-                  styles.dayText,
-                  { color: ink },
-                  disabled && styles.dayTextDisabled,
-                  disabled && { color: soft },
-                  selected && { color: shadeInk },
-                  !selected && isToday && styles.dayTextToday,
-                ]}
-              >
-                {day}
-              </Text>
+              <View style={[styles.dayCircle, selected && { backgroundColor: tint.shade }]}>
+                <Text
+                  style={[
+                    styles.dayText,
+                    { color: ink },
+                    disabled && styles.dayTextDisabled,
+                    disabled && { color: soft },
+                    selected && { color: shadeInk },
+                    !selected && isToday && { color: ink, fontFamily: fonts.ui.bold },
+                  ]}
+                >
+                  {day}
+                </Text>
+              </View>
             </Pressable>
           );
         })}
@@ -205,7 +208,7 @@ function DateGrid({
         accessibilityRole="button"
         accessibilityLabel="Jump to today"
       >
-        <Text style={styles.todayText}>Today</Text>
+        <Text style={[styles.todayText, { color: ink }]}>Today</Text>
       </Pressable>
     </View>
   );
@@ -227,6 +230,7 @@ function TimeWheels({
   const [period, setPeriod] = useState<'AM' | 'PM'>(() => (value.getHours() < 12 ? 'AM' : 'PM'));
   const tint = doorTints[doorColor];
   const shadeInk = onTint(tint.shade);
+  const tintInk = onTint(tint.light);
 
   const hours = useMemo(() => Array.from({ length: 12 }, (_, i) => i + 1), []);
   const minutes = useMemo(() => Array.from({ length: 60 }, (_, i) => i), []);
@@ -268,7 +272,7 @@ function TimeWheels({
               accessibilityState={{ selected: period === p }}
               accessibilityLabel={p}
             >
-              <Text style={[styles.periodText, period === p && { color: shadeInk }]}>{p}</Text>
+              <Text style={[styles.periodText, { color: period === p ? shadeInk : tintInk }]}>{p}</Text>
             </Pressable>
           ))}
         </View>
@@ -325,7 +329,13 @@ function Wheel({
               accessibilityState={{ selected: active }}
               accessibilityLabel={`${label} ${format(item)}`}
             >
-              <Text style={[styles.wheelText, active && { fontFamily: fonts.ui.bold, color: shadeInk }]}>
+              <Text
+                style={[
+                  styles.wheelText,
+                  { color: soft },
+                  active && { fontFamily: fonts.ui.bold, color: shadeInk },
+                ]}
+              >
                 {format(item)}
               </Text>
             </Pressable>
@@ -369,9 +379,7 @@ const styles = StyleSheet.create({
     // Unselected tabs stay white on every door.
     backgroundColor: colors.surface,
   },
-  tabActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   tabText: { fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.ink },
-  tabTextActive: { color: colors.background },
   monthRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -393,15 +401,20 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 999,
   },
-  daySelected: { backgroundColor: colors.accent },
+  // Inset circle so the selected chip reads centered with breathing room
+  // instead of bleeding edge to edge across the grid.
+  dayCircle: {
+    width: '84%',
+    aspectRatio: 1,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   dayText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.ink },
   dayTextDisabled: { color: colors.inkFaint },
-  dayTextSelected: { color: colors.background },
-  dayTextToday: { color: colors.accentDeep },
   todayBtn: { alignSelf: 'center', paddingHorizontal: 16, paddingVertical: 10 },
-  todayText: { fontFamily: fonts.ui.bold, fontSize: 15, color: colors.accentDeep },
+  todayText: { fontFamily: fonts.ui.bold, fontSize: 15, color: colors.ink },
   wheels: { flexDirection: 'row', alignItems: 'stretch', gap: 8 },
   wheelCol: { flex: 1 },
   wheelLabel: {
@@ -413,9 +426,7 @@ const styles = StyleSheet.create({
   },
   wheel: { height: ROW_H * 5, backgroundColor: colors.surface, borderRadius: 14 },
   wheelRow: { height: ROW_H, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
-  wheelRowActive: { backgroundColor: colors.accent },
   wheelText: { fontFamily: fonts.ui.semibold, fontSize: 17, color: colors.inkSoft },
-  wheelTextActive: { fontFamily: fonts.ui.bold, color: colors.white },
   colon: {
     alignSelf: 'center',
     fontFamily: fonts.ui.bold,
@@ -435,9 +446,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     minHeight: ROW_H,
   },
-  periodBtnActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   periodText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.ink },
-  periodTextActive: { color: colors.background },
   doneBtn: {
     marginTop: 12,
     backgroundColor: colors.accent,

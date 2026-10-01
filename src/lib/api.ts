@@ -534,7 +534,10 @@ export async function setItemPosition(id: string, x: number | null, y: number | 
 }
 
 export async function keepLonger(id: string): Promise<void> {
-  const { error } = await supabase.rpc('keep_longer', { p_id: id });
+  // keep_cycle extends +7d like keep_longer, but wraps back to the type's
+  // standard lifetime once a full +7d step no longer fits under the cap,
+  // so repeated Keep taps repeat the same cycle instead of dead-ending.
+  const { error } = await supabase.rpc('keep_cycle', { p_id: id });
   if (error) raise(error);
 }
 

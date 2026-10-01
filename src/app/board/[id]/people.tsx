@@ -92,7 +92,7 @@ export default function PeopleScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScreenHeader title="People" />
+      <ScreenHeader title="People" tone="pine" />
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.list}>
           {members.map((m) => (
@@ -124,7 +124,7 @@ export default function PeopleScreen() {
                 <Text style={styles.shareText}>Share link</Text>
               </Pressable>
               <Pressable onPress={shareCode} style={styles.shareBtnGhost}>
-                <Text style={styles.shareText}>Share code</Text>
+                <Text style={styles.ghostText}>Share code</Text>
               </Pressable>
               {isOwner ? (
                 <Pressable onPress={resetLink} style={styles.shareBtnGhost}>
@@ -134,7 +134,7 @@ export default function PeopleScreen() {
             </>
           ) : (
             <Pressable onPress={loadInvite} disabled={loading} style={styles.shareBtn}>
-              {loading ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.shareText}>Get invite link</Text>}
+              {loading ? <ActivityIndicator color={colors.pine} /> : <Text style={styles.shareText}>Get invite link</Text>}
             </Pressable>
           )}
         </View>
@@ -144,27 +144,25 @@ export default function PeopleScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1, backgroundColor: colors.pine },
   body: { paddingHorizontal: 24, paddingTop: 12, paddingBottom: 32 },
   list: { gap: 6 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.pineGhost,
     borderRadius: 16,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   rowText: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
-  name: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.ink },
+  name: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.onPine },
   role: {
     fontFamily: fonts.ui.semibold,
     fontSize: 11,
-    color: colors.accentDeep,
-    backgroundColor: colors.highlight,
+    color: colors.pine,
+    backgroundColor: colors.leaf,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 999,
@@ -172,25 +170,23 @@ const styles = StyleSheet.create({
   },
   remove: { fontFamily: fonts.ui.bold, fontSize: 14, color: colors.danger },
   invite: { marginTop: 28 },
-  inviteLabel: { fontFamily: fonts.hand.bold, fontSize: 24, color: colors.ink },
-  inviteHint: { fontFamily: fonts.ui.regular, fontSize: 13, color: colors.inkSoft, marginTop: 4 },
+  inviteLabel: { fontFamily: fonts.hand.bold, fontSize: 24, color: colors.onPine },
+  inviteHint: { fontFamily: fonts.ui.regular, fontSize: 13, color: colors.onPineSoft, marginTop: 4 },
   codeCard: {
     marginTop: 14,
-    backgroundColor: colors.ink,
+    backgroundColor: colors.surface,
     borderRadius: 18,
     paddingVertical: 20,
     alignItems: 'center',
   },
-  code: { fontFamily: fonts.ui.extraBold, fontSize: 30, letterSpacing: 3, color: colors.background },
+  code: { fontFamily: fonts.ui.extraBold, fontSize: 30, letterSpacing: 3, color: colors.ink },
   shareBtn: {
     marginTop: 14,
     height: 50,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.leaf,
   },
   shareBtnGhost: {
     marginTop: 10,
@@ -199,6 +195,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  shareText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.ink },
+  shareText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.pine },
+  ghostText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.onPine },
   resetText: { fontFamily: fonts.ui.bold, fontSize: 14, color: colors.danger },
 });

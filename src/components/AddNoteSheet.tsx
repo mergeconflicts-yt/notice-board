@@ -425,9 +425,10 @@ export function AddNoteSheet({
                   </Pressable>
                 )}
                 <TextInput
-                  style={[styles.input, styles.captionInput, { backgroundColor: tint.light }]}
+                  style={[styles.input, styles.captionInput, { backgroundColor: tint.light, color: tintInk }]}
                   placeholder="Add a caption (optional)..."
-                  placeholderTextColor={colors.inkFaint}
+                  placeholderTextColor={tintInk}
+                  selectionColor={tintInk}
                   value={text}
                   onChangeText={setText}
                   multiline

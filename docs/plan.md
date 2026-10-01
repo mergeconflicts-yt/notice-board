@@ -234,6 +234,7 @@ Tokens: link token = 16 random bytes (`extensions.gen_random_bytes(16)`), base64
 | `set_pinned(id, pinned boolean)` | member | Pinned means `keep_until = NULL`. Unpinning sets the type default from now. |
 | `set_done(id, done boolean)` | member | Notes and dates only. Done sets `done_at`, `done_by`, `keep_until = now() + 2 days`. Undo clears them and restores the type default. |
 | `keep_longer(id)` | member | `keep_until = greatest(keep_until, now()) + 7 days`. Not for pinned items or lists. |
+| `keep_cycle(id)` | member | Same guards as `keep_longer`; the app calls this instead. Extends +7 days while a full step fits under the `now() + 30 days` cap, otherwise wraps back to the type default from now (far-future dates are never shortened) — repeated Keep taps repeat the same cycle. |
 | `remove_item(id)` | member | Soft delete: `deleted_at`, `deleted_by`. |
 | `restore_item(id)` | member | Only if deleted within 30 days. Clears `deleted_at`. If `keep_until` has passed, sets it to `now() + 2 days`. |
 | `list_removed_items(board_id) → setof items` | member | Soft-deleted in the last 30 days, for the board settings screen. |

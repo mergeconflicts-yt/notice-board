@@ -397,13 +397,23 @@ function createBoardStore(boardId: string) {
 
       keepLonger: async (item) => {
         // Optimistic +7d (capped at now + 30d, never shortening), mirroring
-        // the server's keep_longer math, so the new date shows instantly.
-        // A reload after reconciles the exact server timestamp.
+        // the server's keep_cycle math, so the new date shows instantly.
+        // When a full +7d step no longer fits under the cap the server wraps
+        // back to the type default (unknowable here for dates — it needs the
+        // board timezone), so keep the current date and let the reload after
+        // snap to the reset value. A reload after reconciles the exact
+        // server timestamp.
         const nowMs = Date.now();
         const curMs = item.keepUntil ? new Date(item.keepUntil).getTime() : NaN;
-        const base = Number.isNaN(curMs) ? nowMs : Math.max(curMs, nowMs);
-        const extendedMs = Math.min(base + 7 * 86400000, nowMs + 30 * 86400000);
-        const optimisticMs = Number.isNaN(curMs) ? extendedMs : Math.max(curMs, extendedMs);
+        let optimisticMs: number;
+        if (Number.isNaN(curMs)) {
+          optimisticMs = Math.min(nowMs + 7 * 86400000, nowMs + 30 * 86400000);
+        } else {
+          const base = Math.max(curMs, nowMs);
+          // The server wraps instead of extending when a full step no longer
+          // fits: hold the current date; the reload below snaps to the reset.
+          optimisticMs = base + 7 * 86400000 > nowMs + 30 * 86400000 ? curMs : base + 7 * 86400000;
+        }
         await patchItem(
           item.id,
           { keepUntil: new Date(optimisticMs).toISOString() },

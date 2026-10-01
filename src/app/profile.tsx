@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, Pressable, ScrollView, StyleSheet, Alert, Linking, Platform } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Alert, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -34,14 +34,10 @@ async function openLegal(page: 'privacy.html' | 'terms.html' | 'contact.html'): 
 
 export default function ProfileScreen() {
   const user = useSession((s) => s.user);
-  const setDisplayName = useSession((s) => s.setDisplayName);
   const signOut = useSession((s) => s.signOut);
   const deleteAccount = useSession((s) => s.deleteAccount);
   const init = useSession((s) => s.init);
   const { boards } = useMyBoards();
-  const [name, setName] = useState(user?.displayName ?? '');
-  const [editingName, setEditingName] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [savingEmail, setSavingEmail] = useState(false);
   const [account, setAccount] = useState<{ email: string | null; provider: string | null } | null>(
     null,
@@ -60,20 +56,6 @@ export default function ProfileScreen() {
       alive = false;
     };
   }, [isGuest, user?.id]);
-
-  const saveName = async () => {
-    if (!name.trim()) return;
-    setBusy(true);
-    try {
-      await setDisplayName(name.trim());
-      setEditingName(false);
-      useToast.getState().show('Name saved');
-    } catch (e) {
-      useToast.getState().show(friendlyMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const confirmConflict = () => {
     Alert.alert(
@@ -169,22 +151,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {editingName ? (
-          <View style={styles.nameRow}>
-            <TextInput
-              style={styles.input}
-              value={name}
-              onChangeText={setName}
-              placeholder="Your name"
-              placeholderTextColor={colors.inkFaint}
-              autoFocus
-            />
-            <Pressable onPress={saveName} disabled={busy || !name.trim()} style={styles.saveBtn}>
-              <Text style={styles.saveText}>Save</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
         {isGuest ? (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Save your account</Text>
@@ -224,10 +190,6 @@ export default function ProfileScreen() {
           </View>
         ) : null}
 
-        <Pressable style={styles.nameLink} onPress={() => setEditingName((v) => !v)}>
-          <Text style={styles.nameLinkText}>Your name</Text>
-        </Pressable>
-
         <Pressable style={styles.signOutRow} onPress={confirmSignOut}>
           <MaterialCommunityIcons name="logout" size={20} color={colors.onPine} />
           <Text style={styles.signOutText}>Sign out</Text>
@@ -262,28 +224,6 @@ const styles = StyleSheet.create({
   identityText: { flex: 1 },
   name: { fontFamily: fonts.ui.bold, fontSize: 22, color: colors.onPine },
   role: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.onPineSoft, marginTop: 2 },
-  nameRow: { flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 8 },
-  input: {
-    flex: 1,
-    height: 52,
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 16,
-    fontFamily: fonts.ui.semibold,
-    fontSize: 16,
-    color: colors.ink,
-  },
-  saveBtn: {
-    paddingHorizontal: 20,
-    height: 52,
-    borderRadius: 16,
-    backgroundColor: colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveText: { fontFamily: fonts.ui.bold, fontSize: 15, color: colors.background },
   card: {
     marginTop: 22,
     backgroundColor: colors.pineGhost,
@@ -311,10 +251,8 @@ const styles = StyleSheet.create({
   saveRowText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.pine },
   appleRow: { backgroundColor: colors.accent, borderColor: colors.accent },
   appleRowText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.white },
-  nameLink: { marginTop: 24, paddingVertical: 10 },
   signOutRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
   signOutText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.onPine },
-  nameLinkText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.onPine },
   dangerRow: { marginTop: 6, paddingVertical: 12 },
   dangerText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.danger },
   legalRow: {

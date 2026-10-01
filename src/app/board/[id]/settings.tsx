@@ -1,35 +1,23 @@
 import { useState } from 'react';
 import { View, Text, TextInput, ScrollView, Pressable, StyleSheet, Alert, Share } from 'react-native';
-import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { offeredBoardColors, boardColors, colors, doorInk, doorSoft, fonts } from '../../../theme';
 import { ScreenHeader } from '../../../components/ScreenHeader';
 import { Avatar } from '../../../components/Avatar';
-import { useBoard, fetchRemovedItems } from '../../../hooks/useBoard';
+import { useBoard } from '../../../hooks/useBoard';
 import { useSession } from '../../../store/session';
 import { useToast } from '../../../store/toast';
 import {
-  BlockedMember,
-  ReportedItem,
-  blockMember as apiBlockMember,
   deleteBoard as apiDeleteBoard,
-  dismissReports as apiDismissReports,
   friendlyMessage,
-  getBlocked as apiGetBlocked,
   getInviteLink,
-  getReportedItems as apiGetReportedItems,
   leaveBoard as apiLeaveBoard,
-  removeAndBlock as apiRemoveAndBlock,
-  removeItem as apiRemoveItem,
   renameBoard as apiRenameBoard,
-  restoreItem as apiRestoreItem,
-  signedPhotoUrl,
-  unblockMember as apiUnblockMember,
 } from '../../../lib/api';
 import { inviteMessage } from '../../../lib/inviteLinks';
-import { BoardColor, ItemWithAuthor } from '../../../types';
+import { BoardColor } from '../../../types';
 
 export default function BoardSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -38,10 +26,6 @@ export default function BoardSettingsScreen() {
   const user = useSession((s) => s.user);
   const [draftName, setDraftName] = useState<string | null>(null);
   const [editingName, setEditingName] = useState(false);
-  const [removed, setRemoved] = useState<ItemWithAuthor[] | null>(null);
-  const [reported, setReported] = useState<ReportedItem[] | null>(null);
-  const [reportedPhotos, setReportedPhotos] = useState<Record<string, string>>({});
-  const [blocked, setBlocked] = useState<BlockedMember[] | null>(null);
 
   const name = draftName ?? board?.name ?? '';
   const myMembership = user ? members.find((m) => m.userId === user.id) : undefined;
@@ -78,148 +62,6 @@ export default function BoardSettingsScreen() {
     } catch (e) {
       useToast.getState().show(friendlyMessage(e));
     }
-  };
-
-  const openRemoved = async () => {
-    try {
-      setRemoved(await fetchRemovedItems(boardId));
-    } catch (e) {
-      useToast.getState().show(friendlyMessage(e));
-    }
-  };
-
-  const undoRemoved = async (item: ItemWithAuthor) => {
-    try {
-      await apiRestoreItem(item.id);
-      setRemoved((prev) => (prev ? prev.filter((i) => i.id !== item.id) : prev));
-      await reload();
-    } catch (e) {
-      useToast.getState().show(friendlyMessage(e));
-    }
-  };
-
-  // Owner-only safety queue: reported posts with keep/dismiss actions, and the
-  // block list. Non-owners never see these rows (see the render below).
-  const openReported = async () => {
-    try {
-      const items = await apiGetReportedItems(boardId);
-      setReported(items);
-      // Sign photo URLs for reported photo posts (best effort; rows without
-      // a URL simply show no thumbnail).
-      const withPhotos = items.filter((i) => i.photoPath);
-      if (withPhotos.length > 0) {
-        const urls = await Promise.all(withPhotos.map((i) => signedPhotoUrl(i.photoPath!)));
-        setReportedPhotos((prev) => {
-          const next = { ...prev };
-          withPhotos.forEach((item, idx) => {
-            const url = urls[idx];
-            if (url) next[item.id] = url;
-          });
-          return next;
-        });
-      }
-    } catch (e) {
-      useToast.getState().show(friendlyMessage(e));
-    }
-  };
-
-  const keepReported = async (item: ItemWithAuthor) => {
-    try {
-      await apiDismissReports(item.id);
-      setReported((prev) => (prev ? prev.filter((i) => i.id !== item.id) : prev));
-    } catch (e) {
-      useToast.getState().show(friendlyMessage(e));
-    }
-  };
-
-  const removeReported = async (item: ItemWithAuthor) => {
-    try {
-      await apiRemoveItem(item.id);
-      await apiDismissReports(item.id);
-      setReported((prev) => (prev ? prev.filter((i) => i.id !== item.id) : prev));
-      await reload();
-    } catch (e) {
-      useToast.getState().show(friendlyMessage(e));
-    }
-  };
-
-  // Remove the post AND block its author in one atomic server call
-  // (remove_and_block): either everything succeeds or nothing changes — the
-  // post can never end up removed while the block failed, or vice versa.
-  const removeAndBlockReported = async (item: ReportedItem) => {
-    const authorId = item.createdBy;
-    const authorLabel = item.authorName ?? 'the author';
-    if (!authorId || authorId === user?.id) {
-      // No author to block (already left, or the owner's own post): just
-      // remove the post.
-      await removeReported(item);
-      return;
-    }
-    Alert.alert(
-      `Remove post and block ${authorLabel}?`,
-      'The post is removed and they leave this fridge and can’t rejoin, even with a fresh invite link.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove + Block',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await apiRemoveAndBlock(item.id);
-              setReported((prev) => (prev ? prev.filter((i) => i.id !== item.id) : prev));
-              await reload();
-              setBlocked(await apiGetBlocked(boardId));
-            } catch (e) {
-              useToast.getState().show(friendlyMessage(e));
-            }
-          },
-        },
-      ],
-    );
-  };
-
-  const openBlocked = async () => {
-    try {
-      setBlocked(await apiGetBlocked(boardId));
-    } catch (e) {
-      useToast.getState().show(friendlyMessage(e));
-    }
-  };
-
-  const confirmBlock = (userId: string, name: string) => {
-    Alert.alert(`Block ${name}?`, 'They leave this fridge and can’t rejoin, even with a fresh invite link.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Block',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await apiBlockMember(boardId, userId);
-            await reload();
-            setBlocked(await apiGetBlocked(boardId));
-          } catch (e) {
-            useToast.getState().show(friendlyMessage(e));
-          }
-        },
-      },
-    ]);
-  };
-
-  const confirmUnblock = (userId: string, name: string) => {
-    Alert.alert(`Unblock ${name}?`, 'They can join again with a fresh invite link.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Unblock',
-        onPress: async () => {
-          try {
-            await apiUnblockMember(boardId, userId);
-            setBlocked((prev) => (prev ? prev.filter((b) => b.userId !== userId) : prev));
-          } catch (e) {
-            useToast.getState().show(friendlyMessage(e));
-          }
-        },
-      },
-    ]);
   };
 
   const confirmLeave = () => {
@@ -342,133 +184,7 @@ export default function BoardSettingsScreen() {
             <Text style={styles.rowLabel}>Invite someone</Text>
             <MaterialCommunityIcons name="share-outline" size={22} color={colors.onPineSoft} />
           </Pressable>
-          <View style={styles.divider} />
-          <Pressable style={styles.row} onPress={openRemoved}>
-            <Text style={styles.rowLabel}>Removed posts</Text>
-            <Text style={styles.rowValue}>Restore ›</Text>
-          </Pressable>
         </View>
-
-        {removed ? (
-          <View style={styles.removedList}>
-            {removed.length === 0 ? (
-              <Text style={styles.rowValue}>Nothing removed in the last 30 days.</Text>
-            ) : (
-              removed.map((item) => (
-                <View key={item.id} style={styles.removedRow}>
-                  <Text style={styles.removedText} numberOfLines={1}>
-                    {item.title ?? item.body ?? 'Post'}
-                  </Text>
-                  <Pressable onPress={() => undoRemoved(item)} hitSlop={8}>
-                    <Text style={styles.restore}>Restore</Text>
-                  </Pressable>
-                </View>
-              ))
-            )}
-          </View>
-        ) : null}
-
-        {isOwner ? (
-          <>
-            <Text style={styles.sectionLabel}>Safety</Text>
-            <View style={styles.group}>
-              <Pressable style={styles.row} onPress={openReported}>
-                <Text style={styles.rowLabel}>Reported posts</Text>
-                <Text style={styles.rowValue}>Review ›</Text>
-              </Pressable>
-              <View style={styles.divider} />
-              <Pressable style={styles.row} onPress={openBlocked}>
-                <Text style={styles.rowLabel}>Blocked people</Text>
-                <Text style={styles.rowValue}>
-                  {blocked === null ? 'View ›' : `${blocked.length} blocked ›`}
-                </Text>
-              </Pressable>
-            </View>
-
-            {reported ? (
-              <View style={styles.removedList}>
-                {reported.length === 0 ? (
-                  <Text style={styles.rowValue}>No reports. Nice fridge.</Text>
-                ) : (
-                  reported.map((item) => {
-                    const photoUrl = reportedPhotos[item.id] ?? null;
-                    const subtitle = [
-                      item.authorName ?? 'Former member',
-                      `${item.reportCount} ${item.reportCount === 1 ? 'report' : 'reports'}`,
-                    ].join(' · ');
-                    return (
-                      <View key={item.id} style={styles.reportCard}>
-                        {photoUrl ? (
-                          <Image source={{ uri: photoUrl }} style={styles.reportPhoto} />
-                        ) : null}
-                        <Text style={styles.removedText} numberOfLines={2}>
-                          {item.title ?? item.body ?? 'Photo post'}
-                        </Text>
-                        <Text style={styles.reportMeta} numberOfLines={1}>
-                          {subtitle}
-                        </Text>
-                        {item.reasons.length > 0 ? (
-                          <Text style={styles.reportMeta} numberOfLines={2}>
-                            “{item.reasons.join('” · “')}”
-                          </Text>
-                        ) : null}
-                        <View style={styles.reportActions}>
-                          <Pressable onPress={() => keepReported(item)} hitSlop={8}>
-                            <Text style={styles.restore}>Keep</Text>
-                          </Pressable>
-                          <Pressable onPress={() => removeReported(item)} hitSlop={8}>
-                            <Text style={styles.dangerText}>Remove</Text>
-                          </Pressable>
-                          <Pressable onPress={() => removeAndBlockReported(item)} hitSlop={8}>
-                            <Text style={styles.dangerText}>Remove + Block</Text>
-                          </Pressable>
-                        </View>
-                      </View>
-                    );
-                  })
-                )}
-              </View>
-            ) : null}
-
-            {blocked && blocked.length > 0 ? (
-              <View style={styles.removedList}>
-                {blocked.map((b) => (
-                  <View key={b.userId} style={styles.removedRow}>
-                    <Text style={styles.removedText} numberOfLines={1}>
-                      {b.displayName}
-                    </Text>
-                    <Pressable onPress={() => confirmUnblock(b.userId, b.displayName)} hitSlop={8}>
-                      <Text style={styles.restore}>Unblock</Text>
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-
-            {members.filter((m) => m.userId !== user?.id).length > 0 ? (
-              <>
-                <Text style={styles.sectionLabel}>Block someone</Text>
-                <View style={styles.removedList}>
-                  {members
-                    .filter((m) => m.userId !== user?.id)
-                    .map((m) => (
-                      <View key={m.userId} style={styles.removedRow}>
-                        <Text style={styles.removedText} numberOfLines={1}>
-                          {m.user.displayName}
-                        </Text>
-                        <Pressable
-                          onPress={() => confirmBlock(m.userId, m.user.displayName)}
-                          hitSlop={8}
-                        >
-                          <Text style={styles.dangerText}>Block</Text>
-                        </Pressable>
-                      </View>
-                    ))}
-                </View>
-              </>
-            ) : null}
-          </>
-        ) : null}
 
         <Text style={styles.sectionLabel}>Fridge access</Text>
         <View style={styles.group}>
@@ -526,26 +242,5 @@ const styles = StyleSheet.create({
   rowValue: { fontFamily: fonts.ui.regular, fontSize: 15, color: colors.onPineSoft },
   chevron: { fontSize: 22, color: colors.onPineFaint },
   divider: { borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.onPineFaint },
-  removedList: { marginTop: 12, gap: 8 },
-  removedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.pineGhost,
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-  },
-  removedText: { flex: 1, fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.onPine },
-  restore: { fontFamily: fonts.ui.bold, fontSize: 14, color: colors.brandYellow },
-  reportActions: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 10 },
-  reportCard: {
-    backgroundColor: colors.pineGhost,
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-  },
-  reportPhoto: { width: '100%', height: 180, borderRadius: 10, marginBottom: 10 },
-  reportMeta: { fontFamily: fonts.ui.regular, fontSize: 13, color: colors.onPineSoft, marginTop: 4 },
   dangerText: { color: colors.danger },
 });
