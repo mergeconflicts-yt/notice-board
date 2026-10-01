@@ -27,7 +27,7 @@
 <meta name="twitter:image" content="https://fridge-board.kranehx.com/og.png" />
 <link rel="preload" href="fonts/nunito-400.woff2" as="font" type="font/woff2" crossorigin />
 <link rel="preload" href="fonts/caveat-600.woff2" as="font" type="font/woff2" crossorigin />
-<link rel="stylesheet" href="styles.css?v=3" />
+<link rel="stylesheet" href="styles.css?v=5" />
 </head>
 <body>
 
@@ -44,12 +44,12 @@
 
 <main id="top">
 
-  <!-- 1 · HERO: what it is, who it's for, why not a chat -->
+  <!-- 1 · HERO -->
   <section class="hero">
     <div class="hero-copy">
-      <p class="eyebrow">The family noticeboard, on every phone</p>
-      <h1 class="hand">Stop losing important stuff in the family group chat.</h1>
-      <p class="lede">Fridge Board is one shared board for your home. The Wi-Fi password, the grocery list, Saturday's dentist time &mdash; pinned where everyone can see it. No replies, no pings, nothing scrolls away.</p>
+      <p class="eyebrow">FOR FAMILIWA, ROOMMATES & TEAMS</p>
+      <h1 class="hand">Stop losing stuff in the <span class="hl">group chat.</span></h1>
+      <p class="lede">One shared board for the people you live, play or work with. <span class="hl">No replies, no pings, nothing scrolls away.</span></p>
       <div class="store-row">
         <a class="store-btn" href="https://apps.apple.com/app/id0000000000" data-placeholder="app-store" aria-label="Download on the App Store">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="11" y="18" x2="13" y="18"/></svg>
@@ -60,123 +60,124 @@
           <span><small>Get it on</small><strong>Google Play</strong></span>
         </a>
       </div>
-      <p class="guest-note"><span class="tick" aria-hidden="true">✓</span> Try it as a guest. No sign-up. <span class="guest-platforms">iPhone &amp; Android.</span></p>
+      <p class="guest-note"><span class="tick" aria-hidden="true">✓</span> Try it as a guest. No sign-up. <span class="gn-sep" aria-hidden="true">·</span> <span class="tick" aria-hidden="true">✓</span> iPhone &amp; Android. <span class="gn-sep" aria-hidden="true">·</span> <span class="tick" aria-hidden="true">✓</span> Free, no ads.</p>
     </div>
 
-    <div class="hero-board">
-      <div class="hero-visual">
-        <div class="chat-mock hero-chat" aria-hidden="true">
-          <div class="chat-head">
-            <span class="chat-avatar">❤️</span>
-            <span class="chat-name"><strong>Family</strong><small>Dad, Mom, Riya, +3</small></span>
-            <span class="unread">12</span>
-          </div>
-          <div class="chat-body">
-            <div class="msg"><small>Dad</small><p>who took my charger</p></div>
-            <div class="msg right"><p>not me</p></div>
-            <div class="msg"><small>Riya</small><p>😂😂😂</p></div>
-            <div class="msg highlight"><small>Dad</small><p>New wifi pw is sunflower22</p></div>
-            <div class="msg"><small>Mom</small><p>did anyone see my msg??</p></div>
-          </div>
+    <div class="hero-visual">
+      <div class="hero-chat-col">
+      <!-- noisy chat, its important line kept and the rest struck through -->
+      <div class="chat-mock hero-chat" aria-hidden="true">
+        <div class="chat-head">
+          <span class="chat-avatar">❤️</span>
+          <span class="chat-name"><strong>Family</strong><small>Dad, Mom, Maya, +3</small></span>
+          <span class="unread">128</span>
         </div>
-        <div class="hero-arrow" aria-hidden="true">→</div>
-        <div class="fridge-stage" id="fridgeStage">
+        <div class="chat-body">
+          <div class="msg"><small>Dad</small><p class="noise">Who took my charger</p></div>
+          <div class="msg right"><p class="noise">not me</p></div>
+          <div class="msg"><small>Maya</small><p class="noise">😂😂😂</p></div>
+          <div class="msg"><small>Mom</small><p class="keep">Dentist moved to Sat 10:30</p></div>
+          <div class="msg"><small>Maya</small><p class="noise">[sticker]</p></div>
+          <div class="msg"><small>Mom</small><p class="noise">did anyone see my msg??</p></div>
+        </div>
+      </div>
+      <p class="hand hero-pinned" aria-hidden="true">pinned on the board <span class="arrow-r">→</span></p>
+      </div>
+
+      <div class="fridge-stage" id="fridgeStage">
         <div class="fridge" id="fridge" aria-label="A fridge door with pinned notes">
-        <span class="board-tag">Jack Family</span>
-        <div class="fridge-door fridge-top">
-          <span class="handle"></span>
-          <!-- note: short body -> 33px bold hero -->
-          <div class="paper c-butter drag" style="--r:-2deg; --px:62%"><span class="pin pin-red"></span>
-            <p class="note-body note-hero">Wi-Fi: HomeNet<br />sunflower22</p>
-            <p class="meta">Dad · 2 h</p>
-          </div>
-          <!-- note: short body -> 33px bold hero -->
-          <div class="paper c-sage drag" style="--r:1.5deg; --px:41%"><span class="pin pin-teal"></span>
-            <p class="note-body note-hero">Trash: Tue &amp;<br />Fri</p>
-            <p class="meta">Mom · Yesterday</p>
-          </div>
-        </div>
-        <div class="fridge-seam"></div>
-        <div class="fridge-door fridge-bottom">
-          <span class="handle"></span>
-          <!-- list -->
-          <div class="paper c-paper drag" style="--r:-1deg; --px:55%"><span class="pin pin-blue"></span>
-            <p class="list-title">Groceries</p>
-            <ul class="entries">
-              <li class="entry done"><button type="button" aria-pressed="true"><span class="checkbox"><span class="checkmark">✓</span></span><span class="entry-text">Milk</span></button></li>
-              <li class="entry"><button type="button" aria-pressed="false"><span class="checkbox"></span><span class="entry-text">Bread</span></button></li>
-              <li class="entry done"><button type="button" aria-pressed="true"><span class="checkbox"><span class="checkmark">✓</span></span><span class="entry-text">Coffee</span></button></li>
-              <li class="entry"><button type="button" aria-pressed="false"><span class="checkbox"></span><span class="entry-text">Chicken</span></button></li>
-            </ul>
-            <p class="meta">Dad · 2 h</p>
-          </div>
-          <!-- date ticket -->
-          <div class="paper c-sky drag" style="--r:1deg; --px:48%"><span class="pin pin-yellow"></span>
-            <div class="ticket">
-              <div class="cal"><div class="cal-dow">SAT</div><div class="cal-day">26</div><div class="cal-mon">SEP</div></div>
-              <div><p class="ticket-title">Dentist</p><p class="ticket-time">10:30 AM</p></div>
+          <span class="board-tag">Jack Family</span>
+          <div class="fridge-door fridge-top">
+            <span class="handle"></span>
+            <div class="paper c-butter drag" style="--r:-2deg; --px:62%"><span class="pin pin-red"></span>
+              <p class="note-body note-hero">Wi-Fi: HomeNet<br />sunflower22</p>
+              <p class="meta">Dad · pinned</p>
             </div>
-            <p class="meta">Mom · Yesterday</p>
+            <div class="paper c-sage drag" style="--r:1.5deg; --px:41%"><span class="pin pin-teal"></span>
+              <p class="note-body note-hero">Trash: Tue &amp;<br />Fri</p>
+              <p class="meta">Mom · Yesterday</p>
+            </div>
           </div>
-          <!-- note: medium body -> 25px semibold -->
-          <div class="paper c-lavender drag" style="--r:-1.5deg; --px:58%"><span class="pin pin-red"></span>
-            <p class="note-body">Grandma visits Saturday ♥</p>
-            <p class="meta">Riya · 3 h</p>
-          </div>
-          <!-- photo: real image + heart caption -->
-          <div class="paper c-paper drag photo-card" style="--r:2deg; --px:44%"><span class="pin pin-pink"></span>
-            <div class="photo-img"><img src="img/beach.jpg" alt="Beach at sunset" loading="lazy" /></div>
-            <p class="photo-cap">Goa! ♥</p>
-            <p class="meta">Dad · 5 h</p>
+          <div class="fridge-seam"></div>
+          <div class="fridge-door fridge-bottom">
+            <span class="handle"></span>
+            <div class="paper c-paper drag" style="--r:-1deg; --px:55%"><span class="pin pin-blue"></span>
+              <p class="list-title">Groceries</p>
+              <ul class="entries">
+                <li class="entry done"><button type="button" aria-pressed="true"><span class="checkbox"><span class="checkmark">✓</span></span><span class="entry-text">Milk</span></button></li>
+                <li class="entry"><button type="button" aria-pressed="false"><span class="checkbox"></span><span class="entry-text">Bread</span></button></li>
+                <li class="entry done"><button type="button" aria-pressed="true"><span class="checkbox"><span class="checkmark">✓</span></span><span class="entry-text">Coffee</span></button></li>
+                <li class="entry"><button type="button" aria-pressed="false"><span class="checkbox"></span><span class="entry-text">Chicken</span></button></li>
+              </ul>
+              <p class="meta">Dad · 2 h</p>
+            </div>
+            <div class="paper c-sky drag" style="--r:1deg; --px:48%"><span class="pin pin-yellow"></span>
+              <div class="ticket">
+                <div class="cal"><div class="cal-dow">SAT</div><div class="cal-day">26</div><div class="cal-mon">SEP</div></div>
+                <div><p class="ticket-title">Dentist</p><p class="ticket-time">10:30 AM</p></div>
+              </div>
+              <p class="meta">Mom · just now</p>
+            </div>
+            <div class="paper c-lavender drag" style="--r:-1.5deg; --px:58%"><span class="pin pin-red"></span>
+              <p class="note-body">Grandma visits Saturday ♥</p>
+              <p class="meta">Maya · 3 h</p>
+            </div>
+            <div class="paper c-paper drag photo-card" style="--r:2deg; --px:44%"><span class="pin pin-pink"></span>
+              <div class="photo-img"><img src="img/beach.jpg" alt="Beach at sunset" loading="lazy" /></div>
+              <p class="photo-cap">Maui! ♥</p>
+              <p class="meta">Dad · 5 h</p>
+            </div>
           </div>
         </div>
+        <p class="hand scribble" aria-hidden="true"><span class="scribble-arrow">⤴</span> go on, move them</p>
       </div>
-      </div>
-      </div>
-      <p class="hand scribble" aria-hidden="true"><span class="scribble-arrow">⤴</span> go on, move them</p>
     </div>
   </section>
 
-  <!-- 2 · THE PROBLEM: buried cards + the chat-vs-note compare, one story -->
+  <!-- 2 · BURIED -->
   <div class="band band-cream">
   <section class="section" id="problem">
     <p class="eyebrow">Buried every day</p>
     <h2 class="hand section-title">Lost it in the chat again?</h2>
-    <p class="lede">The things people actually needed &mdash; drowned under hundreds of messages, stickers and "seen by 12".</p>
+    <p class="lede">The things people actually needed, drowned under hundreds of messages, stickers and "seen by 12".</p>
     <div class="buried-grid">
       <div class="buried-card">
-        <p class="buried-who">Wife · 214 messages ago</p>
+        <p class="buried-who">Mom · 214 messages ago</p>
         <p class="hand buried-text">"Pick up milk, eggs and bread on your way home."</p>
-        <p class="buried-result">You came home with… nothing. 🙈</p>
+        <p class="buried-result">You came home with… nothing. 🏠</p>
       </div>
       <div class="buried-card">
-        <p class="buried-who">Roommate · 380 messages ago</p>
-        <p class="hand buried-text">"Rent's due on the 1st. Bins go out Tuesday."</p>
-        <p class="buried-result">Late fee, and the bins missed. 🗑️</p>
+        <p class="buried-who">Roommate · 3 weeks ago</p>
+        <p class="hand buried-text">"Rent's due on the 1st. Trash goes out Tuesday."</p>
+        <p class="buried-result">Late fee, and a very full kitchen. 🗑️</p>
       </div>
       <div class="buried-card">
-        <p class="buried-who">Mom · 300 messages ago</p>
-        <p class="hand buried-text">"Dentist moved to Saturday 10:30."</p>
-        <p class="buried-result">You showed up Friday. 🦷</p>
+        <p class="buried-who">Dad · 300 messages ago</p>
+        <p class="hand buried-text">"Grandma lands Saturday at 4. Who's picking her up?"</p>
+        <p class="buried-result">Everyone thought someone else was. ✈️</p>
       </div>
     </div>
+  </section>
+  </div>
 
-    <h3 class="hand compare-title">Stop scrolling up for the Wi-Fi password.</h3>
+  <!-- 3 · THE FIX (compare) -->
+  <section class="section" id="fix">
+    <h2 class="hand section-title centered">Stop scrolling up for the Wi-Fi password.</h2>
     <div class="compare">
-      <figure class="chat-mock">
+      <figure class="chat-mock chat-mock-lg">
         <div class="chat-head">
           <span class="chat-avatar" aria-hidden="true">❤️</span>
-          <span class="chat-name"><strong>Family</strong><small>Dad, Mom, Riya, +3</small></span>
+          <span class="chat-name"><strong>Family</strong><small>Dad, Mom, Maya, +3</small></span>
           <span class="unread">128</span>
         </div>
         <div class="chat-body">
           <p class="chat-day"><span>Today</span></p>
           <div class="msg"><small>Dad</small><p>Who took my charger<span class="wmeta"><span class="wtime">10:02 AM</span><span class="wticks">✓✓</span></span></p></div>
           <div class="msg right"><p>not me<span class="wmeta"><span class="wtime">10:03 AM</span><span class="wticks">✓✓</span></span></p></div>
-          <div class="msg"><small>Riya</small><p>😂😂😂<span class="wmeta"><span class="wtime">10:04 AM</span><span class="wticks">✓✓</span></span></p></div>
+          <div class="msg"><small>Maya</small><p>😂😂😂<span class="wmeta"><span class="wtime">10:04 AM</span><span class="wticks">✓✓</span></span></p></div>
           <div class="msg"><small>Mom</small><p>Dinner at 8<span class="wmeta"><span class="wtime">10:05 AM</span><span class="wticks">✓✓</span></span></p></div>
           <div class="msg highlight"><small>Dad</small><p>New wifi pw is sunflower22<span class="wmeta"><span class="wtime">10:06 AM</span><span class="wticks">✓✓</span></span></p></div>
-          <div class="msg"><small>Riya</small><p>[sticker]<span class="wmeta"><span class="wtime">10:07 AM</span><span class="wticks">✓✓</span></span></p></div>
+          <div class="msg"><small>Maya</small><p>[sticker]<span class="wmeta"><span class="wtime">10:07 AM</span><span class="wticks">✓✓</span></span></p></div>
         </div>
         <figcaption>Found it? It scrolled away an hour ago.</figcaption>
       </figure>
@@ -186,62 +187,135 @@
           <p class="note-body note-hero">Wi-Fi: HomeNet<br />sunflower22</p>
           <p class="meta">Dad · pinned</p>
         </div>
-        <figcaption>Keep what matters here. One note. Always in the same place.</figcaption>
+        <figcaption>One note. Always in the same place.</figcaption>
       </figure>
     </div>
   </section>
-  </div>
 
-  <!-- 3 · WHAT GOES ON THE BOARD -->
+  <!-- 4 · WHAT GOES ON THE BOARD -->
   <div class="band band-white">
   <section class="section" id="features">
     <p class="eyebrow">What goes on the board</p>
-    <h2 class="hand section-title">Notes, lists, dates and photos.</h2>
-    <p class="lede">Everything people used to lose in the chat, in one place everyone can see.</p>
+    <h2 class="hand section-title">Four things. That's the whole app.</h2>
     <div class="feature-grid">
       <div class="feature-card">
-        <div class="phone"><img src="img/notes.png" alt="A pinned note on the Fridge Board app" loading="lazy" /></div>
+        <div class="app-phone">
+          <div class="app-board">
+            <span class="app-tag">Jack Family</span>
+            <span class="app-always">📍 Always here</span>
+            <div class="app-stack">
+              <div class="mini-note c-butter" style="--r:-2deg"><span class="pin pin-red"></span>
+                <p>Garage code<br />4417</p>
+                <span class="mini-meta">Dad · pinned</span>
+              </div>
+              <div class="mini-note c-blush" style="--r:1.5deg"><span class="pin pin-teal"></span>
+                <p>Maya has the car till 6</p>
+                <span class="mini-meta">Mom · 1 h</span>
+              </div>
+            </div>
+          </div>
+          <span class="add-fridge">+ Add to Fridge</span>
+        </div>
         <h3>Notes</h3>
-        <p>Short and clear. The Wi-Fi password, the door code, "back late tonight".</p>
+        <p>Door codes, the Wi-Fi password, who has the car. Short, big and easy to read at a glance.</p>
       </div>
+
       <div class="feature-card">
-        <div class="phone"><img src="img/lists.png" alt="A shared grocery list being ticked off in the Fridge Board app" loading="lazy" /></div>
+        <div class="app-phone">
+          <div class="app-board">
+            <span class="app-tag">Jack Family</span>
+            <div class="app-stack">
+              <div class="mini-list c-paper" style="--r:-1deg"><span class="pin pin-blue"></span>
+                <p class="list-title">Groceries</p>
+                <ul class="entries">
+                  <li class="entry done"><span class="checkbox"><span class="checkmark">✓</span></span><span class="entry-text">Milk</span></li>
+                  <li class="entry"><span class="checkbox"></span><span class="entry-text">Eggs</span></li>
+                  <li class="entry done"><span class="checkbox"><span class="checkmark">✓</span></span><span class="entry-text">Bread</span></li>
+                  <li class="entry"><span class="checkbox"></span><span class="entry-text">Bananas</span></li>
+                  <li class="entry"><span class="checkbox"></span><span class="entry-text">Dish soap</span></li>
+                </ul>
+                <span class="mini-meta">Mom · 2 left</span>
+              </div>
+            </div>
+          </div>
+          <span class="add-fridge">+ Add to Fridge</span>
+        </div>
         <h3>Lists</h3>
-        <p>Groceries, chores, packing. Everyone ticks things off and sees the same list.</p>
+        <p>Groceries, packing, chores. Anyone can tick things off, and everyone sees what's left.</p>
       </div>
+
       <div class="feature-card">
-        <div class="phone"><img src="img/dates.png" alt="A pinned date for the dentist in the Fridge Board app" loading="lazy" /></div>
+        <div class="app-phone">
+          <div class="app-board">
+            <span class="app-tag">Jack Family</span>
+            <div class="app-stack">
+              <div class="mini-note c-sky" style="--r:1deg"><span class="pin pin-yellow"></span>
+                <p class="mini-day">TOMORROW</p>
+                <div class="ticket">
+                  <div class="cal"><div class="cal-dow">SAT</div><div class="cal-day">26</div><div class="cal-mon">SEP</div></div>
+                  <div><p class="ticket-title">Dentist</p><p class="ticket-time">10:30 AM</p></div>
+                </div>
+                <span class="mini-meta">Mom · Yesterday</span>
+              </div>
+              <div class="mini-note c-sage" style="--r:-1.5deg"><span class="pin pin-teal"></span>
+                <div class="ticket">
+                  <div class="cal"><div class="cal-dow">SUN</div><div class="cal-day">27</div><div class="cal-mon">SEP</div></div>
+                  <div><p class="ticket-title">Soccer final</p><p class="ticket-time">2:00 PM</p></div>
+                </div>
+                <span class="mini-meta">Dad · 3 h</span>
+              </div>
+            </div>
+          </div>
+          <span class="add-fridge">+ Add to Fridge</span>
+        </div>
         <h3>Dates</h3>
-        <p>Dentist, match day, rent due. Pinned where no one can miss it.</p>
+        <p>Appointments, games and visits, shown as "Today" or "Tomorrow" so nobody has to do the math.</p>
       </div>
+
       <div class="feature-card">
-        <div class="phone"><img src="img/photos.png" alt="A pinned photo on the Fridge Board app" loading="lazy" /></div>
+        <div class="app-phone">
+          <div class="app-board">
+            <span class="app-tag">Jack Family</span>
+            <div class="app-stack">
+              <div class="mini-note mini-photo c-paper" style="--r:1.5deg"><span class="pin pin-pink"></span>
+                <span class="mini-beach" aria-hidden="true"></span>
+                <p class="mini-cap">Maui! ♥</p>
+                <span class="mini-meta">Dad · 5 h</span>
+              </div>
+            </div>
+          </div>
+          <span class="add-fridge">+ Add to Fridge</span>
+        </div>
         <h3>Photos</h3>
-        <p>Grandma's visit, the new puppy. Share a moment without opening a feed.</p>
+        <p>The vacation shot Grandma will actually see, without joining another chat.</p>
       </div>
     </div>
   </section>
   </div>
 
-  <!-- 4 · WHY IT'S NOT ANOTHER CHAT -->
+  <!-- 5 · WHY IT'S NOT ANOTHER CHAT -->
   <section class="section" id="no-noise">
     <p class="eyebrow">Why it's not another chat</p>
-    <p class="hand struck-list">
-      <span class="crossed">Replies</span>
-      <span class="crossed">Reactions</span>
-      <span class="crossed">Read receipts</span>
-      <span class="crossed">A buzz for every post</span>
-      <span class="kept">Just Notes.</span>
-      <span class="kept kept-noise">No Noise.</span>
-    </p>
-    <div class="trio">
-      <div><h3>No conversations</h3><p>No replies, threads, reactions or "seen by". You post it and you're done, so nothing turns into a debate.</p></div>
-      <div><h3>No pings for every post</h3><p>The board doesn't buzz each time someone adds a note. Look at it when you need it, like the fridge.</p></div>
-      <div><h3>Nothing gets buried</h3><p>Posts stay where they were put instead of scrolling away. Important things can be pinned to the top for good.</p></div>
+    <div class="not-chat">
+      <div class="not-chat-copy">
+        <p class="hand struck-list">
+          <span class="crossed">Replies</span><br />
+          <span class="crossed">Reactions</span><br />
+          <span class="crossed">Read receipts</span><br />
+          <span class="crossed">A buzz for every post</span><br />
+          <span class="kept">Just notes. <span class="kept-noise">No noise.</span></span>
+        </p>
+        <p class="lede">These aren't settings you have to find. The app simply doesn't have them, so the board can't turn into another chat.</p>
+      </div>
+      <div class="trio">
+        <div class="trio-card"><h3>No conversations</h3><p>No replies, threads, reactions or "seen by". You post it and you're done, so nothing turns into a debate.</p></div>
+        <div class="trio-card"><h3>No pings for every post</h3><p>The board doesn't buzz each time someone adds a note. Look at it when you need it, like the fridge.</p></div>
+        <div class="trio-card"><h3>Nothing gets buried</h3><p>Posts stay where they were put instead of scrolling away. Important things can be pinned to the top for good.</p></div>
+      </div>
     </div>
   </section>
 
-  <!-- 5 · TIDIES ITSELF -->
+  <!-- 6 · TIDIES ITSELF -->
   <div class="band band-sage">
   <section class="section tidy" id="tidy">
     <div class="tidy-copy">
@@ -249,45 +323,36 @@
       <h2 class="hand section-title">Nothing hangs around forever.</h2>
       <p class="lede">Real fridge doors fill up with notes nobody reads. Here, things leave on their own once they've done their job.</p>
       <ol class="timeline">
-        <li class="tl-step">
-          <span class="tl-dot" aria-hidden="true"></span>
-          <p class="hand tl-label">Dates</p>
-          <p class="tl-sub">leave the day after the event</p>
-        </li>
-        <li class="tl-step">
-          <span class="tl-dot" aria-hidden="true"></span>
-          <p class="hand tl-label">Lists</p>
-          <p class="tl-sub">leave two days after everything's ticked</p>
-        </li>
-        <li class="tl-step">
-          <span class="tl-dot" aria-hidden="true"></span>
-          <p class="hand tl-label">Notes</p>
-          <p class="tl-sub">leave after a week</p>
-        </li>
-        <li class="tl-step">
-          <span class="tl-dot" aria-hidden="true"></span>
-          <p class="hand tl-label">Photos</p>
-          <p class="tl-sub">leave after two weeks</p>
-        </li>
-        <li class="tl-step tl-pinned">
-          <span class="tl-dot" aria-hidden="true"></span>
-          <p class="hand tl-label">Pinned</p>
-          <p class="tl-sub">stay until you unpin them, like the Wi-Fi password</p>
-        </li>
+        <li class="tl-step"><span class="tl-dot" aria-hidden="true"></span><p class="hand tl-label">Dates</p><p class="tl-sub">the day after</p></li>
+        <li class="tl-step"><span class="tl-dot" aria-hidden="true"></span><p class="hand tl-label">Lists</p><p class="tl-sub">2 days after all ticked</p></li>
+        <li class="tl-step"><span class="tl-dot" aria-hidden="true"></span><p class="hand tl-label">Notes</p><p class="tl-sub">after a week</p></li>
+        <li class="tl-step"><span class="tl-dot" aria-hidden="true"></span><p class="hand tl-label">Photos</p><p class="tl-sub">after 2 weeks</p></li>
+        <li class="tl-step tl-pinned"><span class="tl-dot" aria-hidden="true"></span><p class="hand tl-label">Pinned</p><p class="tl-sub">until you unpin</p></li>
       </ol>
       <p class="restore">Removed something by mistake? You can bring it back for 30 days.</p>
     </div>
     <div class="tidy-board">
-      <div class="phone phone-board"><img src="img/note-detail.png" alt="A note showing when it will leave the board, with Pin, Keep and Remove options" loading="lazy" /></div>
-      <p class="hand scribble">it tells you when it goes ↑</p>
+      <div class="mini-board">
+        <div class="paper c-paper shop-list" style="--r:0deg; --px:50%">
+          <span class="pin pin-teal"></span>
+          <p class="list-title">Saturday shop</p>
+          <ul class="entries" id="shopList">
+            <li class="entry"><button type="button" aria-pressed="false"><span class="checkbox"></span><span class="entry-text">Eggs</span></button></li>
+            <li class="entry"><button type="button" aria-pressed="false"><span class="checkbox"></span><span class="entry-text">Rice</span></button></li>
+            <li class="entry"><button type="button" aria-pressed="false"><span class="checkbox"></span><span class="entry-text">Tomatoes</span></button></li>
+          </ul>
+          <p class="meta" id="shopLeft">Dad · 3 left</p>
+        </div>
+      </div>
+      <p class="hand scribble">tick them all ↑</p>
     </div>
   </section>
   </div>
 
-  <!-- 6 · HOW IT WORKS -->
+  <!-- 7 · HOW IT WORKS -->
   <section class="section" id="how-it-works">
     <p class="eyebrow">How it works</p>
-    <h2 class="hand section-title">Up and running before the kettle boils.</h2>
+    <h2 class="hand section-title">Up and running in under a minute.</h2>
     <div class="steps">
       <div class="step"><span class="num num-red">1</span><h3>Make a board</h3><p>Give it a name and a door colour. Start as a guest, or with Apple, Google or your email.</p></div>
       <div class="step"><span class="num num-yellow">2</span><h3>Send the link</h3><p>Share one invite link in your family chat. Tapping it opens the board. There's no code to type.</p></div>
@@ -295,36 +360,36 @@
     </div>
   </section>
 
-  <!-- 7 · MADE FOR -->
+  <!-- 8 · MADE FOR -->
   <div class="band band-cream">
   <section class="section">
     <p class="eyebrow">Made for</p>
     <h2 class="hand section-title">Anyone who shares a fridge. Or doesn't.</h2>
     <div class="tags">
-      <span class="tag sticky-yellow hand" style="--r:-1deg">Families</span>
-      <span class="tag sticky-sky hand" style="--r:1deg">Roommates</span>
+      <a class="tag sticky-yellow hand" style="--r:-1deg" href="families/">Families <span class="tag-arrow">→</span></a>
+      <a class="tag sticky-sky hand" style="--r:1deg" href="roommates/">Roommates <span class="tag-arrow">→</span></a>
       <span class="tag sticky-blush hand" style="--r:-1.5deg">Couples</span>
       <span class="tag sticky-mint hand" style="--r:1.5deg">Grandparents</span>
       <span class="tag sticky-lilac hand" style="--r:-1deg">Sports clubs</span>
       <span class="tag sticky-sage hand" style="--r:1deg">Small teams</span>
     </div>
-    <p class="lede">Keep one board per group, like "Home", "Flat 4B" and "Badminton Sundays", and switch between them from the board name.</p>
+    <p class="lede">Keep one board per group, like "Home", "Apt 4B" and "Sunday Pickleball", and switch between them from the board name.</p>
   </section>
   </div>
 
-  <!-- 8 · PRIVACY -->
+  <!-- 9 · PRIVACY -->
   <section class="section" id="privacy">
     <p class="eyebrow">Private by default</p>
     <h2 class="hand section-title">Your fridge door, not a social network.</h2>
     <div class="privacy-grid">
-      <div><p class="p-icon" aria-hidden="true">🔒</p><h3>Invite only</h3><p>Only people with your board's link can join, and the owner can remove anyone.</p></div>
-      <div><p class="p-icon" aria-hidden="true">🚫</p><h3>No ads</h3><p>No feeds, no followers and nothing to scroll. Just the board.</p></div>
-      <div><p class="p-icon" aria-hidden="true">🛡️</p><h3>Minimal data</h3><p>A display name, what you post, and an email only if you choose to save your account.</p></div>
-      <div><p class="p-icon" aria-hidden="true">🗑️</p><h3>Delete any time</h3><p>Delete your account from the app. Your posts stay on the board as "Former member".</p></div>
+      <div><p class="p-icon" aria-hidden="true">🔒</p><h3>Invite only</h3><p>Only people with your board's link can join. The owner can remove anyone.</p></div>
+      <div><p class="p-icon" aria-hidden="true">🚫</p><h3>No ads</h3><p>No feeds, no followers, nothing to scroll.</p></div>
+      <div><p class="p-icon" aria-hidden="true">🛡️</p><h3>Minimal data</h3><p>A display name, what you post, and an email only if you save your account.</p></div>
+      <div><p class="p-icon" aria-hidden="true">🗑️</p><h3>Delete any time</h3><p>Right from the app. <a href="privacy.html">Read the privacy policy</a>.</p></div>
     </div>
   </section>
 
-  <!-- 9 · QUESTIONS -->
+  <!-- 10 · QUESTIONS -->
   <div class="band band-white">
   <section class="section" id="questions">
     <p class="eyebrow">Questions</p>
@@ -332,7 +397,11 @@
     <div class="faq" id="faq">
       <details open>
         <summary>How is this different from WhatsApp, Google Keep or a family calendar?<span aria-hidden="true">✕</span></summary>
-        <p>Group chats are built for conversation, so the useful bit &mdash; the password, the time, the list &mdash; scrolls away under "lol" and stickers. Fridge Board has no conversation at all: just the notes, lists, dates and photos everyone needs, in one fixed place. Unlike a shared notes app, the board is built around voices and photos that expire on their own, and it notifies no one. Unlike a calendar, it's not only for events: it's the whole fridge door.</p>
+        <p>A group chat is built for talking, so the important things scroll away. Google Keep shares notes, but it isn't one place the whole household looks at. A family calendar only holds dates. Fridge Board is one shared board for notes, lists, dates and photos, with no conversation and no pings, and it clears old posts away by itself.</p>
+      </details>
+      <details>
+        <summary>Is it free?<span aria-hidden="true">+</span></summary>
+        <p>Yes. Fridge Board is free to use, with no ads and nothing to buy to keep your board working.</p>
       </details>
       <details>
         <summary>Do I need an account?<span aria-hidden="true">+</span></summary>
@@ -344,7 +413,7 @@
       </details>
       <details>
         <summary>Can people reply to a post?<span aria-hidden="true">+</span></summary>
-        <p>No &mdash; there are no replies, threads or reactions. You post it and you're done, so nothing turns into a debate.</p>
+        <p>No, there are no replies, threads or reactions. You post it and you're done, so nothing turns into a debate.</p>
       </details>
       <details>
         <summary>Will it keep sending me notifications?<span aria-hidden="true">+</span></summary>
@@ -357,10 +426,6 @@
       <details>
         <summary>Can I get something back after removing it?<span aria-hidden="true">+</span></summary>
         <p>Yes. Removed notes stay restorable for 30 days before they're gone for good.</p>
-      </details>
-      <details>
-        <summary>Does everyone need the same kind of phone?<span aria-hidden="true">+</span></summary>
-        <p>No. Fridge Board works on iPhone and Android, and everyone sees the same board right away.</p>
       </details>
     </div>
   </section>
@@ -380,13 +445,20 @@
         <span><small>Get it on</small><strong>Google Play</strong></span>
       </a>
     </div>
+    <p class="cta-note">Free <span class="gn-sep">·</span> iPhone &amp; Android <span class="gn-sep">·</span> Try it as a guest</p>
   </section>
 
 </main>
 
 <footer class="footer">
   <p>© 2026 Fridge Board</p>
-  <nav><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="contact.html">Contact</a></nav>
+  <nav>
+    <a href="families/">For families</a>
+    <a href="roommates/">For roommates</a>
+    <a href="privacy.html">Privacy</a>
+    <a href="terms.html">Terms</a>
+    <a href="contact.html">Contact</a>
+  </nav>
 </footer>
 
 <script type="application/ld+json">
@@ -417,7 +489,12 @@
         {
           "@type": "Question",
           "name": "How is this different from WhatsApp, Google Keep or a family calendar?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Group chats are built for conversation, so the useful bit scrolls away under messages and stickers. Fridge Board has no conversation at all: just the notes, lists, dates and photos everyone needs, in one fixed place." }
+          "acceptedAnswer": { "@type": "Answer", "text": "A group chat is built for talking, so the important things scroll away. Google Keep shares notes, but it isn't one place the whole household looks at. A family calendar only holds dates. Fridge Board is one shared board for notes, lists, dates and photos, with no conversation and no pings, and it clears old posts away by itself." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is it free?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Fridge Board is free to use, with no ads and nothing to buy to keep your board working." }
         },
         {
           "@type": "Question",
@@ -427,7 +504,7 @@
         {
           "@type": "Question",
           "name": "Can people reply to a post?",
-          "acceptedAnswer": { "@type": "Answer", "text": "No. There are no replies, threads or reactions. You post it and you're done, so nothing turns into a debate." }
+          "acceptedAnswer": { "@type": "Answer", "text": "No, there are no replies, threads or reactions. You post it and you're done, so nothing turns into a debate." }
         },
         {
           "@type": "Question",
@@ -443,11 +520,6 @@
           "@type": "Question",
           "name": "Can I get something back after removing it?",
           "acceptedAnswer": { "@type": "Answer", "text": "Yes. Removed notes stay restorable for 30 days before they're gone for good." }
-        },
-        {
-          "@type": "Question",
-          "name": "Does everyone need the same kind of phone?",
-          "acceptedAnswer": { "@type": "Answer", "text": "No. Fridge Board works on iPhone and Android, and everyone sees the same board right away." }
         }
       ]
     }
@@ -455,6 +527,6 @@
 }
 </script>
 
-<script src="script.js?v=3"></script>
+<script src="script.js?v=5"></script>
 </body>
 </html>

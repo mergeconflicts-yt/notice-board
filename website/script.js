@@ -120,8 +120,28 @@ document.querySelectorAll('#faq details').forEach((d) => {
 
   // Coarse pointers get a hint that matches the gesture.
   if (window.matchMedia('(pointer: coarse)').matches) {
-    document.querySelectorAll('.hero-board .scribble').forEach((s) => {
+    document.querySelectorAll('.fridge-stage .scribble').forEach((s) => {
       s.innerHTML = '<span class="scribble-arrow">⤴</span> touch &amp; hold to move them';
     });
   }
+})();
+
+// Tidy demo: tick the "Saturday shop" list; the meta line counts down.
+(() => {
+  const items = document.querySelectorAll('#shopList button');
+  const left = document.getElementById('shopLeft');
+  if (!items.length || !left) return;
+  const paint = () => {
+    const remaining = [...items].filter((b) => b.getAttribute('aria-pressed') !== 'true').length;
+    left.textContent = remaining === 0 ? 'Dad · all ticked — leaves in 2 days' : `Dad · ${remaining} left`;
+  };
+  items.forEach((b) => {
+    b.addEventListener('click', () => {
+      const on = b.getAttribute('aria-pressed') === 'true';
+      b.setAttribute('aria-pressed', String(!on));
+      b.closest('li').classList.toggle('done', !on);
+      paint();
+    });
+  });
+  paint();
 })();

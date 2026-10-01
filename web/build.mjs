@@ -1,8 +1,9 @@
-// Generates the universal-link association files, the /j landing page, and
-// the legal pages (Privacy / Terms / Contact) from environment variables, so
-// no placeholder IDs ever ship. Run at deploy time (`node build.mjs`),
-// output goes to ./public. The legal pages mirror website/{privacy,terms,
-// contact}.html — keep both copies in sync when the copy changes.
+// Generates the universal-link association files, the /j landing page, the
+// Cloudflare Pages _headers/_redirects, and the legal pages (Privacy / Terms
+// / Contact) from environment variables, so no placeholder IDs ever ship.
+// Run at deploy time (`node build.mjs`), output goes to ./public. The legal
+// pages mirror website/{privacy,terms,contact}.html — keep both copies in
+// sync when the copy changes.
 //
 // Required env:
 //   APPLE_TEAM_ID     Apple Developer team id (e.g. A1B2C3D4E5)
@@ -90,6 +91,20 @@ mkdirSync(join(out, '.well-known'), { recursive: true });
 writeFileSync(join(out, '.well-known', 'apple-app-site-association'), JSON.stringify(aasa, null, 2) + '\n');
 writeFileSync(join(out, '.well-known', 'assetlinks.json'), JSON.stringify(assetlinks, null, 2) + '\n');
 writeFileSync(join(out, 'j.html'), jHtml);
+
+// Cloudflare Pages equivalents of web/vercel.json (this output is served by
+// Cloudflare, not Vercel): rewrite /j/<token> to j.html and keep the link
+// routes + association files tuned. The noindex is scoped to /j/* only, so a
+// marketing site sharing the domain stays indexable.
+writeFileSync(join(out, '_redirects'), '/j/*  /j.html  200\n');
+writeFileSync(
+  join(out, '_headers'),
+  '/.well-known/*\n' +
+    '  Content-Type: application/json\n\n' +
+    '/j/*\n' +
+    '  X-Robots-Tag: noindex, nofollow\n' +
+    '  Referrer-Policy: no-referrer\n',
+);
 
 // Legal pages: same copy as website/{privacy,terms,contact}.html, restyled
 // for the standalone link site (no shared stylesheet here). Keep both copies

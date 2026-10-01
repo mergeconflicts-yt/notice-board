@@ -37,7 +37,7 @@ Repeat per hosted project (`Fridge-Board-dev` first, then the prod twin).
 - [ ] Apple (Services ID + `.p8`) — DEFERRED: no Apple Developer account. Blocks link-site `APPLE_TEAM_ID`/`APP_STORE_ID` too.
 - [x] Run Deploy workflow → `SUPABASE-Dev` green 2026-09-28 (12 migrations, 4 functions, `JOB_SECRET`, lint, verify posture all pass).
 - [x] CI manual-only (2026-09-28): `ci.yml` is `workflow_dispatch` — nothing runs on push/merge/PR; dispatch `check` + `database` from Actions only when needed.
-- [ ] Link site — DEFERRED (needs Apple IDs; `build.mjs` fails by design without them). Interim `EXPO_PUBLIC_INVITE_BASE_URL=https://fridge-board.kranehx.com`. No Vercel needed: will merge `web/public/` into the existing Cloudflare host later.
+- [ ] Link site — PARTIAL: Cloudflare serves `website/` directly, so the invite fallback is merged into it (`website/j.html`, `website/_redirects` `/j/* → /j.html`, and link-scoped rules in `website/_headers`). Still pending Apple IDs: `.well-known/apple-app-site-association` + `.well-known/assetlinks.json` (run `web/build.mjs` and copy `.well-known/*` in once `APPLE_TEAM_ID`/`ANDROID_SHA256`/`APP_STORE_ID` exist). Interim `EXPO_PUBLIC_INVITE_BASE_URL=https://fridge-board.kranehx.com`. `web/vercel.json` is the ignored historical equivalent.
 - [x] EAS project linked (`@mergeconflictss-team/fridge-board`) + prod env 4 vars set (2026-09-28); still to do: `eas build --profile production` → real-device tests.
 - [ ] Check `http_failures()` the next day.
 - [ ] Prod twin — DEFERRED by the 2026-09-28 single-project decision (see top).

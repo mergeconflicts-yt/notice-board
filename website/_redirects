@@ -1,0 +1,2 @@
+# Invite links: /j/<token> serves the fallback page (a rewrite, not a redirect).
+/j/*  /j.html  200
