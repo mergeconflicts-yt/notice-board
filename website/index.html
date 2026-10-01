@@ -27,7 +27,7 @@
 <meta name="twitter:image" content="https://fridge-board.kranehx.com/og.png" />
 <link rel="preload" href="fonts/nunito-400.woff2" as="font" type="font/woff2" crossorigin />
 <link rel="preload" href="fonts/caveat-600.woff2" as="font" type="font/woff2" crossorigin />
-<link rel="stylesheet" href="styles.css?v=2" />
+<link rel="stylesheet" href="styles.css?v=3" />
 </head>
 <body>
 
@@ -64,8 +64,24 @@
     </div>
 
     <div class="hero-board">
-      <div class="fridge-stage" id="fridgeStage">
-      <div class="fridge" id="fridge" aria-label="A fridge door with pinned notes">
+      <div class="hero-visual">
+        <div class="chat-mock hero-chat" aria-hidden="true">
+          <div class="chat-head">
+            <span class="chat-avatar">❤️</span>
+            <span class="chat-name"><strong>Family</strong><small>Dad, Mom, Riya, +3</small></span>
+            <span class="unread">12</span>
+          </div>
+          <div class="chat-body">
+            <div class="msg"><small>Dad</small><p>who took my charger</p></div>
+            <div class="msg right"><p>not me</p></div>
+            <div class="msg"><small>Riya</small><p>😂😂😂</p></div>
+            <div class="msg highlight"><small>Dad</small><p>New wifi pw is sunflower22</p></div>
+            <div class="msg"><small>Mom</small><p>did anyone see my msg??</p></div>
+          </div>
+        </div>
+        <div class="hero-arrow" aria-hidden="true">→</div>
+        <div class="fridge-stage" id="fridgeStage">
+        <div class="fridge" id="fridge" aria-label="A fridge door with pinned notes">
         <span class="board-tag">Jack Family</span>
         <div class="fridge-door fridge-top">
           <span class="handle"></span>
@@ -115,15 +131,6 @@
           </div>
         </div>
       </div>
-      <div class="chaos-layer" id="chaosLayer" aria-hidden="true">
-        <span class="chat-pop" style="--x:56%; --y:8%; --r:2deg"><b>Dad</b>who took my charger</span>
-        <span class="chat-pop" style="--x:2%; --y:15%; --r:-5deg"><b>Riya</b>😂😂😂</span>
-        <span class="chat-pop" style="--x:38%; --y:32%; --r:-2deg"><b>Mom</b>seen by 4</span>
-        <span class="chat-pop mini" style="--x:66%; --y:39%; --r:3deg">ok</span>
-        <span class="chat-pop" style="--x:1%; --y:55%; --r:3deg"><b>Riya</b>[sticker]</span>
-        <span class="chat-pop mini" style="--x:48%; --y:60%; --r:-2deg"><b>Dad</b>👍</span>
-        <span class="chat-pop" style="--x:8%; --y:82%; --r:-3deg"><b>Riya</b>lol</span>
-        <span class="chat-pop" style="--x:38%; --y:84%; --r:1deg"><b>Mom</b>did anyone see my msg??</span>
       </div>
       </div>
       <p class="hand scribble" aria-hidden="true"><span class="scribble-arrow">⤴</span> go on, move them</p>
@@ -448,6 +455,6 @@
 }
 </script>
 
-<script src="script.js?v=2"></script>
+<script src="script.js?v=3"></script>
 </body>
 </html>
