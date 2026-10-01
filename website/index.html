@@ -1,55 +1,66 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-US">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Fridge Board — Just what everyone needs to know.</title>
-<meta name="description" content="No replies, no reactions, no read receipts, no buzz for every post. Just what everyone needs to know, pinned on the family board." />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="styles.css" />
+<title>Fridge Board: Shared Family Board for Notes &amp; Lists</title>
+<meta name="description" content="Stop losing the Wi-Fi password, grocery list and dentist time in the family chat. One shared board for your home. No replies, no pings. iPhone &amp; Android." />
+<link rel="canonical" href="https://fridge-board.kranehx.com/" />
+<link rel="icon" href="favicon.svg" type="image/svg+xml" />
+<link rel="icon" type="image/png" sizes="96x96" href="favicon.png" />
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<meta name="theme-color" content="#EDF3EA" />
+<!-- TODO: replace app-id once the App Store listing is live (no Apple account yet). -->
+<meta name="apple-itunes-app" content="app-id=0000000000" />
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Fridge Board: the family noticeboard on every phone" />
+<meta property="og:description" content="Notes, lists, dates and photos that don't get buried in the group chat." />
+<meta property="og:url" content="https://fridge-board.kranehx.com/" />
+<meta property="og:image" content="https://fridge-board.kranehx.com/og.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:site_name" content="Fridge Board" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Fridge Board: the family noticeboard on every phone" />
+<meta name="twitter:description" content="Notes, lists, dates and photos that don't get buried in the group chat." />
+<meta name="twitter:image" content="https://fridge-board.kranehx.com/og.png" />
+<link rel="preload" href="fonts/nunito-400.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="fonts/caveat-600.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="styles.css?v=2" />
 </head>
 <body>
 
 <header class="nav">
   <a class="brand" href="#top"><span class="brand-pin" aria-hidden="true"></span><span class="hand brand-name">Fridge Board</span></a>
   <nav class="nav-links">
-    <a href="#buried">Lost it?</a>
-    <a href="#no-noise">No noise</a>
+    <a href="#features">Features</a>
     <a href="#how-it-works">How it works</a>
     <a href="privacy.html">Privacy</a>
-    <a href="#questions">Questions</a>
+    <a href="#questions">FAQ</a>
   </nav>
   <a class="btn btn-dark btn-small" href="#get-the-app">Get the app</a>
 </header>
 
 <main id="top">
 
-  <!-- 1 · HERO -->
+  <!-- 1 · HERO: what it is, who it's for, why not a chat -->
   <section class="hero">
     <div class="hero-copy">
-      <p class="eyebrow">Fridge door, in everyone's pocket</p>
-      <p class="hand struck-list hero-struck">
-        <span class="crossed">Replies</span><br />
-        <span class="crossed">Reactions</span><br />
-        <span class="crossed">Read receipts</span><br />
-        <span class="crossed">A buzz for every post</span><br />
-        <span class="kept">Just Notes.</span>
-        <span class="kept kept-noise">No Noise.</span>
-      </p>
-      <p class="lede">These aren't settings you have to find. The app simply doesn't have them, so the board can't turn into another chat.</p>
+      <p class="eyebrow">The family noticeboard, on every phone</p>
+      <h1 class="hand">Stop losing important stuff in the family group chat.</h1>
+      <p class="lede">Fridge Board is one shared board for your home. The Wi-Fi password, the grocery list, Saturday's dentist time &mdash; pinned where everyone can see it. No replies, no pings, nothing scrolls away.</p>
       <div class="store-row">
-        <a class="store-btn" href="#get-the-app" aria-label="Download on the App Store">
+        <a class="store-btn" href="https://apps.apple.com/app/id0000000000" data-placeholder="app-store" aria-label="Download on the App Store">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="11" y="18" x2="13" y="18"/></svg>
           <span><small>Download on the</small><strong>App Store</strong></span>
         </a>
-        <a class="store-btn" href="#get-the-app" aria-label="Get it on Google Play">
+        <a class="store-btn" href="https://play.google.com/store/apps/details?id=com.fridgeboard.app" aria-label="Get it on Google Play">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M5 3.5v17l13-8.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
           <span><small>Get it on</small><strong>Google Play</strong></span>
         </a>
       </div>
-      <p class="guest-note"><span class="tick" aria-hidden="true">✓</span> Try it as a guest. No account, no email, no sign-up.</p>
+      <p class="guest-note"><span class="tick" aria-hidden="true">✓</span> Try it as a guest. No sign-up. <span class="guest-platforms">iPhone &amp; Android.</span></p>
     </div>
 
     <div class="hero-board">
@@ -98,7 +109,7 @@
           </div>
           <!-- photo: real image + heart caption -->
           <div class="paper c-paper drag photo-card" style="--r:2deg; --px:44%"><span class="pin pin-pink"></span>
-            <div class="photo-img"><img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80&auto=format&fit=crop" alt="Beach at sunset" loading="lazy" /></div>
+            <div class="photo-img"><img src="img/beach.jpg" alt="Beach at sunset" loading="lazy" /></div>
             <p class="photo-cap">Goa! ♥</p>
             <p class="meta">Dad · 5 h</p>
           </div>
@@ -114,21 +125,17 @@
         <span class="chat-pop" style="--x:8%; --y:82%; --r:-3deg"><b>Riya</b>lol</span>
         <span class="chat-pop" style="--x:38%; --y:84%; --r:1deg"><b>Mom</b>did anyone see my msg??</span>
       </div>
-      <div class="paper c-butter reveal-note" id="revealNote" aria-hidden="true"><span class="pin pin-red" style="--px:55%"></span>
-        <p class="note-body note-hero">Only what<br />matters</p>
-        <p class="meta">Fridge Board · pinned</p>
-      </div>
       </div>
       <p class="hand scribble" aria-hidden="true"><span class="scribble-arrow">⤴</span> go on, move them</p>
     </div>
   </section>
 
-  <!-- 2 · BURIED -->
+  <!-- 2 · THE PROBLEM: buried cards + the chat-vs-note compare, one story -->
   <div class="band band-cream">
-  <section class="section section-tight-bottom" id="buried">
+  <section class="section" id="problem">
     <p class="eyebrow">Buried every day</p>
     <h2 class="hand section-title">Lost it in the chat again?</h2>
-    <p class="lede">The things people actually needed — drowned under hundreds of messages, stickers and "seen by 12".</p>
+    <p class="lede">The things people actually needed &mdash; drowned under hundreds of messages, stickers and "seen by 12".</p>
     <div class="buried-grid">
       <div class="buried-card">
         <p class="buried-who">Wife · 214 messages ago</p>
@@ -136,9 +143,9 @@
         <p class="buried-result">You came home with… nothing. 🙈</p>
       </div>
       <div class="buried-card">
-        <p class="buried-who">Boyfriend · last year, 1,000+ messages ago</p>
-        <p class="hand buried-text">"My favourite colour is sage green."</p>
-        <p class="buried-result">His birthday gift? Blue. 💙</p>
+        <p class="buried-who">Roommate · 380 messages ago</p>
+        <p class="hand buried-text">"Rent's due on the 1st. Bins go out Tuesday."</p>
+        <p class="buried-result">Late fee, and the bins missed. 🗑️</p>
       </div>
       <div class="buried-card">
         <p class="buried-who">Mom · 300 messages ago</p>
@@ -146,18 +153,8 @@
         <p class="buried-result">You showed up Friday. 🦷</p>
       </div>
     </div>
-  </section>
-  </div>
 
-  <div class="section-connector" aria-hidden="true">
-    <p class="hand">enough scrolling — here's the fix</p>
-    <span class="connector-arrow">↓</span>
-  </div>
-
-  <!-- 3 · NO NOISE -->
-  <section class="section section-tight-top" id="no-noise">
-    <p class="eyebrow">Keep what matters</p>
-    <h2 class="hand section-title">Stop scrolling up for the Wi-Fi password.</h2>
+    <h3 class="hand compare-title">Stop scrolling up for the Wi-Fi password.</h3>
     <div class="compare">
       <figure class="chat-mock">
         <div class="chat-head">
@@ -185,6 +182,51 @@
         <figcaption>Keep what matters here. One note. Always in the same place.</figcaption>
       </figure>
     </div>
+  </section>
+  </div>
+
+  <!-- 3 · WHAT GOES ON THE BOARD -->
+  <div class="band band-white">
+  <section class="section" id="features">
+    <p class="eyebrow">What goes on the board</p>
+    <h2 class="hand section-title">Notes, lists, dates and photos.</h2>
+    <p class="lede">Everything people used to lose in the chat, in one place everyone can see.</p>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="phone"><img src="img/notes.png" alt="A pinned note on the Fridge Board app" loading="lazy" /></div>
+        <h3>Notes</h3>
+        <p>Short and clear. The Wi-Fi password, the door code, "back late tonight".</p>
+      </div>
+      <div class="feature-card">
+        <div class="phone"><img src="img/lists.png" alt="A shared grocery list being ticked off in the Fridge Board app" loading="lazy" /></div>
+        <h3>Lists</h3>
+        <p>Groceries, chores, packing. Everyone ticks things off and sees the same list.</p>
+      </div>
+      <div class="feature-card">
+        <div class="phone"><img src="img/dates.png" alt="A pinned date for the dentist in the Fridge Board app" loading="lazy" /></div>
+        <h3>Dates</h3>
+        <p>Dentist, match day, rent due. Pinned where no one can miss it.</p>
+      </div>
+      <div class="feature-card">
+        <div class="phone"><img src="img/photos.png" alt="A pinned photo on the Fridge Board app" loading="lazy" /></div>
+        <h3>Photos</h3>
+        <p>Grandma's visit, the new puppy. Share a moment without opening a feed.</p>
+      </div>
+    </div>
+  </section>
+  </div>
+
+  <!-- 4 · WHY IT'S NOT ANOTHER CHAT -->
+  <section class="section" id="no-noise">
+    <p class="eyebrow">Why it's not another chat</p>
+    <p class="hand struck-list">
+      <span class="crossed">Replies</span>
+      <span class="crossed">Reactions</span>
+      <span class="crossed">Read receipts</span>
+      <span class="crossed">A buzz for every post</span>
+      <span class="kept">Just Notes.</span>
+      <span class="kept kept-noise">No Noise.</span>
+    </p>
     <div class="trio">
       <div><h3>No conversations</h3><p>No replies, threads, reactions or "seen by". You post it and you're done, so nothing turns into a debate.</p></div>
       <div><h3>No pings for every post</h3><p>The board doesn't buzz each time someone adds a note. Look at it when you need it, like the fridge.</p></div>
@@ -192,37 +234,45 @@
     </div>
   </section>
 
-  <!-- 4 · TIDIES ITSELF -->
+  <!-- 5 · TIDIES ITSELF -->
   <div class="band band-sage">
-  <section class="section tidy">
+  <section class="section tidy" id="tidy">
     <div class="tidy-copy">
       <p class="eyebrow">The board tidies itself</p>
       <h2 class="hand section-title">Nothing hangs around forever.</h2>
       <p class="lede">Real fridge doors fill up with notes nobody reads. Here, things leave on their own once they've done their job.</p>
-      <dl class="expiry">
-        <div><dt class="hand">Notes</dt><dd>leave after a week</dd></div>
-        <div><dt class="hand">Photos</dt><dd>leave after two weeks</dd></div>
-        <div><dt class="hand">Dates</dt><dd>leave the day after</dd></div>
-        <div><dt class="hand">Lists</dt><dd>leave two days after everything's ticked</dd></div>
-        <div><dt class="hand">Pinned</dt><dd>stay until you unpin them, like the Wi-Fi password</dd></div>
-      </dl>
+      <ol class="timeline">
+        <li class="tl-step">
+          <span class="tl-dot" aria-hidden="true"></span>
+          <p class="hand tl-label">Dates</p>
+          <p class="tl-sub">leave the day after the event</p>
+        </li>
+        <li class="tl-step">
+          <span class="tl-dot" aria-hidden="true"></span>
+          <p class="hand tl-label">Lists</p>
+          <p class="tl-sub">leave two days after everything's ticked</p>
+        </li>
+        <li class="tl-step">
+          <span class="tl-dot" aria-hidden="true"></span>
+          <p class="hand tl-label">Notes</p>
+          <p class="tl-sub">leave after a week</p>
+        </li>
+        <li class="tl-step">
+          <span class="tl-dot" aria-hidden="true"></span>
+          <p class="hand tl-label">Photos</p>
+          <p class="tl-sub">leave after two weeks</p>
+        </li>
+        <li class="tl-step tl-pinned">
+          <span class="tl-dot" aria-hidden="true"></span>
+          <p class="hand tl-label">Pinned</p>
+          <p class="tl-sub">stay until you unpin them, like the Wi-Fi password</p>
+        </li>
+      </ol>
       <p class="restore">Removed something by mistake? You can bring it back for 30 days.</p>
     </div>
     <div class="tidy-board">
-      <div class="mini-board">
-        <!-- list, like the app renders it -->
-        <div class="paper c-paper shop-list" style="--r:0deg; --px:50%">
-          <span class="pin pin-teal"></span>
-          <p class="list-title">Saturday shop</p>
-          <ul class="entries" id="shopList">
-            <li class="entry"><button type="button" aria-pressed="false"><span class="checkbox"></span><span class="entry-text">Eggs</span></button></li>
-            <li class="entry"><button type="button" aria-pressed="false"><span class="checkbox"></span><span class="entry-text">Rice</span></button></li>
-            <li class="entry"><button type="button" aria-pressed="false"><span class="checkbox"></span><span class="entry-text">Tomatoes</span></button></li>
-          </ul>
-          <p class="meta" id="shopLeft">Dad · 3 left</p>
-        </div>
-      </div>
-      <p class="hand scribble">tick them all ↑</p>
+      <div class="phone phone-board"><img src="img/note-detail.png" alt="A note showing when it will leave the board, with Pin, Keep and Remove options" loading="lazy" /></div>
+      <p class="hand scribble">it tells you when it goes ↑</p>
     </div>
   </section>
   </div>
@@ -274,7 +324,11 @@
     <h2 class="hand section-title">Good questions.</h2>
     <div class="faq" id="faq">
       <details open>
-        <summary>Do I need an account?<span aria-hidden="true">✕</span></summary>
+        <summary>How is this different from WhatsApp, Google Keep or a family calendar?<span aria-hidden="true">✕</span></summary>
+        <p>Group chats are built for conversation, so the useful bit &mdash; the password, the time, the list &mdash; scrolls away under "lol" and stickers. Fridge Board has no conversation at all: just the notes, lists, dates and photos everyone needs, in one fixed place. Unlike a shared notes app, the board is built around voices and photos that expire on their own, and it notifies no one. Unlike a calendar, it's not only for events: it's the whole fridge door.</p>
+      </details>
+      <details>
+        <summary>Do I need an account?<span aria-hidden="true">+</span></summary>
         <p>No. Tap "Use as guest" and you're on a board in seconds. You can save your account later with Apple, Google or email, and every board comes with you.</p>
       </details>
       <details>
@@ -283,7 +337,7 @@
       </details>
       <details>
         <summary>Can people reply to a post?<span aria-hidden="true">+</span></summary>
-        <p>No — there are no replies, threads or reactions. You post it and you're done, so nothing turns into a debate.</p>
+        <p>No &mdash; there are no replies, threads or reactions. You post it and you're done, so nothing turns into a debate.</p>
       </details>
       <details>
         <summary>Will it keep sending me notifications?<span aria-hidden="true">+</span></summary>
@@ -310,11 +364,11 @@
     <h2 class="hand">Put something on the board.</h2>
     <p class="lede">Start a board for your home in under a minute.</p>
     <div class="store-row center">
-      <a class="store-btn" href="#" aria-label="Download on the App Store">
+      <a class="store-btn" href="https://apps.apple.com/app/id0000000000" data-placeholder="app-store" aria-label="Download on the App Store">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="11" y="18" x2="13" y="18"/></svg>
         <span><small>Download on the</small><strong>App Store</strong></span>
       </a>
-      <a class="store-btn" href="#" aria-label="Get it on Google Play">
+      <a class="store-btn" href="https://play.google.com/store/apps/details?id=com.fridgeboard.app" aria-label="Get it on Google Play">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M5 3.5v17l13-8.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
         <span><small>Get it on</small><strong>Google Play</strong></span>
       </a>
@@ -328,6 +382,72 @@
   <nav><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="contact.html">Contact</a></nav>
 </footer>
 
-<script src="script.js"></script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "name": "Fridge Board",
+      "url": "https://fridge-board.kranehx.com/",
+      "logo": "https://fridge-board.kranehx.com/apple-touch-icon.png",
+      "email": "support@fridgeboard.app"
+    },
+    {
+      "@type": "MobileApplication",
+      "name": "Fridge Board",
+      "alternateName": "Fridge Board - Family Notice Board",
+      "operatingSystem": "iOS, Android",
+      "applicationCategory": "LifestyleApplication",
+      "description": "A shared board for your home. Notes, lists, dates and photos that don't get buried in the family group chat.",
+      "url": "https://fridge-board.kranehx.com/",
+      "image": "https://fridge-board.kranehx.com/og.png",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How is this different from WhatsApp, Google Keep or a family calendar?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Group chats are built for conversation, so the useful bit scrolls away under messages and stickers. Fridge Board has no conversation at all: just the notes, lists, dates and photos everyone needs, in one fixed place." }
+        },
+        {
+          "@type": "Question",
+          "name": "Do I need an account?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. Tap Use as guest and you're on a board in seconds. You can save your account later with Apple, Google or email, and every board comes with you." }
+        },
+        {
+          "@type": "Question",
+          "name": "Can people reply to a post?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. There are no replies, threads or reactions. You post it and you're done, so nothing turns into a debate." }
+        },
+        {
+          "@type": "Question",
+          "name": "Will it keep sending me notifications?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. The board never buzzes when someone posts. Open it when you need it, like walking up to the fridge." }
+        },
+        {
+          "@type": "Question",
+          "name": "Who can see my board?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Only people you invite. Boards are invite-only, and the owner can remove anyone at any time." }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I get something back after removing it?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. Removed notes stay restorable for 30 days before they're gone for good." }
+        },
+        {
+          "@type": "Question",
+          "name": "Does everyone need the same kind of phone?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. Fridge Board works on iPhone and Android, and everyone sees the same board right away." }
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+<script src="script.js?v=2"></script>
 </body>
 </html>

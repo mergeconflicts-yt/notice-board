@@ -16,6 +16,9 @@ export function ScreenHeader({ title, tone = 'cream' }: Props) {
         hitSlop={12}
         onPress={() => router.back()}
         style={[styles.back, pine && styles.backPine]}
+        accessibilityRole="button"
+        accessibilityLabel="Back"
+        testID="back"
       >
         <Text style={[styles.backGlyph, pine && styles.backGlyphPine]}>‹</Text>
       </Pressable>

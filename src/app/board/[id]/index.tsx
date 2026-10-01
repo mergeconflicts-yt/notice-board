@@ -374,6 +374,7 @@ export default function BoardScreen() {
                 style={styles.brandBadge}
                 accessibilityRole="button"
                 accessibilityLabel="Switch fridges"
+                testID="switch-fridges"
               >
                 <Text
                   style={[

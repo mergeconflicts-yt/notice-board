@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /j/
+
+Sitemap: https://fridge-board.kranehx.com/sitemap.xml

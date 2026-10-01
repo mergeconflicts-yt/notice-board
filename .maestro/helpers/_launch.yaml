@@ -1,0 +1,16 @@
+appId: host.exp.Exponent
+---
+# Shared launch: fresh install state, open the dev project in Expo Go, wait
+# for the signed-out welcome screen.
+# Prerequisites (see ../README.md): Metro + local Supabase running, a booted
+# Simulator, Maestro connected to it.
+- clearState:
+    appId: host.exp.Exponent
+- openLink: exp://127.0.0.1:8081
+# Fresh Expo Go auto-opens its dev menu over the project: close it.
+- tapOn:
+    id: xmark
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Use as guest"
+    timeout: 90000

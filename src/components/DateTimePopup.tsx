@@ -192,6 +192,7 @@ function DateGrid({
         style={styles.todayBtn}
         accessibilityRole="button"
         accessibilityLabel="Jump to today"
+        testID="today-btn"
       >
         <Text style={styles.todayText}>Today</Text>
       </Pressable>
@@ -258,6 +259,7 @@ function TimeWheels({
         style={styles.doneBtn}
         accessibilityRole="button"
         accessibilityLabel="Confirm time"
+        testID="dt-done"
       >
         <Text style={styles.doneText}>
           {`Set ${hour12}:${String(minute).padStart(2, '0')} ${period}`}
@@ -296,6 +298,7 @@ function Wheel({
               <Pressable
                 onPress={() => onSelect(item)}
                 style={[styles.wheelRow, active && styles.wheelRowActive]}
+                testID={`wheel-${label}-${item}`}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
               accessibilityLabel={`${label} ${format(item)}`}

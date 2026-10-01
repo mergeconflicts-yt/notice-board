@@ -1,0 +1,3 @@
+# Maestro workspace config: the app under test (Expo Go hosts the dev
+# bundle) and shared defaults for every flow in flows/.
+appId: host.exp.Exponent

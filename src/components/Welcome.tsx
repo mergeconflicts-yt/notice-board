@@ -353,6 +353,7 @@ export function Welcome({ inviteToken }: Props) {
             <TextInput
               style={styles.nameInput}
               placeholder="Your name"
+              testID="guest-name"
               placeholderTextColor={colors.onPineFaint}
               value={guestName}
               onChangeText={setGuestName}

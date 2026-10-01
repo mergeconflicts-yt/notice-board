@@ -47,6 +47,7 @@ export function IdentitySheet({ visible, onDone, submitting = false, error = nul
           <TextInput
             style={styles.input}
             placeholder="Your name"
+            testID="identity-name-field"
             placeholderTextColor={colors.inkFaint}
             value={name}
             onChangeText={setName}

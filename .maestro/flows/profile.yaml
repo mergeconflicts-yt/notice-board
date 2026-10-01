@@ -1,0 +1,17 @@
+appId: host.exp.Exponent
+---
+# Profile: identity shows the guest name; Sign out / Delete rows present.
+# Starts from home (no board needed), so no teardown is needed either.
+- runFlow: ../helpers/_guest.yaml
+- tapOn:
+    text: "You · E2E Guest"
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
+- assertVisible: "E2E Guest"
+- assertVisible: "Delete account"
+- tapOn:
+    id: back
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Create a fridge"
+    timeout: 15000

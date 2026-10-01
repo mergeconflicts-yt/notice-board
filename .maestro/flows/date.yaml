@@ -1,0 +1,39 @@
+appId: host.exp.Exponent
+---
+# Post a date note: title, Today via the date grid, 9:30 AM via the wheels.
+# The popup closes after each pick, so the time trigger is opened separately.
+# Event default is tomorrow 9:00 AM, so "Set 9:30 AM" is deterministic.
+- runFlow: ../helpers/_board.yaml
+- tapOn:
+    text: "+ Add note"
+    retryTapIfNoChange: true
+- tapOn:
+    id: tab-date
+    retryTapIfNoChange: true
+- tapOn:
+    id: date-title-field
+- inputText: "E2E dentist"
+- tapOn:
+    id: pick-date
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
+- tapOn:
+    id: today-btn
+    retryTapIfNoChange: true
+- tapOn:
+    id: pick-time
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
+- tapOn:
+    id: wheel-Minute-3
+    retryTapIfNoChange: true
+- tapOn:
+    id: dt-done
+    retryTapIfNoChange: true
+- tapOn:
+    text: "Post"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "E2E dentist"
+    timeout: 30000
+- runFlow: ../helpers/_teardown.yaml

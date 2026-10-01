@@ -153,6 +153,7 @@ export function EmailCode({ mode, onSend, onVerify, onDone, onConflict, onBack, 
             setError(null);
           }}
           placeholder="you@example.com"
+            testID="email-field"
           placeholderTextColor={colors.inkFaint}
           autoCapitalize="none"
           keyboardType="email-address"

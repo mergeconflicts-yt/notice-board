@@ -47,6 +47,7 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
+    "test:e2e": "maestro test --config .maestro/config.yaml .maestro/flows",
     "postinstall": "patch-package"
   },
   "overrides": {

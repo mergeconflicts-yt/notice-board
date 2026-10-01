@@ -1,0 +1,24 @@
+appId: host.exp.Exponent
+---
+# Post a checklist via the composer. The first "List item..." row is empty,
+# so tapping it focuses the first row.
+- runFlow: ../helpers/_board.yaml
+- tapOn:
+    text: "+ Add note"
+    retryTapIfNoChange: true
+- tapOn:
+    id: tab-list
+    retryTapIfNoChange: true
+- tapOn:
+    id: list-title-field
+- inputText: "E2E groceries"
+- tapOn:
+    id: list-item-field
+- inputText: "E2E milk"
+- tapOn:
+    text: "Post"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "E2E groceries"
+    timeout: 30000
+- runFlow: ../helpers/_teardown.yaml

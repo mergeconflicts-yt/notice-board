@@ -120,7 +120,7 @@ export default function PeopleScreen() {
           {invite ? (
             <>
               <View style={styles.codeCard}>
-                <Text style={styles.code}>{invite.code}</Text>
+                <Text style={styles.code} testID="invite-code">{invite.code}</Text>
               </View>
               <Pressable onPress={shareLink} style={styles.shareBtn}>
                 <Text style={styles.shareText}>Share link</Text>

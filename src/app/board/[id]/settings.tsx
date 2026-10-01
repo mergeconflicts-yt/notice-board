@@ -177,7 +177,7 @@ export default function BoardSettingsScreen() {
 
         <Text style={styles.sectionLabel}>Fridge</Text>
         <View style={styles.group}>
-          <Pressable style={styles.row} onPress={() => router.push(`/board/${boardId}/people`)}>
+          <Pressable style={styles.row} onPress={() => router.push(`/board/${boardId}/people`)} testID="row-people">
             <Text style={styles.rowLabel}>People</Text>
             <Text style={styles.rowValue}>{memberCount} members ›</Text>
           </Pressable>

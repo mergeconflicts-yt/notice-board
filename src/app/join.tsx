@@ -65,6 +65,7 @@ export default function JoinBoardScreen() {
           <TextInput
             style={styles.input}
             placeholder="AB2DE-FG3HJ"
+            testID="invite-code-field"
             placeholderTextColor={colors.inkFaint}
             value={code}
             onChangeText={(v) => {

@@ -345,6 +345,7 @@ export function AddNoteSheet({
                     key={t.id}
                     onPress={() => selectTab(t.id)}
                     style={[styles.tab, pillRest, active && pillActive]}
+                    testID={`tab-${t.id}`}
                   >
                     <MaterialCommunityIcons
                       name={t.icon}
@@ -370,6 +371,7 @@ export function AddNoteSheet({
                 <TextInput
                   style={[styles.stickyInput, { color: palette.ink }]}
                   placeholder="Write something..."
+                  testID="note-field"
                   placeholderTextColor={colors.inkFaint}
                   value={text}
                   onChangeText={setText}
@@ -416,6 +418,7 @@ export function AddNoteSheet({
                 <TextInput
                   style={[styles.input, styles.captionInput]}
                   placeholder="Add a caption (optional)..."
+                  testID="caption-field"
                   placeholderTextColor={colors.inkFaint}
                   selectionColor={colors.ink}
                   value={text}
@@ -440,6 +443,7 @@ export function AddNoteSheet({
                 <TextInput
                   style={[styles.npTitle, { color: palette.ink }]}
                   placeholder="List title..."
+                  testID="list-title-field"
                   placeholderTextColor={palette.ink}
                   value={listTitle}
                   onChangeText={setListTitle}
@@ -458,6 +462,7 @@ export function AddNoteSheet({
                       <TextInput
                         style={[styles.rowInput, { color: palette.ink }]}
                         placeholder="List item..."
+                        testID="list-item-field"
                         placeholderTextColor={palette.ink}
                         value={row.text}
                         onChangeText={(v) => updateRow(row.id, v)}
@@ -492,6 +497,7 @@ export function AddNoteSheet({
                   <TextInput
                     style={[styles.stickyInput, styles.dateInput, { color: palette.ink }]}
                     placeholder="What's happening?"
+                    testID="date-title-field"
                     placeholderTextColor={colors.inkFaint}
                     value={text}
                     onChangeText={setText}
@@ -508,6 +514,7 @@ export function AddNoteSheet({
                     onPress={openDatePicker}
                     accessibilityRole="button"
                     accessibilityLabel="Pick a date"
+                    testID="pick-date"
                   >
                     <MaterialCommunityIcons name="calendar-month-outline" size={20} color={pickerOpen && pickerMode === 'date' ? colors.onPine : colors.pine} />
                     <Text style={[styles.dtTriggerText, pickerOpen && pickerMode === 'date' && styles.dtTriggerTextActive]}>
@@ -519,6 +526,7 @@ export function AddNoteSheet({
                     onPress={openTimePicker}
                     accessibilityRole="button"
                     accessibilityLabel="Pick a time"
+                    testID="pick-time"
                   >
                     <MaterialCommunityIcons name="clock-outline" size={20} color={pickerOpen && pickerMode === 'time' ? colors.onPine : colors.pine} />
                     <Text style={[styles.dtTriggerText, pickerOpen && pickerMode === 'time' && styles.dtTriggerTextActive]}>

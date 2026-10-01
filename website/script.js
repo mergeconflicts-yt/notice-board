@@ -126,18 +126,17 @@ document.querySelectorAll('#faq details').forEach((d) => {
   }
 })();
 
-// Hero intro: fridge starts empty -> chats pop -> struck off ->
-// "Only what matters" drops in, zips away as all posts pin in together.
-// Plays on scroll into view, once; skipped for reduced motion.
+// Hero intro: the finished board is always the first frame (and the
+// no-JS/reduced-motion frame). Chat bubbles pop in over it, all get struck
+// at once, then the noise clears so the solution remains. Plays once on
+// scroll into view; skipped for reduced motion.
 (() => {
-  const fridge = document.getElementById('fridge');
   const stage = document.getElementById('fridgeStage');
-  if (!fridge || !stage) return;
+  if (!stage) return;
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const pops = [...stage.querySelectorAll('.chat-pop')];
-  const posts = [...fridge.querySelectorAll('.fridge-door .paper')];
-  const POP_GAP = 130, HOLD = 450, STRIKE_SHOW = 350, NOTE_HOLD = 900;
-  const POST_ANIM = 450;
+  if (!pops.length) return;
+  const POP_GAP = 130, HOLD = 500, STRIKE_HOLD = 520, CLEAR = 400, TAIL = 250;
 
   pops.forEach((p, i) => {
     p.style.setProperty('--d', `${i * POP_GAP}ms`);
@@ -149,27 +148,14 @@ document.querySelectorAll('#faq details').forEach((d) => {
   function play() {
     timers.forEach(clearTimeout);
     timers = [];
-    stage.classList.remove('playing', 'striking', 'clearing', 'revealing', 'note-leaving', 'posts-in', 'intro-empty');
+    stage.classList.remove('playing', 'striking', 'clearing');
     void stage.offsetWidth; // restart CSS animations
-    stage.classList.add('intro-empty', 'playing');
+    stage.classList.add('playing');
     const chaosMs = pops.length * POP_GAP + HOLD;
     later(() => stage.classList.add('striking'), chaosMs);
-    const strikeMs = chaosMs + STRIKE_SHOW;
-    later(() => {
-      stage.classList.add('clearing', 'revealing');
-      const note = document.getElementById('revealNote');
-      if (note) note.setAttribute('aria-hidden', 'false');
-    }, strikeMs);
-    const finaleMs = strikeMs + NOTE_HOLD;
-    later(() => {
-      stage.classList.remove('revealing');
-      stage.classList.add('note-leaving');
-      stage.classList.remove('intro-empty');
-      stage.classList.add('posts-in');
-    }, finaleMs);
-    later(() => {
-      stage.classList.remove('playing', 'striking', 'clearing', 'note-leaving', 'posts-in');
-    }, finaleMs + POST_ANIM + 200);
+    const clearMs = chaosMs + STRIKE_HOLD;
+    later(() => stage.classList.add('clearing'), clearMs);
+    later(() => stage.classList.remove('playing', 'striking', 'clearing'), clearMs + CLEAR + TAIL);
   }
 
   const seen = new IntersectionObserver((entries) => {
@@ -180,24 +166,4 @@ document.querySelectorAll('#faq details').forEach((d) => {
     }
   }, { threshold: 0.35 });
   seen.observe(stage);
-})();
-
-// Tidy demo: tick the shopping list (app marks .done on the row)
-(() => {
-  const items = document.querySelectorAll('#shopList button');
-  const left = document.getElementById('shopLeft');
-  if (!items.length || !left) return;
-  const paint = () => {
-    const remaining = [...items].filter((b) => b.getAttribute('aria-pressed') !== 'true').length;
-    left.textContent = remaining === 0 ? 'Dad · all ticked — leaves in 2 days' : `Dad · ${remaining} left`;
-  };
-  items.forEach((b) => {
-    b.addEventListener('click', () => {
-      const on = b.getAttribute('aria-pressed') === 'true';
-      b.setAttribute('aria-pressed', String(!on));
-      b.closest('li').classList.toggle('done', !on);
-      paint();
-    });
-  });
-  paint();
 })();

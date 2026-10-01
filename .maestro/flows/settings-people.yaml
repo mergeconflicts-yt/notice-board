@@ -1,0 +1,28 @@
+appId: host.exp.Exponent
+---
+# Fridge settings + People: sections render, member list shows our guest.
+- runFlow: ../helpers/_board.yaml
+- tapOn:
+    id: switch-fridges
+    retryTapIfNoChange: true
+- tapOn:
+    text: "Fridge settings"
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
+- assertVisible: "Fridge colour"
+- tapOn:
+    id: row-people
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "E2E Guest"
+    timeout: 15000
+- tapOn:
+    id: back
+    retryTapIfNoChange: true
+- tapOn:
+    id: back
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "+ Add note"
+    timeout: 15000
+- runFlow: ../helpers/_teardown.yaml

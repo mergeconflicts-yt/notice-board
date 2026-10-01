@@ -1,0 +1,17 @@
+appId: host.exp.Exponent
+---
+# Post a text note via the composer. Starts and ends hermetic (own fridge).
+- runFlow: ../helpers/_board.yaml
+- tapOn:
+    text: "+ Add note"
+    retryTapIfNoChange: true
+- tapOn:
+    id: note-field
+- inputText: "E2E hello note"
+- tapOn:
+    text: "Post"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "E2E hello note"
+    timeout: 30000
+- runFlow: ../helpers/_teardown.yaml

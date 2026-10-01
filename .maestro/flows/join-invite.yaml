@@ -1,0 +1,77 @@
+appId: host.exp.Exponent
+---
+# Full invite-code journey with two guests on one device: the owner creates a
+# fridge and copies its invite code, then a FRESH guest (clearState wipes the
+# owner) pastes the code and joins. The iOS pasteboard survives clearState.
+# Ends with the joiner leaving, so reruns stay clean (the owner's empty board
+# is debris the nightly cleanup jobs remove; see ../README.md).
+# Owner part: fresh guest + board + copy code.
+- runFlow: ../helpers/_board.yaml
+- tapOn:
+    id: switch-fridges
+    retryTapIfNoChange: true
+- tapOn:
+    text: "Fridge settings"
+    retryTapIfNoChange: true
+- tapOn:
+    id: row-people
+    retryTapIfNoChange: true
+- tapOn:
+    text: "Get invite link"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{5}-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{5}$"
+    timeout: 30000
+# copyTextFrom takes text (regex), not id: match the 5+5 unambiguous code.
+- copyTextFrom:
+    text: "^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{5}-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{5}$"
+# Joiner part: brand-new guest redeems the pasted code.
+- clearState:
+    appId: host.exp.Exponent
+- openLink: exp://127.0.0.1:8081
+- tapOn:
+    id: xmark
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Use as guest"
+    timeout: 90000
+- tapOn:
+    text: "Use as guest"
+    retryTapIfNoChange: true
+- tapOn:
+    id: guest-name
+- inputText: "E2E Joiner"
+- tapOn:
+    text: "Continue as guest"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Create a fridge"
+    timeout: 30000
+- tapOn:
+    text: "Join a fridge"
+    retryTapIfNoChange: true
+- tapOn:
+    id: invite-code-field
+- pasteText
+- tapOn:
+    text: "Join"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "+ Add note"
+    timeout: 30000
+# Leave (joiner is not the owner, so no Delete row): keeps reruns clean.
+- tapOn:
+    id: switch-fridges
+    retryTapIfNoChange: true
+- tapOn:
+    text: "Fridge settings"
+    retryTapIfNoChange: true
+- tapOn:
+    text: "Leave fridge"
+    retryTapIfNoChange: true
+- tapOn:
+    text: "Leave"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Create a fridge"
+    timeout: 30000

@@ -1,0 +1,249 @@
+:root {
+  --pine: #0b4f41;
+  --pine-deep: #07332a;
+  --on-pine: #f6f0dc;
+  --on-pine-soft: rgba(246, 240, 220, 0.72);
+  --cream: #fbf5e9;
+  --paper: #fffdf7;
+  --ink: #143c34;
+  --ink-soft: #47645b;
+  --yellow: #f1d876;
+  --butter: #fff3a6;
+  --sage: #ddf3d5;
+  --sky: #dcecf8;
+  --blush: #f8dde0;
+  --lav: #e9e0f6;
+  --hand: 'Caveat', cursive;
+  --ui: 'Nunito', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body.preview {
+  background: #2b2620;
+  font-family: var(--ui);
+  padding: 40px;
+}
+
+.preview-head {
+  color: #f6f0dc;
+  font-family: var(--ui);
+  max-width: 1400px;
+  margin: 0 auto 24px;
+}
+.preview-head h1 { font-size: 28px; }
+.preview-head p { opacity: 0.7; }
+.preview-head code { background: rgba(255,255,255,.12); padding: 2px 8px; border-radius: 6px; }
+
+.shots-row {
+  display: flex;
+  gap: 24px;
+  overflow-x: auto;
+  padding-bottom: 24px;
+  align-items: flex-start;
+}
+.shots-row .shot {
+  flex: none;
+  transform: scale(0.28);
+  transform-origin: top left;
+  margin-right: -930px; /* 1290 * (1 - .28) ≈ 929 + gap compensation */
+  margin-bottom: -2015px; /* 2796 * (1 - .28) */
+  box-shadow: 0 24px 80px rgba(0,0,0,.5);
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+/* ---------- single shot : exactly 1290 x 2796 (6.7" App Store) ---------- */
+.shot {
+  width: 1290px;
+  height: 2796px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: var(--ui);
+  position: relative;
+  overflow: hidden;
+}
+.shot.pine { background: var(--pine); color: var(--on-pine); }
+.shot.cream { background: var(--cream); color: var(--ink); }
+.shot.paper { background: var(--paper); color: var(--ink); }
+.shot.yellow { background: var(--yellow); color: var(--ink); }
+
+.copy { text-align: center; padding: 150px 110px 0; z-index: 2; }
+.copy h2 {
+  font-family: var(--hand);
+  font-weight: 700;
+  font-size: 132px;
+  line-height: 1.02;
+  letter-spacing: -1px;
+}
+.copy p {
+  margin-top: 28px;
+  font-size: 43px;
+  line-height: 1.45;
+  font-weight: 600;
+  opacity: 0.85;
+  max-width: 980px;
+}
+.shot.pine .copy p { color: var(--on-pine-soft); }
+.shot.cream .copy p, .shot.paper .copy p, .shot.yellow .copy p { color: var(--ink-soft); }
+
+/* ---------- floating chat debris (shot 2) ---------- */
+.debris { position: absolute; inset: 640px 0 0; pointer-events: none; z-index: 1; }
+.bubble {
+  position: absolute;
+  background: #fff;
+  border-radius: 28px;
+  padding: 18px 30px;
+  font-size: 33px;
+  font-weight: 700;
+  box-shadow: 0 10px 30px rgba(20,60,52,.14);
+}
+.bubble small { display: block; font-size: 24px; color: #93a8a0; font-weight: 700; }
+.bubble.struck::after {
+  content: ''; position: absolute; left: -4%; right: -4%; top: 52%;
+  height: 7px; background: #ce5410; border-radius: 4px; transform: rotate(-4deg);
+}
+
+/* ---------- phone ---------- */
+.phone-wrap { margin-top: 90px; z-index: 2; }
+.phone {
+  width: 780px;
+  height: 1720px;
+  background: #111;
+  border-radius: 110px;
+  padding: 26px;
+  box-shadow: 0 60px 120px rgba(0,0,0,.35), 0 4px 0 rgba(255,255,255,.25) inset;
+  position: relative;
+}
+.screen {
+  background: var(--cream);
+  border-radius: 88px;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  color: var(--ink);
+}
+.island {
+  position: absolute; top: 28px; left: 50%; transform: translateX(-50%);
+  width: 250px; height: 62px; background: #111; border-radius: 40px; z-index: 5;
+}
+.statusbar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 34px 64px 10px; font-weight: 800; font-size: 33px;
+}
+.statusbar .icons { letter-spacing: 4px; font-size: 28px; }
+.board-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 18px 40px 6px; font-family: var(--hand); font-weight: 700; font-size: 52px;
+}
+.board-head .dots { margin-left: auto; display: flex; }
+.dot { width: 34px; height: 34px; border-radius: 50%; border: 3px solid #fff; margin-left: -10px; }
+.always {
+  margin: 10px 28px 0; background: rgba(20,60,52,.06); border-radius: 24px;
+  padding: 16px 24px; font-size: 26px; font-weight: 700; color: var(--ink-soft);
+}
+.board { flex: 1; padding: 22px 28px 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-content: start; }
+.note {
+  border-radius: 8px 12px 8px 10px;
+  padding: 34px 24px 18px;
+  position: relative;
+  box-shadow: 0 2px 2px rgba(0,0,0,.08), 0 14px 26px -12px rgba(20,30,25,.45);
+  min-height: 220px;
+}
+.note .magnet {
+  position: absolute; top: -14px; left: 50%; width: 30px; height: 30px;
+  border-radius: 50%; margin-left: -15px; box-shadow: 0 3px 6px rgba(0,0,0,.35);
+}
+.note .magnet::after {
+  content: ''; position: absolute; top: 5px; left: 6px; width: 10px; height: 10px;
+  border-radius: 50%; background: rgba(255,255,255,.55);
+}
+.note h4 { font-family: var(--hand); font-weight: 700; font-size: 47px; line-height: 1.08; }
+.note ul { list-style: none; margin-top: 10px; }
+.note li { font-family: var(--hand); font-size: 40px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid rgba(20,60,53,.14); padding: 6px 0; }
+.note li .box { width: 28px; height: 28px; border: 3px solid currentColor; border-radius: 50%; flex: none; }
+.note .meta { margin-top: 14px; text-align: right; font-size: 22px; font-weight: 700; opacity: .6; }
+.note.tall { grid-row: span 2; }
+.n-butter { background: var(--butter); color: #4a3e22; }
+.n-sage { background: var(--sage); color: #2e4330; }
+.n-sky { background: var(--sky); color: #263e57; }
+.n-blush { background: var(--blush); color: #53343c; }
+.n-paper { background: #fff; color: #3e362e; border: 2px solid #f2eee5; }
+.n-lav { background: var(--lav); color: #3d3458; }
+.photo-block { border-radius: 8px; overflow: hidden; margin: 8px 0; background: linear-gradient(180deg,#7ec8e3,#f6e7c1 70%,#3e8e5a); aspect-ratio: 1/1; display: flex; align-items: flex-end; justify-content: center; font-size: 90px; }
+
+/* ticket (date) */
+.ticket { display: flex; gap: 16px; align-items: flex-start; }
+.cal { text-align: center; min-width: 86px; }
+.cal .dow { font-weight: 800; font-size: 22px; color: #d9564a; letter-spacing: 1px; }
+.cal .day { font-weight: 800; font-size: 58px; line-height: 1; }
+.cal .mon { font-weight: 700; font-size: 22px; opacity: .7; }
+.ticket .tt { font-family: var(--hand); font-weight: 700; font-size: 42px; line-height: 1.1; }
+.ticket .tm { font-family: var(--hand); font-weight: 700; font-size: 36px; }
+
+/* sheet (shot 3) */
+.sheet {
+  margin: auto 24px 24px; background: #fff; border-radius: 44px; padding: 36px 36px 30px;
+  box-shadow: 0 -12px 40px rgba(20,60,52,.12);
+}
+.sheet h5 { font-size: 34px; font-weight: 800; margin-bottom: 18px; }
+.chips { display: flex; gap: 14px; }
+.chip { flex: 1; background: #f6f1e2; border-radius: 22px; padding: 20px 0; text-align: center; font-size: 26px; font-weight: 800; }
+.chip span { display: block; font-size: 44px; }
+.shop-title { font-family: var(--hand); font-size: 52px; margin: 22px 0 6px; text-decoration: underline; }
+.cta-btn { margin-top: 26px; background: var(--pine); color: var(--on-pine); border-radius: 999px; text-align: center; font-weight: 800; font-size: 34px; padding: 26px; }
+
+/* legend (shot 5) */
+.legend { margin: 32px 120px 0; width: 1050px; z-index: 2; }
+.legend div { display: flex; justify-content: space-between; padding: 16px 0; font-size: 38px; font-weight: 600; border-bottom: 1px solid rgba(246,240,220,.18); }
+.legend div b { font-family: var(--hand); font-size: 44px; }
+.legend div span { opacity: .75; font-family: var(--hand); font-size: 40px; }
+
+/* shot 2: narrower phone so struck chat bubbles fit in the margins */
+.shot#shot-2 .phone { width: 660px; }
+.shot#shot-2 .bubble { font-size: 28px; max-width: 290px; }
+.shot#shot-2 .bubble small { font-size: 21px; }
+.shot#shot-5 .copy { padding-top: 110px; }
+.shot#shot-5 .phone { height: 1380px; }
+.shot#shot-5 .phone-wrap { margin-top: 70px; }
+
+/* boards list (shot 6) */
+.sheet.tall { margin-top: 30px; }
+.rowline { display: flex; align-items: center; gap: 18px; padding: 22px 0; border-bottom: 1px solid #ede4d3; font-size: 32px; font-weight: 700; }
+.rowline small { display: block; font-size: 25px; color: #93a8a0; }
+.bicon { width: 74px; height: 74px; border-radius: 20px; flex: none; }
+.share-btn { margin-top: 26px; background: var(--ink); color: #fff; border-radius: 999px; text-align: center; font-weight: 800; font-size: 34px; padding: 26px; }
+.new-btn { margin-top: 16px; background: #a9cfb2; color: var(--ink); border-radius: 999px; text-align: center; font-weight: 800; font-size: 34px; padding: 26px; }
+.toast { background: var(--ink); color: #fff; border-radius: 999px; font-size: 26px; font-weight: 800; padding: 12px 26px; display: inline-block; }
+
+/* ---------- real app screenshots in the phone frame ----------
+   Each `.screen` may carry an <img class="screen-img"> pointing at
+   ./assets/<name>.png. A tiny inline script adds `.has-photo` when the
+   file exists; when it is missing the img removes itself and the
+   CSS-drawn mockup underneath shows instead. */
+.screen-img {
+  position: absolute; inset: 0; z-index: 3;
+  width: 100%; height: 100%;
+  object-fit: cover; object-position: top center;
+  border-radius: 88px; display: block;
+}
+.screen.has-photo .island { display: none; }
+.shot.has-photo .debris { display: none; }
+/* Fridge captures: the app's new door borders leave background slivers at
+   the outer corners — zoom from the top-center so the phone mask crops them
+   away. Status bar stays pinned; only empty door green is lost at the sides
+   and bottom. Non-fridge captures (welcome, composer) are untouched. */
+.screen-img.fridge { transform: scale(1.04); transform-origin: 50% 0; }
+/* photo screens use the full-size frame (mocks stay compact) */
+.shot#shot-2.has-photo .phone { width: 780px; }
+.shot#shot-5.has-photo .phone { height: 1720px; }
+.shot#shot-5.has-photo .phone-wrap { margin-top: 90px; }
+.shot#shot-5.has-photo .copy { padding-top: 120px; }
+.shot#shot-5.has-photo .legend div { padding: 14px 0; }
+
+@media (max-width: 900px) {
+  .copy h2 { font-size: 96px; }
+}

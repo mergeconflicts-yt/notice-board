@@ -248,6 +248,7 @@ export default function ItemDetailScreen() {
               icon="clock-plus-outline"
               label={keeping ? 'Keeping…' : 'Keep'}
               busy={keeping}
+              testID="action-keep"
               onPress={() => {
                 if (keeping) return;
                 setKeeping(true);
@@ -274,6 +275,7 @@ export default function ItemDetailScreen() {
             label="Remove"
             destructive
             onPress={handleRemove}
+            testID="action-remove"
           />
         </View>
       </View>
@@ -302,6 +304,7 @@ function ActionButton({
   destructive = false,
   active = false,
   busy = false,
+  testID,
 }: {
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   label: string;
@@ -309,6 +312,7 @@ function ActionButton({
   destructive?: boolean;
   active?: boolean;
   busy?: boolean;
+  testID?: string;
 }) {
   const tint = destructive ? colors.danger : active ? colors.accentDeep : colors.ink;
   return (
@@ -319,6 +323,7 @@ function ActionButton({
       style={[styles.actionBtn, busy && styles.actionBtnBusy]}
       accessibilityRole="button"
       accessibilityLabel={label}
+      testID={testID}
     >
       <View style={[styles.actionIconWrap, active && styles.actionIconActive]}>
         <MaterialCommunityIcons name={icon} size={22} color={tint} />

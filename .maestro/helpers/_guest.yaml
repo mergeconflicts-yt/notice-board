@@ -1,0 +1,16 @@
+appId: host.exp.Exponent
+---
+# Welcome -> guest signup -> home. Ends on home with display name E2E Guest.
+- runFlow: _launch.yaml
+- tapOn:
+    text: "Use as guest"
+    retryTapIfNoChange: true
+- tapOn:
+    id: guest-name
+- inputText: "E2E Guest"
+- tapOn:
+    text: "Continue as guest"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Create a fridge"
+    timeout: 30000

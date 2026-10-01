@@ -1,0 +1,38 @@
+appId: host.exp.Exponent
+---
+# Keep button on the note detail page: repeated taps never dead-end (the
+# expiry wraps instead of sticking) and the app stays responsive. Ends by
+# removing the post (itself a back navigation to the board).
+- runFlow: ../helpers/_board.yaml
+- tapOn:
+    text: "+ Add note"
+    retryTapIfNoChange: true
+- tapOn:
+    id: note-field
+- inputText: "E2E keep me"
+- tapOn:
+    text: "Post"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "E2E keep me"
+    timeout: 30000
+- tapOn:
+    text: "E2E keep me"
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
+- tapOn:
+    id: action-keep
+    retryTapIfNoChange: true
+- tapOn:
+    id: action-keep
+    retryTapIfNoChange: true
+- tapOn:
+    id: action-keep
+    retryTapIfNoChange: true
+- tapOn:
+    id: action-remove
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "+ Add note"
+    timeout: 15000
+- runFlow: ../helpers/_teardown.yaml

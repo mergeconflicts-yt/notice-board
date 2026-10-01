@@ -1,0 +1,20 @@
+appId: host.exp.Exponent
+---
+# Board -> switcher -> settings -> delete fridge -> home. Starts on a board.
+# The confirm alert duplicates the row text, so it is pinned relative to
+# Cancel (which exists only in the alert).
+- tapOn:
+    id: switch-fridges
+    retryTapIfNoChange: true
+- tapOn:
+    text: "Fridge settings"
+    retryTapIfNoChange: true
+- tapOn:
+    text: "Delete fridge"
+    retryTapIfNoChange: true
+- tapOn:
+    text: "Delete fridge"
+    rightOf: "Cancel"
+- extendedWaitUntil:
+    visible: "Create a fridge"
+    timeout: 30000

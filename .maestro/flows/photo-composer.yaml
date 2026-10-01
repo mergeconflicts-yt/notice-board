@@ -1,0 +1,24 @@
+appId: host.exp.Exponent
+---
+# Photo tab UI: dropzone, caption field, disabled Post with no photo.
+# Full upload (system picker + permission dialog) is intentionally NOT
+# automated — see ../README.md. Server upload is covered by unit-adjacent
+# tooling; this flow locks the composer UI in place.
+- runFlow: ../helpers/_board.yaml
+- tapOn:
+    text: "+ Add note"
+    retryTapIfNoChange: true
+- tapOn:
+    id: tab-photo
+    retryTapIfNoChange: true
+- tapOn:
+    id: caption-field
+- inputText: "E2E view"
+- assertVisible: "E2E view"
+- tapOn:
+    text: "Cancel"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "+ Add note"
+    timeout: 15000
+- runFlow: ../helpers/_teardown.yaml
