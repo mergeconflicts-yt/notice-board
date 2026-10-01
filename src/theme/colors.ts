@@ -11,16 +11,16 @@ export const colors = {
   background: '#FBF5E9',
   surface: '#FFFFFF',
 
-  // Ink / text
-  ink: '#3E362E',
-  inkSoft: '#6B6156',
-  inkFaint: '#A3998C',
+  // Ink / text — deep greens: cream screens carry green text.
+  ink: '#143C34',
+  inkSoft: '#47645B',
+  inkFaint: '#93A8A0',
 
-  // Accents — marigold orange tuned against pine: fills read ~4.4:1 on the
+  // Accents — bright orange tuned against pine: fills read ~4.4:1 on the
   // green; small bold uses on cream hold the previous ratio. Keep the pair
   // in step (deep ≈ fill darkened) so active states match their fills.
-  accent: '#E8823C',
-  accentDeep: '#C96A27',
+  accent: '#F26B1D',
+  accentDeep: '#CE5410',
   /** Accent-tinted pill/background (e.g. role chips). */
   highlight: '#FFF0E4',
   /** Softer accent wash (selected controls). */
@@ -31,9 +31,9 @@ export const colors = {
   // Lines
   border: '#EDE4D3',
   /** Strong divider between board sections. */
-  divider: 'rgba(62, 54, 46, 0.28)',
+  divider: 'rgba(20, 60, 52, 0.28)',
   /** Faint divider inside a paper (checklist rows). */
-  hairline: 'rgba(62, 54, 46, 0.14)',
+  hairline: 'rgba(20, 60, 53, 0.14)',
 
   // Paper
   /** Warm-white paper (list/photo/photo sheets). */
@@ -42,9 +42,9 @@ export const colors = {
 
   // Overlays
   /** Modal scrim. */
-  scrim: 'rgba(62, 54, 46, 0.35)',
+  scrim: 'rgba(11, 45, 38, 0.4)',
   /** Dim behind the note-detail popup. */
-  backdrop: 'rgba(62, 54, 46, 0.12)',
+  backdrop: 'rgba(20, 60, 52, 0.12)',
   /** Frosted action pill on the detail popup. */
   overlay: 'rgba(255, 255, 255, 0.9)',
   /** Dark badge (e.g. photo remove button). */
@@ -55,7 +55,7 @@ export const colors = {
   avatarRing: 'rgba(255, 255, 255, 0.85)',
 
   // Shadow
-  shadow: 'rgba(92, 76, 54, 0.18)',
+  shadow: 'rgba(20, 70, 60, 0.18)',
 
   // Danger
   danger: '#D9564A',
@@ -63,9 +63,9 @@ export const colors = {
   white: '#FFFFFF',
   black: '#000000',
 
-  // Brand pine (homescreen identity — deep green field, cream ink)
-  pine: '#1E3B2A',
-  pineDeep: '#152A1F',
+  // Brand pine (identity — deep green field, cream ink)
+  pine: '#0B4F41',
+  pineDeep: '#07332A',
   onPine: '#F6F0DC',
   onPineSoft: 'rgba(246, 240, 220, 0.72)',
   onPineFaint: 'rgba(246, 240, 220, 0.5)',

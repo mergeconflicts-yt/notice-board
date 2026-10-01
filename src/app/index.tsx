@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, usePathname } from 'expo-router';
 import { colors, fonts } from '../theme';
@@ -101,6 +102,7 @@ export default function StartScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.scroll} bounces={false}>
         <View style={styles.hero}>
           <View style={styles.heroTextWrap}>
@@ -172,7 +174,7 @@ export default function StartScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.pine },
+  safe: { flex: 1, backgroundColor: colors.background },
   scroll: { flexGrow: 1, justifyContent: 'space-between', paddingHorizontal: 24 },
   hero: { flex: 1, justifyContent: 'center', paddingVertical: 40 },
   heroTextWrap: { paddingHorizontal: 4, paddingTop: 48 },
@@ -181,11 +183,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 2,
     textTransform: 'uppercase',
-    color: colors.brandYellow,
+    color: colors.pine,
     marginBottom: 12,
   },
-  headline: { fontFamily: fonts.hand.bold, fontSize: 54, lineHeight: 56, color: colors.onPine },
-  subhead: { fontFamily: fonts.ui.regular, fontSize: 17, color: colors.onPineSoft, marginTop: 14 },
+  headline: { fontFamily: fonts.hand.bold, fontSize: 54, lineHeight: 56, color: colors.pine },
+  subhead: { fontFamily: fonts.ui.regular, fontSize: 17, color: colors.inkSoft, marginTop: 14 },
   footer: { gap: 12, paddingBottom: 24 },
   boardsError: {
     fontFamily: fonts.ui.regular,
@@ -199,20 +201,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 1,
     textTransform: 'uppercase',
-    color: colors.onPineFaint,
+    color: colors.inkFaint,
     marginBottom: 2,
   },
   boardRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: colors.pineGhost,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 16,
   },
-  boardRowName: { flex: 1, fontFamily: fonts.hand.bold, fontSize: 22, color: colors.onPine },
-  boardRowChevron: { fontSize: 22, color: colors.onPineFaint },
+  boardRowName: { flex: 1, fontFamily: fonts.hand.bold, fontSize: 22, color: colors.pine },
+  boardRowChevron: { fontSize: 22, color: colors.inkFaint },
   prompt: {
     backgroundColor: colors.highlight,
     borderRadius: 16,
@@ -225,6 +229,6 @@ const styles = StyleSheet.create({
   promptDismiss: { fontFamily: fonts.ui.semibold, fontSize: 14, color: colors.inkSoft },
   promptSave: { fontFamily: fonts.ui.bold, fontSize: 14, color: colors.accentDeep },
   you: { alignSelf: 'center', paddingVertical: 10 },
-  youText: { fontFamily: fonts.ui.semibold, fontSize: 14, color: colors.onPineSoft },
-  signInText: { fontFamily: fonts.ui.bold, fontSize: 14, color: colors.brandYellow },
+  youText: { fontFamily: fonts.ui.semibold, fontSize: 14, color: colors.inkSoft },
+  signInText: { fontFamily: fonts.ui.bold, fontSize: 14, color: colors.accentDeep },
 });

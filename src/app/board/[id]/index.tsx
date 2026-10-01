@@ -496,7 +496,6 @@ export default function BoardScreen() {
       <AddNoteSheet
         visible={sheetOpen}
         submitting={submitting}
-        doorColor={board.color}
         onClose={handleSheetClose}
         onSubmit={handleAdd}
       />
@@ -608,7 +607,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     borderRadius: 999,
-    backgroundColor: colors.leaf,
+    backgroundColor: colors.pine,
     paddingHorizontal: 22,
     paddingVertical: 14,
     shadowColor: colors.shadow,
@@ -618,8 +617,8 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   composerPressed: { transform: [{ scale: 0.96 }] },
-  composerGlyph: { fontSize: 22, lineHeight: 24, color: colors.pine, fontFamily: fonts.ui.bold },
-  composerText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.pine },
+  composerGlyph: { fontSize: 22, lineHeight: 24, color: colors.onPine, fontFamily: fonts.ui.bold },
+  composerText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.onPine },
   missingTitle: { fontFamily: fonts.hand.bold, fontSize: 30, color: colors.ink },
   missingSub: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.inkSoft, marginTop: 6 },
   missingBtn: {

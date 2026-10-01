@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, ScrollView, Pressable, StyleSheet, Alert, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { router, useLocalSearchParams } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { offeredBoardColors, boardColors, colors, doorInk, doorSoft, fonts } from '../../../theme';
@@ -102,7 +103,8 @@ export default function BoardSettingsScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScreenHeader title="Fridge settings" tone="pine" />
+      <StatusBar style="dark" />
+      <ScreenHeader title="Fridge settings" />
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         <View style={[styles.idCard, { backgroundColor: boardColors[board?.color ?? 'sage'] }]}>
           <View style={styles.idTop}>
@@ -182,7 +184,7 @@ export default function BoardSettingsScreen() {
           <View style={styles.divider} />
           <Pressable style={styles.row} onPress={shareInvite}>
             <Text style={styles.rowLabel}>Invite someone</Text>
-            <MaterialCommunityIcons name="share-outline" size={22} color={colors.onPineSoft} />
+            <MaterialCommunityIcons name="share-outline" size={22} color={colors.inkSoft} />
           </Pressable>
         </View>
 
@@ -208,7 +210,7 @@ export default function BoardSettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.pine },
+  safe: { flex: 1, backgroundColor: colors.background },
   body: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 32 },
   idCard: { borderRadius: 20, paddingHorizontal: 18, paddingVertical: 16 },
   idTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
@@ -229,18 +231,18 @@ const styles = StyleSheet.create({
     color: colors.pine,
   },
   editorActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
-  editorCancelText: { fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.onPineSoft, paddingVertical: 10, paddingHorizontal: 14 },
+  editorCancelText: { fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.inkSoft, paddingVertical: 10, paddingHorizontal: 14 },
   editorSave: { paddingVertical: 10, paddingHorizontal: 22, borderRadius: 14, backgroundColor: colors.accent },
   editorSaveText: { fontFamily: fonts.ui.bold, fontSize: 15, color: colors.background },
-  sectionLabel: { fontFamily: fonts.ui.regular, fontSize: 17, color: colors.onPine, marginTop: 26, marginBottom: 10, paddingLeft: 4 },
+  sectionLabel: { fontFamily: fonts.ui.regular, fontSize: 17, color: colors.pine, marginTop: 26, marginBottom: 10, paddingLeft: 4 },
   swatches: { flexDirection: 'row', gap: 12, paddingLeft: 4 },
   swatch: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, borderColor: 'transparent' },
   swatchActive: { borderColor: colors.accent },
-  group: { backgroundColor: colors.pineGhost, borderRadius: 18, paddingHorizontal: 16 },
+  group: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 18, paddingHorizontal: 16 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 15 },
-  rowLabel: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.onPine, flexShrink: 1 },
-  rowValue: { fontFamily: fonts.ui.regular, fontSize: 15, color: colors.onPineSoft },
-  chevron: { fontSize: 22, color: colors.onPineFaint },
-  divider: { borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.onPineFaint },
+  rowLabel: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.ink, flexShrink: 1 },
+  rowValue: { fontFamily: fonts.ui.regular, fontSize: 15, color: colors.inkSoft },
+  chevron: { fontSize: 22, color: colors.inkFaint },
+  divider: { borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
   dangerText: { color: colors.danger },
 });

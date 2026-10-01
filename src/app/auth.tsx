@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { router, useLocalSearchParams } from 'expo-router';
 import { colors, fonts } from '../theme';
 import { Button } from '../components/Button';
@@ -54,6 +55,7 @@ export default function AuthCallbackScreen() {
   if (failed) {
     return (
       <SafeAreaView style={styles.safe}>
+        <StatusBar style="dark" />
         <Text style={styles.title}>Sign-in didn’t finish</Text>
         <Text style={styles.text}>Please try again from the app.</Text>
         <Button label="Home" onPress={() => router.replace('/')} style={styles.btn} />
@@ -63,6 +65,7 @@ export default function AuthCallbackScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <StatusBar style="dark" />
       <ActivityIndicator color={colors.accent} />
       <Text style={styles.text}>Finishing sign-in…</Text>
     </SafeAreaView>
@@ -70,13 +73,13 @@ export default function AuthCallbackScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.pine, alignItems: 'center', justifyContent: 'center' },
-  title: { fontFamily: fonts.hand.bold, fontSize: 28, color: colors.onPine },
+  safe: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
+  title: { fontFamily: fonts.hand.bold, fontSize: 28, color: colors.pine },
   text: {
     marginTop: 12,
     fontFamily: fonts.ui.regular,
     fontSize: 14,
-    color: colors.onPineSoft,
+    color: colors.inkSoft,
     textAlign: 'center',
     paddingHorizontal: 24,
   },

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { colors, fonts } from '../theme';
 import { Button } from '../components/Button';
@@ -53,11 +54,12 @@ export default function JoinBoardScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <StatusBar style="dark" />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}
       >
-        <ScreenHeader title="Join a fridge" tone="pine" />
+        <ScreenHeader title="Join a fridge" />
         <View style={styles.body}>
           <Text style={styles.label}>Invite code</Text>
           <TextInput
@@ -91,10 +93,10 @@ export default function JoinBoardScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.pine },
+  safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   body: { flex: 1, paddingHorizontal: 24, paddingTop: 24 },
-  label: { fontFamily: fonts.ui.semibold, fontSize: 13, color: colors.onPineSoft, marginBottom: 10 },
+  label: { fontFamily: fonts.ui.semibold, fontSize: 13, color: colors.inkSoft, marginBottom: 10 },
   input: {
     height: 56,
     backgroundColor: colors.surface,
@@ -107,8 +109,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     color: colors.ink,
   },
-  board: { fontFamily: fonts.hand.bold, fontSize: 22, color: colors.onPine, marginTop: 14 },
+  board: { fontFamily: fonts.hand.bold, fontSize: 22, color: colors.pine, marginTop: 14 },
   error: { fontFamily: fonts.ui.regular, color: colors.danger, fontSize: 13, marginTop: 12 },
-  hint: { fontFamily: fonts.ui.regular, color: colors.onPineFaint, fontSize: 13, marginTop: 14 },
+  hint: { fontFamily: fonts.ui.regular, color: colors.inkFaint, fontSize: 13, marginTop: 14 },
   join: { marginTop: 24 },
 });

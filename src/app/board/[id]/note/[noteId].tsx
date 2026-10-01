@@ -19,7 +19,7 @@ const noop = () => {};
 export default function ItemDetailScreen() {
   const { id, noteId } = useLocalSearchParams<{ id: string; noteId: string }>();
   const boardId = id as string;
-  const { board, items, entries, members, loading, toggleEntry, setDone, setPinned, keepLonger, removeItem, restoreItem, editItem, editList } =
+  const { items, entries, members, loading, toggleEntry, setDone, setPinned, keepLonger, removeItem, restoreItem, editItem, editList } =
     useBoard(boardId);
   const me = useSession((s) => s.user);
   const [editing, setEditing] = useState(false);
@@ -282,7 +282,6 @@ export default function ItemDetailScreen() {
         visible={editing && isCreator}
         submitting={saving}
         submitLabel="Save"
-        doorColor={board?.color ?? 'sage'}
         initial={item}
         photoUrl={photoUrl}
         entries={(editSnapshot ?? itemEntries).map((e) => ({ id: e.id, text: e.text }))}

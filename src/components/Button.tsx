@@ -40,9 +40,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 20,
   },
+  // Primary actions are pine; `accent` stays orange for emphasis on any
+  // background. Secondary actions are white (`soft`) or sage (`leaf`).
   primary: {
-    // Important actions are orange; `primary` is the important CTA.
-    backgroundColor: colors.accent,
+    backgroundColor: colors.pine,
   },
   soft: {
     backgroundColor: colors.surface,
@@ -62,10 +63,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   primaryText: {
-    color: colors.background,
+    color: colors.onPine,
   },
   softText: {
-    color: colors.ink,
+    color: colors.pine,
   },
   leafText: {
     color: colors.pine,

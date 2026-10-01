@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { offeredBoardColors, boardColors, colors, fonts } from '../theme';
 import { Button } from '../components/Button';
@@ -48,11 +49,12 @@ export default function CreateBoardScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <StatusBar style="dark" />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}
       >
-        <ScreenHeader title="Create a fridge" tone="pine" />
+        <ScreenHeader title="Create a fridge" />
         <ScrollView
           style={styles.flex}
           contentContainerStyle={styles.body}
@@ -113,10 +115,10 @@ export default function CreateBoardScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.pine },
+  safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   body: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 24, paddingBottom: 24 },
-  label: { fontFamily: fonts.ui.semibold, fontSize: 13, color: colors.onPineSoft, marginBottom: 10 },
+  label: { fontFamily: fonts.ui.semibold, fontSize: 13, color: colors.inkSoft, marginBottom: 10 },
   colorLabel: { marginTop: 24 },
   input: {
     height: 56,

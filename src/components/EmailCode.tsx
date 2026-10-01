@@ -26,6 +26,9 @@ type Props = {
   onConflict?: () => void;
   /** Back arrow. On the code step it returns to the email step. */
   onBack?: () => void;
+  /** Cream text for cream cards (Profile) or pine text for green screens
+   *  (Welcome, the default). */
+  tone?: 'cream' | 'pine';
 };
 
 const emptyDigits = (): string[] => Array(EMAIL_CODE_LENGTH).fill('');
@@ -37,7 +40,7 @@ function mmss(seconds: number): string {
 }
 
 /** Email → 6-digit code → verify, shared by Welcome sign-in/up and Profile save. */
-export function EmailCode({ mode, onSend, onVerify, onDone, onConflict, onBack }: Props) {
+export function EmailCode({ mode, onSend, onVerify, onDone, onConflict, onBack, tone = 'pine' }: Props) {
   const [step, setStep] = useState<'email' | 'code'>('email');
   const [email, setEmail] = useState('');
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
@@ -120,6 +123,11 @@ export function EmailCode({ mode, onSend, onVerify, onDone, onConflict, onBack }
     if (isCodeComplete(next)) void submitCode(next.join(''));
   };
 
+  const titleColor = tone === 'pine' ? colors.onPine : colors.pine;
+  const subColor = tone === 'pine' ? colors.onPineSoft : colors.inkSoft;
+  const linkColor = tone === 'pine' ? colors.brandYellow : colors.accentDeep;
+  const arrowColor = tone === 'pine' ? colors.onPine : colors.ink;
+
   const back = () => {
     if (step === 'code') {
       setStep('email');
@@ -135,11 +143,11 @@ export function EmailCode({ mode, onSend, onVerify, onDone, onConflict, onBack }
       <View>
         {onBack ? (
           <Pressable onPress={back} hitSlop={10} style={styles.back}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.onPine} />
+          <MaterialCommunityIcons name="arrow-left" size={24} color={arrowColor} />
           </Pressable>
         ) : null}
-        <Text style={styles.title}>What’s your email?</Text>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.title, { color: titleColor }]}>What’s your email?</Text>
+        <Text style={[styles.subtitle, { color: subColor }]}>
           {mode === 'link'
             ? 'We’ll send a 6-digit code to confirm this email.'
             : 'We’ll send a 6-digit code. New here? This creates your account.'}
@@ -183,11 +191,11 @@ export function EmailCode({ mode, onSend, onVerify, onDone, onConflict, onBack }
     <View>
       {onBack ? (
         <Pressable onPress={back} hitSlop={10} style={styles.back}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.ink} />
+          <MaterialCommunityIcons name="arrow-left" size={24} color={arrowColor} />
         </Pressable>
       ) : null}
-      <Text style={styles.title}>Check your email</Text>
-      <Text style={styles.subtitle}>Enter the code we sent to {email}</Text>
+      <Text style={[styles.title, { color: titleColor }]}>Check your email</Text>
+      <Text style={[styles.subtitle, { color: subColor }]}>Enter the code we sent to {email}</Text>
       <View style={styles.boxes}>
         {digits.map((d, i) => (
           <TextInput
@@ -212,10 +220,10 @@ export function EmailCode({ mode, onSend, onVerify, onDone, onConflict, onBack }
       </View>
 
       {cooldown > 0 ? (
-        <Text style={styles.resend}>Resend code in {mmss(cooldown)}</Text>
+        <Text style={[styles.resend, { color: subColor }]}>Resend code in {mmss(cooldown)}</Text>
       ) : (
         <Pressable onPress={() => void send()} hitSlop={8} disabled={busy || captchaNeeded}>
-          <Text style={styles.resendLink}>Resend code</Text>
+          <Text style={[styles.resendLink, { color: linkColor }]}>Resend code</Text>
         </Pressable>
       )}
       {turnstileSiteKey && !captchaToken && cooldown <= 0 ? (
@@ -236,9 +244,9 @@ export function EmailCode({ mode, onSend, onVerify, onDone, onConflict, onBack }
         }}
         hitSlop={8}
       >
-        <Text style={styles.different}>Use a different email</Text>
+        <Text style={[styles.different, { color: titleColor }]}>Use a different email</Text>
       </Pressable>
-      <Text style={styles.helper}>Signs you in on its own when all six are in.</Text>
+      <Text style={[styles.helper, { color: subColor }]}>Signs you in on its own when all six are in.</Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
   );

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { colors, boardColors, doorInk, doorSoft, fonts } from '../theme';
+import { colors, boardColors, doorInk, fonts } from '../theme';
 import { useMyBoards } from '../hooks/useBoards';
 import { getMembers } from '../lib/api';
 
@@ -61,17 +61,12 @@ export function BoardSwitcher({ visible, currentBoardId, onClose }: Props) {
     }
     router.replace(`/board/${id}`);
   };
-  // The whole sheet follows the open fridge's door.
-  const door = boards.find((b) => b.id === currentBoardId)?.color ?? 'sage';
-  const ink = doorInk(door);
-  const soft = doorSoft(door);
-
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <Pressable style={styles.scrim} onPress={onClose} />
-        <View style={[styles.sheet, { backgroundColor: boardColors[door] }]}>
-          <Text style={[styles.label, { color: soft }]}>Your fridges</Text>
+        <View style={styles.sheet}>
+          <Text style={styles.label}>Your fridges</Text>
           <View style={styles.group}>
           {boards.map((b, i) => {
             const count = counts[b.id];
@@ -87,11 +82,11 @@ export function BoardSwitcher({ visible, currentBoardId, onClose }: Props) {
                   <Text style={[styles.chipText, { color: doorInk(b.color) }]}>{boardAcronym(b.name)}</Text>
                 </View>
                 <View style={styles.rowText}>
-                  <Text style={[styles.name, { color: ink }]} numberOfLines={1}>
+                  <Text style={styles.name} numberOfLines={1}>
                     {b.name}
                   </Text>
                   {count != null ? (
-                    <Text style={[styles.sub, { color: soft }]}>
+                    <Text style={styles.sub}>
                       {count} {count === 1 ? 'person' : 'people'}
                     </Text>
                   ) : null}
@@ -114,8 +109,8 @@ export function BoardSwitcher({ visible, currentBoardId, onClose }: Props) {
             accessibilityRole="button"
             accessibilityLabel="New fridge"
           >
-            <MaterialCommunityIcons name="plus" size={22} color={ink} />
-            <Text style={[styles.actionLabel, { color: ink }]}>New fridge</Text>
+            <MaterialCommunityIcons name="plus" size={22} color={colors.ink} />
+            <Text style={styles.actionLabel}>New fridge</Text>
           </Pressable>
           <Pressable
             style={[styles.row, styles.rowLast]}
@@ -126,8 +121,8 @@ export function BoardSwitcher({ visible, currentBoardId, onClose }: Props) {
             accessibilityRole="button"
             accessibilityLabel="Join with an invite"
           >
-            <MaterialCommunityIcons name="link-variant" size={22} color={ink} />
-            <Text style={[styles.actionLabel, { color: ink }]}>Join with an invite</Text>
+            <MaterialCommunityIcons name="link-variant" size={22} color={colors.ink} />
+            <Text style={styles.actionLabel}>Join with an invite</Text>
           </Pressable>
           </View>
 
@@ -141,9 +136,9 @@ export function BoardSwitcher({ visible, currentBoardId, onClose }: Props) {
             accessibilityRole="button"
             accessibilityLabel="Fridge settings"
           >
-            <MaterialCommunityIcons name="cog-outline" size={22} color={ink} />
-            <Text style={[styles.actionLabel, styles.settingsLabel, { color: ink }]}>Fridge settings</Text>
-            <MaterialCommunityIcons name="chevron-right" size={22} color={soft} />
+            <MaterialCommunityIcons name="cog-outline" size={22} color={colors.ink} />
+            <Text style={[styles.actionLabel, styles.settingsLabel]}>Fridge settings</Text>
+            <MaterialCommunityIcons name="chevron-right" size={22} color={colors.inkFaint} />
           </Pressable>
           </View>
         </View>
@@ -163,7 +158,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.scrim,
   },
   sheet: {
-    backgroundColor: colors.pine,
+    backgroundColor: colors.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 20,
@@ -175,11 +170,13 @@ const styles = StyleSheet.create({
   label: {
     fontFamily: fonts.ui.semibold,
     fontSize: 14,
-    color: colors.onPineSoft,
+    color: colors.inkSoft,
     paddingLeft: 4,
   },
   group: {
-    backgroundColor: colors.pineGhost,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 18,
     paddingHorizontal: 16,
     overflow: 'hidden',
@@ -190,7 +187,7 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderColor: colors.onPineFaint,
+    borderColor: colors.border,
   },
   // No trailing divider under a group's last item.
   rowLast: { borderBottomWidth: 0 },
@@ -203,8 +200,8 @@ const styles = StyleSheet.create({
   },
   chipText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.ink },
   rowText: { flex: 1 },
-  name: { fontFamily: fonts.ui.semibold, fontSize: 17, color: colors.onPine },
-  sub: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.onPineSoft, marginTop: 2 },
-  actionLabel: { fontFamily: fonts.ui.semibold, fontSize: 17, color: colors.onPine },
+  name: { fontFamily: fonts.ui.semibold, fontSize: 17, color: colors.ink },
+  sub: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.inkSoft, marginTop: 2 },
+  actionLabel: { fontFamily: fonts.ui.semibold, fontSize: 17, color: colors.ink },
   settingsLabel: { flex: 1 },
 });

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Share, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams } from 'expo-router';
 import { colors, fonts } from '../../../theme';
 import { ScreenHeader } from '../../../components/ScreenHeader';
@@ -92,7 +93,8 @@ export default function PeopleScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScreenHeader title="People" tone="pine" />
+      <StatusBar style="dark" />
+      <ScreenHeader title="People" />
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.list}>
           {members.map((m) => (
@@ -134,7 +136,7 @@ export default function PeopleScreen() {
             </>
           ) : (
             <Pressable onPress={loadInvite} disabled={loading} style={styles.shareBtn}>
-              {loading ? <ActivityIndicator color={colors.pine} /> : <Text style={styles.shareText}>Get invite link</Text>}
+              {loading ? <ActivityIndicator color={colors.onPine} /> : <Text style={styles.shareText}>Get invite link</Text>}
             </Pressable>
           )}
         </View>
@@ -144,20 +146,22 @@ export default function PeopleScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.pine },
+  safe: { flex: 1, backgroundColor: colors.background },
   body: { paddingHorizontal: 24, paddingTop: 12, paddingBottom: 32 },
   list: { gap: 6 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: colors.pineGhost,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 16,
     paddingVertical: 12,
     paddingHorizontal: 14,
   },
   rowText: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
-  name: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.onPine },
+  name: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.ink },
   role: {
     fontFamily: fonts.ui.semibold,
     fontSize: 11,
@@ -170,8 +174,8 @@ const styles = StyleSheet.create({
   },
   remove: { fontFamily: fonts.ui.bold, fontSize: 14, color: colors.danger },
   invite: { marginTop: 28 },
-  inviteLabel: { fontFamily: fonts.hand.bold, fontSize: 24, color: colors.onPine },
-  inviteHint: { fontFamily: fonts.ui.regular, fontSize: 13, color: colors.onPineSoft, marginTop: 4 },
+  inviteLabel: { fontFamily: fonts.hand.bold, fontSize: 24, color: colors.pine },
+  inviteHint: { fontFamily: fonts.ui.regular, fontSize: 13, color: colors.inkSoft, marginTop: 4 },
   codeCard: {
     marginTop: 14,
     backgroundColor: colors.surface,
@@ -186,7 +190,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.leaf,
+    backgroundColor: colors.pine,
   },
   shareBtnGhost: {
     marginTop: 10,
@@ -194,8 +198,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  shareText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.pine },
-  ghostText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.onPine },
+  shareText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.onPine },
+  ghostText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.pine },
   resetText: { fontFamily: fonts.ui.bold, fontSize: 14, color: colors.danger },
 });

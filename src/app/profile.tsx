@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, StyleSheet, Alert, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, fonts } from '../theme';
@@ -137,7 +138,8 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScreenHeader title="You" tone="pine" />
+      <StatusBar style="dark" />
+      <ScreenHeader title="You" />
       <ScrollView contentContainerStyle={styles.body}>
         <View style={styles.identity}>
           <MemberDot seed={user?.id ?? 'me'} name={user?.displayName ?? 'Someone'} size={56} />
@@ -172,6 +174,7 @@ export default function ProfileScreen() {
             {savingEmail ? (
               <EmailCode
                 mode="link"
+                tone="cream"
                 onSend={(address) => requestEmailChange(address)}
                 onVerify={(address, code) => confirmEmailChange(address, code)}
                 onDone={() => {
@@ -191,7 +194,7 @@ export default function ProfileScreen() {
         ) : null}
 
         <Pressable style={styles.signOutRow} onPress={confirmSignOut}>
-          <MaterialCommunityIcons name="logout" size={20} color={colors.onPine} />
+          <MaterialCommunityIcons name="logout" size={20} color={colors.ink} />
           <Text style={styles.signOutText}>Sign out</Text>
         </Pressable>
 
@@ -218,23 +221,25 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.pine },
+  safe: { flex: 1, backgroundColor: colors.background },
   body: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40 },
   identity: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 12 },
   identityText: { flex: 1 },
-  name: { fontFamily: fonts.ui.bold, fontSize: 22, color: colors.onPine },
-  role: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.onPineSoft, marginTop: 2 },
+  name: { fontFamily: fonts.ui.bold, fontSize: 22, color: colors.pine },
+  role: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.inkSoft, marginTop: 2 },
   card: {
     marginTop: 22,
-    backgroundColor: colors.pineGhost,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: 20,
     padding: 18,
   },
-  cardTitle: { fontFamily: fonts.ui.bold, fontSize: 18, color: colors.onPine },
+  cardTitle: { fontFamily: fonts.ui.bold, fontSize: 18, color: colors.pine },
   cardHint: {
     fontFamily: fonts.ui.regular,
     fontSize: 14,
-    color: colors.onPineSoft,
+    color: colors.inkSoft,
     marginTop: 4,
     marginBottom: 14,
   },
@@ -252,7 +257,7 @@ const styles = StyleSheet.create({
   appleRow: { backgroundColor: colors.accent, borderColor: colors.accent },
   appleRowText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.white },
   signOutRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
-  signOutText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.onPine },
+  signOutText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.ink },
   dangerRow: { marginTop: 6, paddingVertical: 12 },
   dangerText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.danger },
   legalRow: {
@@ -263,6 +268,6 @@ const styles = StyleSheet.create({
     marginTop: 28,
     paddingBottom: 8,
   },
-  legalText: { fontFamily: fonts.ui.semibold, fontSize: 14, color: colors.onPineSoft },
-  legalDot: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.onPineFaint },
+  legalText: { fontFamily: fonts.ui.semibold, fontSize: 14, color: colors.inkSoft },
+  legalDot: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.inkFaint },
 });

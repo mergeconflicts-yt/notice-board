@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { router, useLocalSearchParams } from 'expo-router';
 import { colors, fonts } from '../../theme';
 import { Button } from '../../components/Button';
@@ -78,6 +79,7 @@ export default function JoinByLinkScreen() {
   if (!preview && !error) {
     return (
       <SafeAreaView style={[styles.safe, styles.center]}>
+        <StatusBar style="dark" />
         <ActivityIndicator color={colors.accent} />
       </SafeAreaView>
     );
@@ -85,6 +87,7 @@ export default function JoinByLinkScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <StatusBar style="dark" />
       <View style={styles.body}>
         {preview ? (
           <>
@@ -123,7 +126,7 @@ export default function JoinByLinkScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.pine },
+  safe: { flex: 1, backgroundColor: colors.background },
   center: { alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, paddingHorizontal: 24, justifyContent: 'center' },
   kicker: {
@@ -131,10 +134,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 2,
     textTransform: 'uppercase',
-    color: colors.brandYellow,
+    color: colors.pine,
     marginBottom: 10,
   },
-  title: { fontFamily: fonts.hand.bold, fontSize: 40, color: colors.onPine },
-  sub: { fontFamily: fonts.ui.regular, fontSize: 16, color: colors.onPineSoft, marginTop: 8 },
+  title: { fontFamily: fonts.hand.bold, fontSize: 40, color: colors.pine },
+  sub: { fontFamily: fonts.ui.regular, fontSize: 16, color: colors.inkSoft, marginTop: 8 },
   join: { marginTop: 28 },
 });
