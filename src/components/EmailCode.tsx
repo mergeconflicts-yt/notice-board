@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, Platform } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, fonts } from '../theme';
 import { Button } from './Button';
 import { Turnstile } from './Turnstile';
@@ -126,7 +125,6 @@ export function EmailCode({ mode, onSend, onVerify, onDone, onConflict, onBack, 
   const titleColor = tone === 'pine' ? colors.onPine : colors.pine;
   const subColor = tone === 'pine' ? colors.onPineSoft : colors.inkSoft;
   const linkColor = tone === 'pine' ? colors.brandYellow : colors.accentDeep;
-  const arrowColor = tone === 'pine' ? colors.onPine : colors.ink;
 
   const back = () => {
     if (step === 'code') {
@@ -141,11 +139,6 @@ export function EmailCode({ mode, onSend, onVerify, onDone, onConflict, onBack, 
   if (step === 'email') {
     return (
       <View>
-        {onBack ? (
-          <Pressable onPress={back} hitSlop={10} style={styles.back}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color={arrowColor} />
-          </Pressable>
-        ) : null}
         <Text style={[styles.title, { color: titleColor }]}>What’s your email?</Text>
         <Text style={[styles.subtitle, { color: subColor }]}>
           {mode === 'link'
@@ -177,23 +170,22 @@ export function EmailCode({ mode, onSend, onVerify, onDone, onConflict, onBack, 
         ) : null}
         <Button
           label={busy ? 'Sending…' : 'Send code'}
-          variant="accent"
           onPress={() => void send()}
           disabled={!isEmailValid(normalizeEmail(email)) || busy || captchaNeeded}
           style={styles.send}
         />
         {error ? <Text style={styles.error}>{error}</Text> : null}
+        {onBack ? (
+          <Pressable onPress={back} hitSlop={8} style={styles.goBack}>
+            <Text style={[styles.goBackText, { color: titleColor }]}>Go back</Text>
+          </Pressable>
+        ) : null}
       </View>
     );
   }
 
   return (
     <View>
-      {onBack ? (
-        <Pressable onPress={back} hitSlop={10} style={styles.back}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color={arrowColor} />
-        </Pressable>
-      ) : null}
       <Text style={[styles.title, { color: titleColor }]}>Check your email</Text>
       <Text style={[styles.subtitle, { color: subColor }]}>Enter the code we sent to {email}</Text>
       <View style={styles.boxes}>
@@ -248,13 +240,19 @@ export function EmailCode({ mode, onSend, onVerify, onDone, onConflict, onBack, 
       </Pressable>
       <Text style={[styles.helper, { color: subColor }]}>Signs you in on its own when all six are in.</Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
+      {onBack ? (
+        <Pressable onPress={back} hitSlop={8} style={styles.goBack}>
+          <Text style={[styles.goBackText, { color: titleColor }]}>Go back</Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  back: { marginBottom: 12, alignSelf: 'flex-start' },
   title: { fontFamily: fonts.hand.bold, fontSize: 34, lineHeight: 36, color: colors.onPine },
+  goBack: { alignSelf: 'center', marginTop: 18 },
+  goBackText: { fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.onPine },
   subtitle: {
     fontFamily: fonts.ui.regular,
     fontSize: 15,

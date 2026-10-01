@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, ScrollView, Platform, ActivityIndicator, Animated, AccessibilityInfo, KeyboardAvoidingView } from 'react-native';
-import { Image } from 'expo-image';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, fonts, noteColors, fastenerColors } from '../theme';
@@ -29,71 +29,7 @@ type Props = {
 
 type Step = 'options' | 'guest' | 'email';
 
-type ShowcasePost =
-  | { kind: 'note'; color: keyof typeof noteColors; body: string; meta: string; rotate: string }
-  | { kind: 'list'; color: keyof typeof noteColors; title: string; rows: { text: string; done: boolean }[]; meta: string; rotate: string }
-  | { kind: 'date'; color: keyof typeof noteColors; title: string; time: string; place: string; dow: string; day: string; mon: string; meta: string; rotate: string }
-  | { kind: 'photo'; color: keyof typeof noteColors; caption: string; meta: string; rotate: string };
-
-// One bigger example per post type. The content inside each card is a
-// realistic use for that type — quick message, shared shopping, upcoming
-// plan, saved moment — so first-time users get the purpose at a glance.
-const SHOWCASE: ShowcasePost[] = [
-  {
-    kind: 'note',
-    color: 'butter',
-    body: "Dinner's in the fridge — reheat 3 min! 🍲",
-    meta: 'Mum · 2 h',
-    rotate: '-2deg',
-  },
-  {
-    kind: 'list',
-    color: 'paper',
-    title: 'Weekly shop',
-    rows: [
-      { text: 'Milk', done: true },
-      { text: 'Bread', done: false },
-      { text: 'Coffee', done: false },
-      { text: 'Eggs', done: false },
-    ],
-    meta: 'Dad · 1 h',
-    rotate: '1.5deg',
-  },
-  {
-    kind: 'date',
-    color: 'sky',
-    title: 'Dentist',
-    time: '10:30',
-    place: 'Smile Clinic',
-    dow: 'THU',
-    day: '12',
-    mon: 'MAR',
-    meta: 'Mum · Yesterday',
-    rotate: '-1.5deg',
-  },
-  {
-    kind: 'photo',
-    color: 'blush',
-    caption: 'Beach day! 🏖️',
-    meta: 'Sofia · 3 h',
-    rotate: '2deg',
-  },
-];
-
-const TYPE_BADGE: Record<ShowcasePost['kind'], string> = {
-  note: 'NOTE',
-  list: 'LIST',
-  date: 'DATE',
-  photo: 'PHOTO',
-};
-
-/** Demo beach shot for the welcome photo card (same photo as the website
- *  hero). Remote so no binary ships with the app; falls back to the icon
- *  placeholder when offline. */
-const SHOWCASE_PHOTO_URL =
-  'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80&auto=format&fit=crop';
-
-/** Staggered pop-in for the showcase cards, like posts pinning onto a board.
+/** Staggered pop-in for the showcase sticky, like a post pinning onto a board.
  *  Skipped when the OS asks for reduced motion. */
 function AnimatedShowcaseCard({
   index,
@@ -147,73 +83,10 @@ function AnimatedShowcaseCard({
   );
 }
 
-/** Body of a showcase card: the same realistic per-type content. */
-function ShowcaseBody({ post }: { post: ShowcasePost }) {
-  const palette = noteColors[post.color];
-  const [imgFailed, setImgFailed] = useState(false);
-  if (post.kind === 'note') {
-    return <Text style={[styles.cardNote, { color: palette.ink }]}>{post.body}</Text>;
-  }
-  if (post.kind === 'list') {
-    return (
-      <View>
-        <Text style={[styles.cardListTitle, { color: palette.ink }]}>{post.title}</Text>
-        {post.rows.map((row) => (
-          <View key={row.text} style={styles.cardRow}>
-            <View style={[styles.cardBox, row.done && styles.cardBoxDone]}>
-              {row.done ? <Text style={styles.cardTick}>✓</Text> : null}
-            </View>
-            <Text
-              style={[styles.cardRowText, { color: palette.ink }, row.done && styles.cardRowDone]}
-            >
-              {row.text}
-            </Text>
-          </View>
-        ))}
-      </View>
-    );
-  }
-  if (post.kind === 'date') {
-    return (
-      <View style={styles.cardTicket}>
-        <View style={styles.cardCal}>
-          <Text style={styles.cardDow}>{post.dow}</Text>
-          <Text style={[styles.cardDay, { color: palette.ink }]}>{post.day}</Text>
-          <Text style={[styles.cardMon, { color: palette.ink }]}>{post.mon}</Text>
-        </View>
-        <View style={styles.cardTicketMain}>
-          <Text style={[styles.cardDateTitle, { color: palette.ink }]}>{post.title}</Text>
-          <Text style={[styles.cardDateTime, { color: palette.ink }]}>{post.time}</Text>
-          <Text style={[styles.cardPlace, { color: palette.ink }]}>{post.place}</Text>
-        </View>
-      </View>
-    );
-  }
-  return (
-    <View>
-      <View style={styles.cardPhoto}>
-        {imgFailed ? (
-          <MaterialCommunityIcons name="image-outline" size={26} color={palette.ink} />
-        ) : (
-          <Image
-            source={{ uri: SHOWCASE_PHOTO_URL }}
-            style={styles.cardPhotoImg}
-            contentFit="cover"
-            onError={() => setImgFailed(true)}
-            accessibilityRole="image"
-            accessibilityLabel={post.caption}
-          />
-        )}
-      </View>
-      <Text style={[styles.cardCaption, { color: palette.ink }]}>{post.caption}</Text>
-    </View>
-  );
-}
-
 const GUEST_WARNING =
   'Your fridges are tied to this phone. If you delete the app or lose the phone, they’re gone. You can save your account any time.';
 
-export function Welcome({ mode, inviteToken }: Props) {
+export function Welcome({ inviteToken }: Props) {
   const continueAsGuest = useSession((s) => s.continueAsGuest);
   const setDisplayName = useSession((s) => s.setDisplayName);
   const continueWithProvider = useSession((s) => s.continueWithProvider);
@@ -321,69 +194,61 @@ export function Welcome({ mode, inviteToken }: Props) {
         </View>
       ) : (
         <>
-          <View style={styles.grid}>
-            {SHOWCASE.map((post, i) => {
-              const palette = noteColors[post.color];
-              return (
-                <AnimatedShowcaseCard
-                  key={post.kind}
-                  index={i}
-                  rotate={post.rotate}
-                  style={[
-                    styles.gridCard,
-                    { backgroundColor: palette.bg, borderColor: palette.edge },
-                  ]}
-                >
-                  <View
-                    style={[styles.gridMagnet, { backgroundColor: fastenerColors.magnets[i % fastenerColors.magnets.length] }]}
-                  />
-                  <Text style={styles.cardBadge}>{TYPE_BADGE[post.kind]}</Text>
-                  <ShowcaseBody post={post} />
-                  <Text style={[styles.cardMeta, { color: palette.ink }]}>{post.meta}</Text>
-                </AnimatedShowcaseCard>
-              );
-            })}
-          </View>
-          <Text style={styles.title}>Fridge Board</Text>
-          <Text style={styles.subtitle}>
-            {mode === 'resume'
-              ? 'Welcome back — pick how you’d like to continue.'
-              : 'One fridge for the people you live with.'}
-          </Text>
+          <Text style={styles.kicker}>Fridge Board</Text>
+          <Text style={styles.hero}>A shared board for{'\n'}your people.</Text>
+          <AnimatedShowcaseCard
+            index={0}
+            rotate="-2deg"
+            style={[
+              styles.showCard,
+              { backgroundColor: noteColors.butter.bg, borderColor: noteColors.butter.edge },
+            ]}
+          >
+            <View style={[styles.gridMagnet, { backgroundColor: fastenerColors.magnets[0] }]} />
+            <Text style={[styles.cardNote, { color: noteColors.butter.ink }]}>
+              Just the{'\n'}information.{'\n'}
+              <Text style={styles.cardStrike}>All </Text>
+              None of{'\n'}the noise.
+            </Text>
+            <Text style={[styles.cardMeta, { color: noteColors.butter.ink }]}>Fridge Board · now</Text>
+          </AnimatedShowcaseCard>
         </>
       )}
     </>
   );
 
   const accountButtons = (
-    <>
+    <View style={styles.roundRow}>
       {Platform.OS === 'ios' ? (
         <Pressable
-          style={[styles.providerBtn, styles.leafBtn]}
+          style={[styles.round, styles.leafBtn]}
           onPress={() => void runAuthed(() => continueWithProvider('apple'))}
           disabled={busy}
+          accessibilityRole="button"
+          accessibilityLabel="Continue with Apple"
         >
-          <MaterialCommunityIcons name="apple" size={20} color={colors.pine} />
-          <Text style={styles.leafBtnText}>Continue with Apple</Text>
+          <MaterialCommunityIcons name="apple" size={22} color={colors.pine} />
         </Pressable>
       ) : null}
       <Pressable
-        style={[styles.providerBtn, styles.leafBtn]}
+        style={[styles.round, styles.leafBtn]}
         onPress={() => void runAuthed(() => continueWithProvider('google'))}
         disabled={busy}
+        accessibilityRole="button"
+        accessibilityLabel="Continue with Google"
       >
-        <MaterialCommunityIcons name="google" size={20} color={colors.pine} />
-        <Text style={styles.leafBtnText}>Continue with Google</Text>
+        <MaterialCommunityIcons name="google" size={22} color={colors.pine} />
       </Pressable>
       <Pressable
-        style={[styles.providerBtn, styles.orangeBtn]}
+        style={[styles.round, styles.orangeBtn]}
         onPress={() => setStep('email')}
         disabled={busy}
+        accessibilityRole="button"
+        accessibilityLabel="Continue with email"
       >
-        <MaterialCommunityIcons name="email-outline" size={20} color={colors.white} />
-        <Text style={styles.darkText}>Continue with email</Text>
+        <MaterialCommunityIcons name="email-outline" size={22} color={colors.white} />
       </Pressable>
-    </>
+    </View>
   );
 
   const roundAccounts = (
@@ -459,7 +324,8 @@ export function Welcome({ mode, inviteToken }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={[styles.safe, (step === 'guest' || step === 'email') && styles.safeCream]}>
+      <StatusBar style={step === 'guest' || step === 'email' ? 'dark' : 'light'} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.flex}
@@ -482,8 +348,8 @@ export function Welcome({ mode, inviteToken }: Props) {
 
         {step === 'guest' ? (
           <>
-            <Text style={styles.title}>Who are you?</Text>
-            <Text style={styles.subtitle}>What do people on the fridge call you?</Text>
+            <Text style={styles.guestTitle}>Who are you?</Text>
+            <Text style={styles.guestSub}>What do people on the fridge call you?</Text>
             <TextInput
               style={styles.nameInput}
               placeholder="Your name"
@@ -505,7 +371,6 @@ export function Welcome({ mode, inviteToken }: Props) {
             ) : null}
             <Button
               label="Continue as guest"
-              variant="accent"
               onPress={() => void continueGuest()}
               disabled={busy || !guestName.trim()}
               style={styles.primaryGap}
@@ -519,6 +384,7 @@ export function Welcome({ mode, inviteToken }: Props) {
         {step === 'email' ? (
           <EmailCode
             mode="signup"
+            tone="cream"
             onSend={(email, token) => sendEmailCode(email, token)}
             onVerify={async (email, code) => {
               // Arm the one-time name step before the session lands; the gate
@@ -544,81 +410,51 @@ export function Welcome({ mode, inviteToken }: Props) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.pine },
+  safeCream: { backgroundColor: colors.background },
   flex: { flex: 1 },
   body: { flex: 1, paddingHorizontal: 24, justifyContent: 'center' },
   scroll: { flex: 1 },
   bodyScroll: { flexGrow: 1, paddingHorizontal: 24, justifyContent: 'center', paddingVertical: 24, paddingBottom: 32 },
   spinner: { marginTop: 16 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8, marginBottom: 12 },
-  gridCard: {
-    width: '48%',
-    flexGrow: 1,
-    borderRadius: 4,
+  kicker: {
+    fontFamily: fonts.ui.bold,
+    fontSize: 12,
+    letterSpacing: 2.5,
+    textTransform: 'uppercase',
+    color: colors.brandYellow,
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  hero: {
+    fontFamily: fonts.hand.bold,
+    fontSize: 48,
+    lineHeight: 50,
+    color: colors.onPine,
+    marginBottom: 20,
+  },
+  showCard: {
+    alignSelf: 'center',
+    width: '84%',
+    borderRadius: 0,
     borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingTop: 12,
-    paddingBottom: 8,
-    boxShadow: '0 1px 1px rgba(0,0,0,0.08), 0 10px 18px -8px rgba(20,30,25,0.45)',
+    paddingHorizontal: 20,
+    paddingTop: 30,
+    paddingBottom: 18,
+    minHeight: 300,
+    justifyContent: 'center',
+    boxShadow: '0 2px 2px rgba(0,0,0,0.14), 0 22px 34px -12px rgba(0,0,0,0.55)',
   },
   gridMagnet: {
     position: 'absolute',
-    top: -6,
+    top: -12,
     left: '50%',
-    marginLeft: -6,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    marginLeft: -12,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
   },
-  cardBadge: {
-    fontFamily: fonts.ui.bold,
-    fontSize: 9,
-    letterSpacing: 1.5,
-    color: colors.inkFaint,
-    marginBottom: 4,
-  },
-  cardNote: { fontFamily: fonts.hand.semibold, fontSize: 21, lineHeight: 26 },
-  cardListTitle: {
-    fontFamily: fonts.hand.regular,
-    fontSize: 22,
-    lineHeight: 26,
-    textDecorationLine: 'underline',
-    marginBottom: 3,
-  },
-  cardRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 1 },
-  cardBox: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    borderColor: colors.ink,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardBoxDone: { backgroundColor: colors.ink },
-  cardTick: { color: colors.paper, fontSize: 8, fontWeight: '800', marginTop: -1 },
-  cardRowText: { fontFamily: fonts.hand.regular, fontSize: 18, lineHeight: 22 },
-  cardRowDone: { textDecorationLine: 'line-through', opacity: 0.55 },
-  cardTicket: { flexDirection: 'row', gap: 6, alignItems: 'flex-start' },
-  cardCal: { alignItems: 'center', minWidth: 34 },
-  cardDow: { fontFamily: fonts.ui.bold, fontSize: 10, letterSpacing: 0.5, color: colors.danger },
-  cardDay: { fontFamily: fonts.hand.bold, fontSize: 30, lineHeight: 31 },
-  cardMon: { fontFamily: fonts.ui.semibold, fontSize: 10, opacity: 0.7 },
-  cardTicketMain: { flex: 1, minWidth: 0 },
-  cardDateTitle: { fontFamily: fonts.hand.bold, fontSize: 22, lineHeight: 26 },
-  cardDateTime: { fontFamily: fonts.hand.bold, fontSize: 18, lineHeight: 22, marginTop: 2 },
-  cardPlace: { fontFamily: fonts.ui.semibold, fontSize: 12, marginTop: 2, opacity: 0.85 },
-  cardPhoto: {
-    width: '100%',
-    aspectRatio: 16 / 9,
-    borderRadius: 6,
-    overflow: 'hidden',
-    backgroundColor: 'rgba(0,0,0,0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  cardPhotoImg: { width: '100%', height: '100%' },
-  cardCaption: { fontFamily: fonts.hand.semibold, fontSize: 19, lineHeight: 23, textAlign: 'center' },
+  cardNote: { fontFamily: fonts.hand.semibold, fontSize: 40, lineHeight: 47 },
+  cardStrike: { textDecorationLine: 'line-through', color: colors.accentDeep },
   cardMeta: {
     marginTop: 6,
     fontFamily: fonts.ui.semibold,
@@ -628,10 +464,14 @@ const styles = StyleSheet.create({
   },
   title: { fontFamily: fonts.hand.bold, fontSize: 40, lineHeight: 42, color: colors.onPine },
   subtitle: { fontFamily: fonts.ui.regular, fontSize: 15, color: colors.onPineSoft, marginTop: 8 },
+  guestTitle: { fontFamily: fonts.hand.bold, fontSize: 40, lineHeight: 42, color: colors.pine },
+  guestSub: { fontFamily: fonts.ui.regular, fontSize: 15, color: colors.inkSoft, marginTop: 8 },
   nameInput: {
     height: 56,
     backgroundColor: colors.surface,
     borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
     paddingHorizontal: 16,
     fontFamily: fonts.ui.semibold,
     fontSize: 18,
@@ -641,26 +481,11 @@ const styles = StyleSheet.create({
   warning: {
     fontFamily: fonts.ui.regular,
     fontSize: 13,
-    color: colors.onPineSoft,
-    marginTop: 12,
-  },
-  providerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    height: 56,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    color: colors.inkSoft,
     marginTop: 12,
   },
   orangeBtn: { backgroundColor: colors.accent, borderColor: colors.accent },
   leafBtn: { backgroundColor: colors.leaf, borderColor: colors.leaf },
-  leafBtnText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.pine },
-  providerText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.ink },
-  darkText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.white },
   guestLink: { alignSelf: 'center', marginTop: 14, paddingVertical: 6 },
   guestLinkText: {
     fontFamily: fonts.ui.semibold,
@@ -671,7 +496,7 @@ const styles = StyleSheet.create({
   captcha: { marginTop: 18, alignItems: 'center' },
   primaryGap: { marginTop: 20 },
   backLink: { alignSelf: 'center', marginTop: 16 },
-  backText: { fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.onPine },
+  backText: { fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.ink },
   error: { fontFamily: fonts.ui.regular, color: colors.danger, fontSize: 13, marginTop: 12, textAlign: 'center' },
   // Invite
   inviteHead: { marginBottom: 28 },
@@ -691,7 +516,7 @@ const styles = StyleSheet.create({
   paperTitle: { fontFamily: fonts.hand.bold, fontSize: 30, color: colors.ink },
   paperSub: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.inkSoft, marginTop: 4 },
   joinBig: { marginTop: 4 },
-  roundRow: { flexDirection: 'row', gap: 12, justifyContent: 'center', marginTop: 14 },
+  roundRow: { flexDirection: 'row', gap: 12, justifyContent: 'center', marginTop: 30 },
   round: {
     width: 56,
     height: 56,

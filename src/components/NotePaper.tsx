@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
   ticketRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
   calBlock: { alignItems: 'center', minWidth: 44, paddingTop: 2 },
   calDow: { fontFamily: fonts.ui.bold, fontSize: 12, letterSpacing: 0.5, color: colors.danger },
-  calDay: { fontFamily: fonts.hand.bold, fontSize: 30, lineHeight: 32 },
+  calDay: { fontFamily: fonts.ui.extraBold, fontSize: 30, lineHeight: 32 },
   calMon: { fontFamily: fonts.ui.semibold, fontSize: 12, opacity: 0.7 },
   ticketMain: { flex: 1, flexShrink: 1, minWidth: 0 },
   ticketTime: { fontFamily: fonts.hand.bold, fontSize: 19, lineHeight: 23, marginTop: 2 },
