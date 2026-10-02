@@ -18,6 +18,17 @@ try {
       '--esModuleInterop --skipLibCheck --strict false',
     { cwd: root, stdio: 'pipe' },
   );
+  // The upload-photo JPEG fast path lives with the Edge Functions, but the
+  // parser itself is dependency-free on purpose so the same file ships to
+  // Deno and is unit-tested here. Compiled separately: folding it into the
+  // command above would move the common root and break every TEST_BUILD
+  // require path below.
+  execSync(
+    'npx tsc supabase/functions/_shared/jpeg.ts --ignoreConfig --outDir ' + JSON.stringify(out) +
+      ' --module commonjs --target es2019 --moduleResolution node --ignoreDeprecations 6.0 ' +
+      '--esModuleInterop --skipLibCheck --strict false',
+    { cwd: root, stdio: 'pipe' },
+  );
 } catch (e) {
   console.error('unit-test compile failed');
   console.error((e.stdout || '').toString() + (e.stderr || '').toString());

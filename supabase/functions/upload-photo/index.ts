@@ -12,6 +12,7 @@
 // Retryable: re-uploading to the same intent path overwrites (upsert).
 import { createClient } from 'jsr:@supabase/supabase-js@2.116.0';
 import { Image } from 'jsr:@cross/image';
+import { stripJpegMetadata } from '../_shared/jpeg.ts';
 
 const BUCKET = 'board-photos';
 const MAX_SIDE = 2048;
@@ -96,6 +97,38 @@ Deno.serve(async (req: Request) => {
   if (!file) return bad('invalid_input');
   if (file.size <= 0 || file.size > MAX_INPUT_BYTES) return bad('invalid_input');
 
+  const bytes = new Uint8Array(await file.arrayBuffer());
+
+  // Fast path: the client always sends ≤2048px JPEGs, and the full pixel
+  // pipeline (pure-JS decode → resize → re-encode) burns >2.7 CPU-seconds
+  // and trips the hosted edge CPU ceiling (WORKER_RESOURCE_LIMIT; local dev
+  // has no such limit, which is why it passed there). Header-validating and
+  // segment-stripping the JPEG is O(bytes) milliseconds with identical
+  // guarantees for this input class: real dimensions parsed from SOF,
+  // EXIF/XMP/IPTC/comments dropped. Anything else (non-JPEG, oversized,
+  // malformed) falls through to the full pipeline below.
+  if (bytes.length > 2 && bytes[0] === 0xff && bytes[1] === 0xd8) {
+    const fast = stripJpegMetadata(bytes);
+    if (fast && Math.max(fast.width, fast.height) <= MAX_SIDE) {
+      const { error: uploadError } = await admin.storage
+        .from(BUCKET)
+        .upload(path, fast.bytes, { contentType: 'image/jpeg', upsert: true });
+      if (uploadError) {
+        console.error('upload-photo storage write failed:', uploadError.message);
+        return bad('could not upload photo', 500);
+      }
+      const { error: sizeError } = await admin
+        .from('photo_upload_intents')
+        .update({ byte_size: fast.bytes.length })
+        .eq('path', path);
+      if (sizeError) {
+        console.error('upload-photo byte_size update failed:', sizeError.message);
+        return bad('could not upload photo', 500);
+      }
+      return Response.json({ path, byte_size: fast.bytes.length });
+    }
+  }
+
   // Decode: rejects anything that is not image data (arbitrary bytes labelled
   // as JPEG fail here). JPEGs go through jpeg-js, NOT @cross/image's
   // built-in JPEG decoder: cross corrupts iOS-encoder output (optimized
@@ -108,7 +141,6 @@ Deno.serve(async (req: Request) => {
   // ignored and tolerant decoding would stay on.
   let image;
   try {
-    const bytes = new Uint8Array(await file.arrayBuffer());
     if (bytes.length > 2 && bytes[0] === 0xff && bytes[1] === 0xd8) {
       // Dynamic import: the static CJS interop hits a TDZ cycle
       // ("Cannot access 'jpeg' before initialization") under the edge bundler.

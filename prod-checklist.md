@@ -59,9 +59,13 @@ Cover at least:
   allowlist, private buckets, Vault secrets and cron health — fix the dashboard
   and re-run if it fails)
 - a check of `http_failures()` the next day to confirm the nightly jobs ran
-- photo uploads go through the `upload-photo` Edge Function (server-side
-  decode, non-image rejection, 2048px downsize, JPEG re-encode stripping
-  EXIF/GPS; quotas 20 intents/hour/account, 256 MB/account, 768 MB/project). It deploys with
+- photo uploads go through the `upload-photo` Edge Function (JPEG fast path:
+  header validation + metadata-segment stripping in O(bytes) — the full
+  pixel decode/resize/re-encode exceeds the hosted edge CPU ceiling, see
+  `supabase/functions/_shared/jpeg.ts`; non-JPEG/oversize inputs still take
+  the full pipeline with non-image rejection, 2048px downsize, JPEG
+  re-encode stripping EXIF/GPS; quotas 20 intents/hour/account, 256
+  MB/account, 768 MB/project). It deploys with
   the other functions in deploy.yml; local dev needs `supabase functions
   serve` running or photo posts fail with a network error.
 
