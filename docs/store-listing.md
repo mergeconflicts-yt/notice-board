@@ -8,21 +8,16 @@ nothing below §4 can ship until the gated items pass their verify scripts.
 
 `contact@fridge-board.kranehx.com` is advertised on
 `website/contact.html`, the privacy policy, the link-site contact page
-(`web/build.mjs`), the homepage JSON-LD, and both store listings. It needs
-a receiver on the subdomain — note Cloudflare Email Routing onboards **root
-domains only**, so it cannot be enabled for the subdomain from the
-`kranehx.com` zone. Two free paths:
-
-- **Native**: add `fridge-board.kranehx.com` to Cloudflare as its own zone
-  (NS delegation from the parent), re-create the subdomain's DNS records
-  (CNAME, etc.) in the new zone, then onboard Email Routing on it and add
-  the `contact` rule. Keeps everything in one dashboard.
-- **Fastest**: add the subdomain at ForwardEmail.net (free) and set its
-  two MX records (`mx1/mx2.forwardemail.net`) on
-  `fridge-board.kranehx.com` in the existing zone; mail forwards to your
-  inbox. No zone surgery; the site's DNS stays untouched.
+(`web/build.mjs`), the homepage JSON-LD, and both store listings. It is
+received via Cloudflare Email Routing with the subdomain extension (no
+separate zone needed):
 
 - Gate: `sh scripts/verify-support-email.sh` (must print OK).
+- Setup (one time, dashboard): onboard `kranehx.com` at Email Routing,
+  add + verify the destination inbox, then open the domain → Settings →
+  **Subdomains** → add `fridge-board.kranehx.com` (Cloudflare publishes the
+  subdomain MX itself). Then Routing Rules → Create rule: `contact` on the
+  subdomain → Send to the verified inbox. Optionally enable the catch-all.
 - SPF note: keep a single SPF TXT per name — if a receiver asks for one on
   the subdomain, merge it with Resend's
   (`v=spf1 include:amazonses.com …`), never two records.

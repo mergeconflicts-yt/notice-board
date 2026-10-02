@@ -30,14 +30,15 @@ fi
 if [ "$fail" -ne 0 ]; then
   cat >&2 <<'EOF'
 Support-email verification FAILED.
-Cloudflare Email Routing onboards root domains only, so the subdomain
-needs its own receiver. Two free paths (see docs/store-listing.md §1):
-  * NATIVE: add fridge-board.kranehx.com to Cloudflare as its own zone
-    (NS delegation), then onboard Email Routing on that zone.
-  * FASTEST: add the subdomain at ForwardEmail.net (free) and set its two
-    MX records on the subdomain; mail forwards to your inbox.
+To fix (Cloudflare dashboard): onboard kranehx.com at Email Routing, add +
+verify the destination inbox, then open the domain → Settings →
+Subdomains → add fridge-board.kranehx.com (Cloudflare publishes the
+subdomain MX itself). Then Routing Rules → rule for `contact` on the
+subdomain. If a receiver asks for an SPF TXT, merge it into ONE record
+with Resend's (v=spf1 include:amazonses.com …), never two.
 Then send a test message from outside and confirm it arrives before
 submitting store listings (both stores show this address publicly).
+See docs/store-listing.md §1.
 EOF
   exit 1
 fi
