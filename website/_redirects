@@ -1,6 +1,5 @@
-# Invite links: serve the fallback page at the ORIGINAL /j/<token> URL.
-# This must be a rewrite (200), not a 3xx redirect — a redirect to /j drops the
-# token and breaks cold-start joining. If a Cloudflare dashboard Redirect Rule
-# also matches /j/*, remove it or make it a rewrite so it can't shadow these.
-/j      /j.html  200
-/j/*    /j.html  200
+# NOTE: /j and /j/* are owned by Pages Functions (website/functions/j/),
+# not by this file. Pages 308-redirects HTML pages to extension-less URLs
+# before _redirects rewrites run, so a 200 rewrite to j.html could never
+# fire here — the Functions serve the page with HTTP 200 at the original
+# URL instead. j.html stays as the mirrored source (see functions/_invitePage.js).
