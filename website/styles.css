@@ -131,7 +131,7 @@ body {
   border-bottom: 1px solid var(--border);
 }
 .brand { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; color: var(--ink); }
-.brand-pin { width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #CDE6D2, #4E7A5C 55%, #1E3B2A 85%); box-shadow: 0 2px 3px rgba(0,0,0,.3); }
+.brand-pin { width: 24px; height: 24px; border-radius: 6px; display: inline-block; }
 .brand-name { font-size: 1.5rem; }
 .nav-links { display: flex; gap: 1.4rem; margin-left: auto; }
 .nav-links a { text-decoration: none; color: var(--ink); font-weight: 600; font-size: 0.95rem; }

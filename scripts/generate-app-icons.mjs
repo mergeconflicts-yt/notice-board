@@ -6,6 +6,9 @@
  * reproduces every asset.
  *
  * Design canvas is 1024x1024; each output is rendered at 4x and box-downsampled.
+ *
+ * Also emits the marketing-site set into `website/` (same fridge, browser
+ * sizes) so the site favicons never drift from the app icon again.
  */
 import zlib from 'node:zlib';
 import { writeFileSync } from 'node:fs';
@@ -14,6 +17,7 @@ import { dirname, join } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ASSETS = join(__dirname, '..', 'assets');
+const WEBSITE = join(__dirname, '..', 'website');
 
 // ---------------------------------------------------------------- palette
 const C = {
@@ -401,12 +405,14 @@ function encodePNG(size, rgba, alpha) {
 }
 
 // ---------------------------------------------------------------- outputs
-function render(name, size, draw, { alpha = true, ss = 4, grainAmp = 0 } = {}) {
+function render(name, size, draw, { dir = ASSETS, alpha = true, ss = 4, grainAmp = 0 } = {}) {
   const c = new Canvas(size, ss);
   draw(c);
   const buf = downsample(c);
   if (grainAmp) grain(buf, size, grainAmp);
-  writeFileSync(join(ASSETS, name), encodePNG(size, buf, alpha));
+  const rel = dir === WEBSITE ? 'website/' : 'assets/';
+  writeFileSync(join(dir, name), encodePNG(size, buf, alpha));
+  return rel;
 }
 
 const outputs = [
@@ -421,9 +427,16 @@ const outputs = [
   ],
   ['android-icon-monochrome.png', 432, (c) => drawMonochrome(c), { alpha: true, ss: 4 }],
   ['favicon.png', 48, (c) => drawFridge(c, { bg: true }), { alpha: false, ss: 8, grainAmp: 5 }],
+  // Marketing site — same fridge, browser sizes (see website/index.html).
+  // Transparent background (no cabinet): the dark surround is only for
+  // full-bleed app-icon slots. Apple-touch stays opaque (iOS renders
+  // transparency as black on home-screen icons).
+  ['favicon.png', 96, (c) => drawFridge(c), { dir: WEBSITE, ss: 8, grainAmp: 5 }],
+  ['favicon-32.png', 32, (c) => drawFridge(c), { dir: WEBSITE, ss: 8, grainAmp: 5 }],
+  ['apple-touch-icon.png', 180, (c) => drawFridge(c, { bg: true }), { dir: WEBSITE, alpha: false, ss: 4, grainAmp: 5 }],
 ];
 
 for (const [name, size, draw, opts] of outputs) {
-  render(name, size, draw, opts);
-  console.log('wrote assets/' + name, `${size}x${size}`);
+  const rel = render(name, size, draw, opts);
+  console.log('wrote ' + rel + name, `${size}x${size}`);
 }
