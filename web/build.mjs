@@ -176,7 +176,7 @@ const privacyBody = `
 <h2>Data we collect</h2>
 <ul>
 <li><strong>Display name</strong> — you choose it; shown to people on your boards.</li>
-<li><strong>Account identifiers</strong> — only if you save your account: an email address (email sign-in) or an Apple/Google identity. Guests use the app with no email at all.</li>
+<li><strong>Account identifiers</strong> — every account (including guests) gets an internal Supabase user ID so boards can be shared and owned. If you save your account we also hold an email address (email sign-in) or an Apple/Google identity. Guests use the app with no email at all.</li>
 <li><strong>Board content</strong> — notes, lists, dates and photos you post. Photos are resized and re-encoded before upload, which strips location (EXIF/GPS) data.</li>
 </ul>
 <h2>What we don't collect</h2>
@@ -186,6 +186,7 @@ const privacyBody = `
 <h2>Processors</h2>
 <ul>
 <li><strong>Supabase</strong> — database, authentication and file storage.</li>
+<li><strong>Resend</strong> — sends the 6-digit email sign-in codes via our custom SMTP sender.</li>
 <li><strong>Apple / Google</strong> — only if you choose to save your account with them.</li>
 <li><strong>Cloudflare Turnstile</strong> — bot protection on sign-in.</li>
 </ul>

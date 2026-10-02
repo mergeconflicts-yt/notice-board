@@ -25,6 +25,7 @@ Each `.shot` section is exactly **1290×2796** (App Store 6.7" size). Export:
 npm i -D playwright   # one time — fetches Chromium
 node store-screenshots/export.mjs
 # → store-screenshots/out/01-hero-1290x2796.png … 06-invite-1290x2796.png
+sips -g pixelWidth -g pixelHeight store-screenshots/out/*.png  # every file must read 1290 × 2796
 ```
 
 ## Real screenshots in the phone frames (recommended)

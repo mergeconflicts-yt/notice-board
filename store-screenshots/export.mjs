@@ -26,7 +26,12 @@ const page = await browser.newPage({ viewport: { width: 1400, height: 3000 } });
 await page.goto('file://' + path.join(dir, 'index.html'));
 // Let Google Fonts settle so Caveat/Nunito render before capture.
 await page.waitForTimeout(2500);
-
+// The preview lays .shot out at scale(0.28) for side-by-side viewing — an
+// element screenshot would then capture 1290*0.28 ≈ 362px wide. Export needs
+// true 1290×2796 pixels, so neutralise the preview transform first.
+await page.addStyleTag({
+  content: '.shots-row{display:block;overflow:visible}.shots-row .shot{transform:none!important;margin:0 0 48px!important}',
+});
 for (const [id, file] of shots) {
   const el = page.locator('#' + id);
   await el.screenshot({ path: path.join(out, file) });

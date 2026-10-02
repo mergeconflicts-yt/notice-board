@@ -4,7 +4,9 @@
 - `supabase db reset && supabase test db`
 - `supabase db lint --level warning --fail-on warning`
 - `npm ci --legacy-peer-deps && npm run typecheck && npm run lint && node scripts/run-unit-tests.cjs` (plain `npm ci` fails on Expo 57 peer conflicts; production installs use `npm ci --legacy-peer-deps --omit=dev`, which is verified to work — `patch-package` is a regular dependency so the `postinstall` patch applies there too)
-- `npm audit --omit=dev`: no high/critical. The `uuid` advisory is fixed via
+- `npm audit --omit=dev`: no UNACCEPTED high/critical — two advisories are
+  documented exceptions below (both break the app if "fixed" via
+  `npm audit fix --force`), never "no high vulnerabilities". The `uuid` advisory is fixed via
   the `overrides` pin in `package.json` (`^11.1.1`; only `v4()` is used, and
   it is verified working). The `decode-uri-component` chain (CVE-2026-45822,
   malformed-URI CPU DoS via `query-string@7.1.3` via `expo-router@57`) is
@@ -20,10 +22,13 @@
   Re-check on every Expo SDK upgrade: drop the patch once `query-string`
   ships the fix in a CJS-compatible release. The `node-forge` chain
   (GHSA-86w9-cpqp-85rv, RSA PKCS#1 v1.5 verification via
-  `@expo/code-signing-certificates` via `@expo/cli`) is local-CLI tooling
-  only — it never ships in the app bundle — and the only audit-proposed fix
-  is a breaking `expo@44` downgrade, so it is accepted like the above.
-  Re-check on every Expo SDK upgrade.
+   `@expo/code-signing-certificates` via `@expo/cli`) is local-CLI tooling
+   only — it never ships in the app bundle — and the only audit-proposed fix
+   is a breaking `expo@44` downgrade, so it is an ACCEPTED EXCEPTION (like
+   the decode-uri-component patch above), not a clean bill of health.
+   `npm audit --omit=dev` will still report it as high until Expo upgrades
+   past the vulnerable `node-forge` range.
+   Re-check on every Expo SDK upgrade.
 
 ## 2. Device tests on a production build, not Expo Go:
 Start from `npm run build:prod` (signed IPA + AAB) and run the device suite:

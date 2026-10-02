@@ -46,10 +46,21 @@ by `web/build.mjs`, which fails fast without `APPLE_TEAM_ID`,
 account. Until then `fridgeboard://` links + code paste cover invites, and
 the Maestro `coldstart-invite` prod flow covers the same in-app path.
 
-## 4. Screenshots (repo-side DONE — one retake outstanding)
+## 4. Screenshots (BLOCKED — files currently invalid, exporter fixed)
 
-`store-screenshots/out/` holds six 1290×2796 (6.7") PNGs, regenerated with
-the current mockups. Still needed before submission:
+`store-screenshots/out/` files are currently **362×783, NOT 1290×2796** —
+the exporter captured the preview's `scale(0.28)` transform instead of true
+pixels (root cause fixed in `store-screenshots/export.mjs`: the preview
+transform is now neutralised before element screenshots). Do NOT submit
+these files. Regenerate then validate before submission:
+
+```bash
+npm i -D playwright   # one time — fetches Chromium
+node store-screenshots/export.mjs
+sips -g pixelWidth -g pixelHeight store-screenshots/out/*.png  # every file must read 1290 × 2796
+```
+
+Still needed before submission:
 
 - **Retake `assets/welcome.png`**: the previous capture showed Apple +
   Google buttons and was quarantined to `assets/stale/` (it contradicted
@@ -71,20 +82,22 @@ Functionality**:
 | --- | --- | --- |
 | Name (display name) | Always (guest or saved) | User-entered, shown to board members |
 | Email Address | Only with email sign-in / saved account | 6-digit code auth; never for guests |
-| User ID | Only with linked Apple/Google account | Provider subject + internal account id |
+| User ID | Always (every Supabase account, including guests) | Internal account id + provider subject when linked with Apple/Google |
 | Photos | Only photos the user posts | Resized + re-encoded, EXIF/GPS stripped |
 | Other User Content | Notes, lists, dates the user posts | Visible only to invited board members |
 
-Data is hosted by Supabase (processor, TLS in transit) and never sold,
+Data is hosted by Supabase (processor, TLS in transit), sign-in codes are
+sent by Resend (email processor), and data is never sold,
 never used for tracking or advertising. Deletion: in-app Delete account
 (You screen); guest sign-out deletes the guest account outright.
 
 ## 6. Google Data Safety (ready to paste)
 
-- **Collects**: Name, Email address (email sign-in only), Photos (user
+- **Collects**: Name, User ID (internal Supabase id for every account,
+  including guests), Email address (email sign-in only), Photos (user
   posts only), Files and docs (notes/lists/dates the user posts).
-- **Shares**: None (processors only: Supabase hosting, Cloudflare
-  Turnstile bot protection, Apple/Google only when the user links them).
+- **Shares**: None (processors only: Supabase hosting, Resend email codes,
+  Cloudflare Turnstile bot protection, Apple/Google only when the user links them).
 - **Security**: Encrypted in transit; users can request deletion (in-app
   Delete account + `website/contact.html` data requests, 30-day response).
 - **Not collected**: location, contacts, advertising IDs, app

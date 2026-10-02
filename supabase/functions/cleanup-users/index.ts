@@ -27,18 +27,46 @@ Deno.serve(async (req: Request) => {
   if (error) return new Response(error.message, { status: 500 });
 
   let deleted = 0;
+  let skipped = 0;
+  const failures: Array<{ id: string; step: string; message: string }> = [];
   for (const id of ids ?? []) {
     // Tidy board state and re-check inactivity in one atomic step; false
     // means a board was joined or a session refreshed since the candidate
-    // query, so the account must be left alone.
+    // query, so the account must be left alone (a skip, not a failure).
     const { data: cleaned, error: cleanupError } = await admin.rpc(
       'cleanup_anonymous_user',
       { p_id: id },
     );
-    if (cleanupError || cleaned !== true) continue;
+    if (cleanupError) {
+      console.error(`cleanup-users cleanup failed for ${id}:`, cleanupError.message);
+      failures.push({ id, step: 'cleanup_anonymous_user', message: cleanupError.message });
+      continue;
+    }
+    if (cleaned !== true) {
+      skipped += 1;
+      continue;
+    }
     const { error: delError } = await admin.auth.admin.deleteUser(id);
-    if (!delError) deleted += 1;
+    if (delError) {
+      console.error(`cleanup-users auth delete failed for ${id}:`, delError.message);
+      failures.push({ id, step: 'deleteUser', message: delError.message });
+      continue;
+    }
+    deleted += 1;
   }
 
-  return Response.json({ candidates: ids?.length ?? 0, deleted });
+  const body = {
+    candidates: ids?.length ?? 0,
+    deleted,
+    skipped,
+    failed: failures.length,
+    failures: failures.slice(0, 20),
+  };
+  // Fail closed: a genuine backend error (RPC/ Auth failure) must surface as
+  // non-2xx so cron monitoring / http_failures() notices instead of logging a
+  // quiet 200. Skips (cleaned !== true) are normal races and stay 2xx.
+  if (failures.length > 0) {
+    return Response.json(body, { status: 500 });
+  }
+  return Response.json(body);
 });
