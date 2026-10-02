@@ -4,18 +4,32 @@ Everything the App Store and Play Console ask for, with the answers already
 filled in from `website/privacy.html` and the shipped app. Work top-down:
 nothing below §4 can ship until the gated items pass their verify scripts.
 
-## 1. Support email (GATE — fails today)
+## 1. Support email (GATE — fails until Email Routing is on)
 
-`support@fridgeboard.app` is advertised on `website/contact.html`, the
-privacy policy, the link-site contact page, and both store listings — but
-`fridgeboard.app` is not even registered (NXDOMAIN), so support, abuse and
-deletion requests cannot arrive.
+`contact@fridge-board.kranehx.com` is advertised on
+`website/contact.html`, the privacy policy, the link-site contact page
+(`web/build.mjs`), the homepage JSON-LD, and both store listings. It needs
+a receiver on the subdomain — note Cloudflare Email Routing onboards **root
+domains only**, so it cannot be enabled for the subdomain from the
+`kranehx.com` zone. Two free paths:
+
+- **Native**: add `fridge-board.kranehx.com` to Cloudflare as its own zone
+  (NS delegation from the parent), re-create the subdomain's DNS records
+  (CNAME, etc.) in the new zone, then onboard Email Routing on it and add
+  the `contact` rule. Keeps everything in one dashboard.
+- **Fastest**: add the subdomain at ForwardEmail.net (free) and set its
+  two MX records (`mx1/mx2.forwardemail.net`) on
+  `fridge-board.kranehx.com` in the existing zone; mail forwards to your
+  inbox. No zone surgery; the site's DNS stays untouched.
 
 - Gate: `sh scripts/verify-support-email.sh` (must print OK).
-- Fix: register `fridgeboard.app`, then accept mail via a registrar
-  mailbox/forward, Google Workspace/M365, or free Cloudflare Email Routing
-  to a monitored inbox. Send an outside test message and confirm arrival
-  before submitting listings.
+- SPF note: keep a single SPF TXT per name — if a receiver asks for one on
+  the subdomain, merge it with Resend's
+  (`v=spf1 include:amazonses.com …`), never two records.
+- Then send an outside test message and confirm arrival before submitting
+  listings.
+- Replying as the address: Email Routing is forward-only — use Gmail
+  "Send mail as" with the Resend SMTP credentials (`smtp.resend.com:587`).
 - The address is hard-coded in `website/contact.html`,
   `website/index.html` (JSON-LD), `web/build.mjs` (link-site contact page)
   and below — change all five if the address ever moves.

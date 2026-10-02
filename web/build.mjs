@@ -227,7 +227,7 @@ const termsBody = `
 <p>Questions about these terms: see the <a href="contact.html">Contact</a> page.</p>`;
 
 const contactBody = `
-<p class="mail"><a href="mailto:support@fridgeboard.app">support@fridgeboard.app</a></p>
+<p class="mail"><a href="mailto:contact@fridge-board.kranehx.com">contact@fridge-board.kranehx.com</a></p>
 <h2>What to include</h2>
 <ul>
 <li><strong>Support</strong> — what happened, your device and app version, and (if relevant) the fridge name.</li>
