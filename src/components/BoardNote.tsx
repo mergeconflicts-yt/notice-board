@@ -223,6 +223,7 @@ export function BoardNote({
         <Animated.View
           accessible
           accessibilityRole="button"
+          testID="note-card"
           accessibilityLabel={noteAccessibilityLabel(item, entries)}
           accessibilityHint="Opens the post"
           accessibilityActions={[{ name: 'activate', label: 'Open post' }]}

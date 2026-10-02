@@ -13,11 +13,10 @@ appId: host.exp.Exponent
 - tapOn:
     text: "Post"
     retryTapIfNoChange: true
-- extendedWaitUntil:
-    visible: "E2E keep me"
-    timeout: 30000
+# Card text isn't matchable (handwriting font), so the card tap itself is
+# the sync point: tapOn waits for the testID, then opens the detail screen.
 - tapOn:
-    text: "E2E keep me"
+    id: "note-card"
     retryTapIfNoChange: true
 - waitForAnimationToEnd
 - tapOn:

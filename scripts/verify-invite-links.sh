@@ -41,6 +41,21 @@ check "invite link keeps token" "$BASE/j/$TOKEN" "200"
 check "apple association" "$BASE/.well-known/apple-app-site-association" "200"
 check "android assetlinks" "$BASE/.well-known/assetlinks.json" "200"
 
+# Status 200 is not enough: Pages' SPA fallback serves index.html with 200
+# for unknown paths (and /.well-known/* even labels it application/json via
+# _headers), which Apple/Google reject. The bodies must be the real JSON.
+check_body() {
+  desc="$1"; url="$2"; marker="$3"
+  body="$(curl -sS --max-time 20 "$url")"
+  case "$body" in
+    *"$marker"*) echo "ok   $desc body looks like association JSON" ;;
+    *) echo "FAIL $desc body is not association JSON (likely the SPA fallback page)"; fail=1 ;;
+  esac
+}
+
+check_body "apple association" "$BASE/.well-known/apple-app-site-association" '"applinks"'
+check_body "android assetlinks" "$BASE/.well-known/assetlinks.json" 'delegate_permission/common.handle_all_urls'
+
 if [ "$fail" -ne 0 ]; then
   cat >&2 <<'EOF'
 Invite-link verification FAILED.

@@ -30,7 +30,7 @@ Repeat per hosted project (`Fridge-Board-dev` first, then the prod twin).
 - [x] Rename to Fridge Board — `fridgeboard://`, `com.fridgeboard.app`.
 - [x] Local verify: reset + 487 pgTAP + lint + tsc + 33 unit pass, patch applied.
   CI `check` + `database` green on main 2026-09-28 after the JSR pin fix (see CI fix note).
-- [ ] Auth rate limits: anonymous ON + manual linking ON are confirmed, but the hosted per-IP/signup limits are still unset. They must be applied in the Supabase dashboard before public registration; this repo cannot set hosted Auth limits. Use the proposed values in the Rate limits note.
+- [x] Auth rate limits applied 2026-10-02 (dashboard): emails 30/h, SMS 30/h, refreshes 150/5min (=1800/h), verifications 30/5min (=360/h), anonymous 30/h/IP, sign-ups+sign-ins 30/5min (=360/h), Web3 30/5min — matching `supabase/config.toml`. Anonymous sign-ins ON + manual linking ON confirmed.
 - [x] SMTP via Resend (key + subdomain + sender + 1s interval) + `{{ .Token }}` in 3 templates mirrored + Confirm email ON verified 2026-09-28.
 - [x] Turnstile CAPTCHA on (Managed, pre-clearance OFF, `fridge-board.kranehx.com`) + site key in EAS env (2026-09-28).
 - [x] Google OAuth: Web ID/secret + callback in Supabase; iOS + Android clients created (EAS SHA-1) — free, no Apple account needed (2026-09-28).
@@ -206,15 +206,14 @@ Open:
 - **Apple**: Services ID + `.p8` — DEFERRED, needs paid Apple Developer
   account. Without it "Continue with Apple" opens a provider error page
   (acceptable for now; Google + email + guest cover testing).
-- **Rate limits**: still NOT set; do not publicly register accounts until the hosted dashboard values below are applied.
-  Proposed values matching `supabase/config.toml:200-215` (dashboard shows
-  per-hour; config is per-5min for 4 of them): emails/hour `30`
-  (`email_sent`), SMS/hour `30`, token refreshes `1800` (=150/5min),
-  token verifications `360` (=30/5min), anonymous/hour/IP `30`,
-  sign-ups+sign-ins `360` (=30/5min), Web3 `360`. Reason for 30/h email +
+- **Rate limits**: applied 2026-10-02 (dashboard shows per-hour where
+  applicable): emails/hour `30` (`email_sent`), SMS/hour `30`, token
+  refreshes `1800` (=150/5min), token verifications `360` (=30/5min),
+  anonymous/hour/IP `30`, sign-ups+sign-ins `360` (=30/5min), Web3
+  `360` (=30/5min) — matching `supabase/config.toml:200-215`. Public
+  registration is unblocked on this front. Reason for 30/h email +
   30/5min verify: every code sign-in sends one email; too low 429s
-  resend/verify on real phones. Apply when ready (prod needs
-  `email_sent` raised with volume).
+  resend/verify on real phones. Revisit `email_sent` with volume.
 
 ## EAS — LINKED, env set, build not done (2026-09-28)
 

@@ -11,7 +11,18 @@ appId: host.exp.Exponent
 - tapOn:
     text: "Post"
     retryTapIfNoChange: true
+# Note cards render in a handwriting font that Maestro's text channel can't
+# match (and extendedWaitUntil takes no id selector), so the card tap itself
+# is the sync point: tapOn waits for testID note-card, then opens the detail
+# screen — which has no back testID, so remove the post (back navigation to
+# the board) and finish on the static composer button like keep.yaml does.
+- tapOn:
+    id: "note-card"
+    retryTapIfNoChange: true
+- tapOn:
+    id: "action-remove"
+    retryTapIfNoChange: true
 - extendedWaitUntil:
-    visible: "E2E hello note"
-    timeout: 30000
+    visible: "+ Add note"
+    timeout: 15000
 - runFlow: ../helpers/_teardown.yaml
