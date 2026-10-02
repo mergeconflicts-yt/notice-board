@@ -10,7 +10,7 @@ import { AddNoteSheet, NoteDraft } from '../../../../components/AddNoteSheet';
 import { useBoard } from '../../../../hooks/useBoard';
 import { useSession } from '../../../../store/session';
 import { useToast } from '../../../../store/toast';
-import { signedPhotoUrl } from '../../../../lib/api';
+import { cachedPhotoUri } from '../../../../lib/photoCache';
 import { keepUntilLabel } from '../../../../utils/note';
 
 const MAX_SCALE = 2.4;
@@ -66,7 +66,7 @@ export default function ItemDetailScreen() {
   }, [expiry, expiryPulse]);
 
   useEffect(() => {
-    if (item?.photoPath) void signedPhotoUrl(item.photoPath).then(setPhotoUrl).catch(noop);
+    if (item?.photoPath) void cachedPhotoUri(item.photoPath).then(setPhotoUrl).catch(noop);
   }, [item?.photoPath]);
 
   if (!item) {

@@ -22,7 +22,8 @@ import { BoardSwitcher } from '../../../components/BoardSwitcher';
 import { useBoard, randomId } from '../../../hooks/useBoard';
 import { useSession } from '../../../store/session';
 import { useToast } from '../../../store/toast';
-import { friendlyMessage, keepLonger as apiKeepLonger, signedPhotoUrl, uploadPhoto } from '../../../lib/api';
+import { friendlyMessage, keepLonger as apiKeepLonger, uploadPhoto } from '../../../lib/api';
+import { cachedPhotoUri, dropCachedPhoto } from '../../../lib/photoCache';
 import { rememberBoard } from '../../../lib/lastBoard';
 import { ItemWithAuthor } from '../../../types';
 
@@ -127,12 +128,14 @@ export default function BoardScreen() {
     itemsRef.current = items;
   }, [items]);
 
-  // Paths we've already tried to sign, so a failure isn't retried until the
-  // periodic/foreground refresh.
+  // Paths we've already tried to resolve, so a failure isn't retried until
+  // the periodic/foreground refresh.
   const attemptedRef = useRef<Set<string>>(new Set());
 
-  /** Apply signed URLs, returning the SAME object when nothing changed — a new
-   *  identity would re-run the effect below and spin forever on a null result. */
+  /** Apply resolved photo URIs, returning the SAME object when nothing
+   *  changed — a new identity would re-run the effect below and spin forever
+   *  on a null result. URIs are stable `file://` cache hits
+   *  (src/lib/photoCache.ts), so refreshes never flicker or re-download. */
   const applyUrls = useCallback(
     (pairs: (readonly [string, string | null])[]) => {
       setPhotoUrls((prev) => {
@@ -156,15 +159,15 @@ export default function BoardScreen() {
       if (unique.length === 0) return;
       for (const p of unique) attemptedRef.current.add(p);
       const pairs = await Promise.all(
-        unique.map(async (path) => [path, await signedPhotoUrl(path)] as const),
+        unique.map(async (path) => [path, await cachedPhotoUri(path)] as const),
       );
       applyUrls(pairs);
     },
     [applyUrls],
   );
 
-  // Sign only photos we don't already have a URL for and haven't already tried,
-  // so a live update never re-signs (or flickers) images, and a null result
+  // Resolve only photos we don't already have a URI for and haven't already tried,
+  // so a live update never refetches (or flickers) images, and a null result
   // (offline / missing file) doesn't loop.
   useEffect(() => {
     const toTry = items
@@ -179,14 +182,16 @@ export default function BoardScreen() {
     // left those paths marked tried forever, so they stayed blank.
     void (async () => {
       const pairs = await Promise.all(
-        toTry.map(async (path) => [path, await signedPhotoUrl(path)] as const),
+        toTry.map(async (path) => [path, await cachedPhotoUri(path)] as const),
       );
       applyUrls(pairs);
     })();
   }, [items, photoUrls, applyUrls]);
 
-  // URLs are signed for 24h, so re-sign everything well before that — every
-  // 12 hours and on foreground (which also retries previously failed paths).
+  // Cached URIs are stable disk files, so re-resolving is a cheap hit — but
+  // re-resolve everything well before the underlying signed URLs would age
+  // out anyway: every 12 hours and on foreground (which also retries
+  // previously failed paths).
   useEffect(() => {
     const refreshAll = () => {
       attemptedRef.current.clear();
@@ -265,6 +270,10 @@ export default function BoardScreen() {
       } else {
         try {
           photoPath = await uploadPhoto(boardId, itemId, draft.photoUri);
+          // The bytes at this path are brand-new (or freshly overwritten on
+          // retry): drop any cached file so the board renders them, not a
+          // stale copy from an earlier attempt.
+          await dropCachedPhoto(photoPath);
         } catch (e) {
           // The upload isn't routed through useBoard, so surface its error here.
           useToast.getState().show(friendlyMessage(e));

@@ -204,8 +204,8 @@ export function AddNoteSheet({
     setPicking(true);
     try {
       // Request the original (quality: 1 = no pre-compress) so the single
-      // client-side lossy encode happens in preparePhoto (2048px / JPEG
-      // 0.8), keeping maximum fidelity into the upload pipeline.
+      // client-side lossy encode happens in preparePhoto (1600px / JPEG
+      // 0.75), keeping maximum fidelity into the upload pipeline.
       const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
       if (!res.canceled && res.assets[0]) {
         setPhotoUri(res.assets[0].uri);
@@ -599,7 +599,14 @@ export function AddNoteSheet({
               </Pressable>
               <View style={styles.createSpacer} />
               <Pressable onPress={submit} disabled={!canPost} style={[styles.postBtn, !canPost && styles.postDisabled]}>
-                <Text style={styles.postText}>Post</Text>
+                {submitting ? (
+                  <View style={styles.postBusy}>
+                    <ActivityIndicator size="small" color={colors.onPine} />
+                    <Text style={styles.postText}>{tab === 'photo' ? 'Uploading…' : 'Posting…'}</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.postText}>Post</Text>
+                )}
               </Pressable>
             </View>
           ) : (
@@ -608,7 +615,14 @@ export function AddNoteSheet({
                 <Text style={styles.cancelText}>Cancel</Text>
               </Pressable>
               <Pressable onPress={submit} disabled={!canPost} style={[styles.postBtn, !canPost && styles.postDisabled]}>
-                <Text style={styles.postText}>{submitLabel}</Text>
+                {submitting ? (
+                  <View style={styles.postBusy}>
+                    <ActivityIndicator size="small" color={colors.onPine} />
+                    <Text style={styles.postText}>Saving…</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.postText}>{submitLabel}</Text>
+                )}
               </Pressable>
             </View>
           )}
@@ -847,4 +861,5 @@ const styles = StyleSheet.create({
   postBtn: { backgroundColor: colors.pine, borderRadius: 999, paddingHorizontal: 22, paddingVertical: 9 },
   postDisabled: { backgroundColor: colors.inkFaint },
   postText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.onPine },
+  postBusy: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 });

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { ItemWithAuthor, ListEntry } from '../types';
@@ -56,6 +57,18 @@ export function NotePaper({
   const age = timeAgo(item.createdAt);
 
   const isPhoto = variant === 'photo';
+  // Show the whole photo: size the frame from the image's intrinsic aspect
+  // (via onLoad) with contentFit contain, so nothing is ever cropped.
+  // Clamped so extreme shapes (panoramas, tall screenshots) letterbox a
+  // little instead of exploding the board layout; the card re-measures via
+  // onLayout and the board reflows around it. Keyed by URI (no reset effect)
+  // so a changed photo re-resolves instead of reusing a stale aspect.
+  const [aspects, setAspects] = useState<Record<string, number>>({});
+  const imgAspect = photoUrl ? aspects[photoUrl] : undefined;
+  const aspect =
+    imgAspect && Number.isFinite(imgAspect) && imgAspect > 0
+      ? Math.min(16 / 9, Math.max(2 / 3, imgAspect))
+      : 4 / 3;
   const cardBg = item.color === 'paper' ? colors.paper : palette.bg;
   const borderColor = item.color === 'paper' ? colors.paperEdge : palette.edge;
 
@@ -108,8 +121,17 @@ export function NotePaper({
         {isPhoto && photoUrl ? (
           <Image
             source={{ uri: photoUrl }}
-            style={[styles.image, { borderRadius: 2, aspectRatio: 4 / 3 }]}
-            contentFit="cover"
+            style={[styles.image, { borderRadius: 2, aspectRatio: aspect }]}
+            contentFit="contain"
+            onLoad={(e) => {
+              const { width, height } = e.source;
+              if (width > 0 && height > 0 && photoUrl) {
+                const next = width / height;
+                setAspects((prev) =>
+                  prev[photoUrl] === next ? prev : { ...prev, [photoUrl]: next },
+                );
+              }
+            }}
             accessible
             accessibilityLabel={item.body?.trim() ? item.body.trim() : 'Attached photo'}
             accessibilityRole="image"
