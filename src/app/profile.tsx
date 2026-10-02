@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, Alert, Linking } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet, Alert, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
@@ -20,6 +20,12 @@ import {
   myAccount,
   requestEmailChange,
 } from '../lib/api';
+import {
+  assertOAuthProviderAvailable,
+  isOAuthProviderAvailable,
+  OAuthProviderId,
+  ProviderUnavailableError,
+} from '../lib/authProviders';
 import { INVITE_BASE_URL } from '../lib/inviteLinks';
 
 /** Open a legal page on the website (Privacy / Terms / Contact). */
@@ -44,6 +50,8 @@ export default function ProfileScreen() {
     null,
   );
   const isGuest = !user || user.isAnonymous;
+  // Google is hidden on iOS until Apple login is configured and review-safe.
+  const googleAvailable = isOAuthProviderAvailable('google', Platform.OS);
 
   useEffect(() => {
     // Guests have no account row to show; nothing to fetch. (The saved account
@@ -69,13 +77,18 @@ export default function ProfileScreen() {
     );
   };
 
-  const link = async (provider: 'apple' | 'google') => {
+  const link = async (provider: OAuthProviderId) => {
     try {
+      assertOAuthProviderAvailable(provider, Platform.OS);
       await linkProvider(provider);
       await init();
       useToast.getState().show('Account saved');
     } catch (e) {
       if (e instanceof AuthCancelledError) return;
+      if (e instanceof ProviderUnavailableError) {
+        useToast.getState().show(e.message);
+        return;
+      }
       if (isIdentityConflict(e)) {
         confirmConflict();
         return;
@@ -161,10 +174,12 @@ export default function ProfileScreen() {
                 ? `Keep your ${boards.length} ${boards.length === 1 ? 'fridge' : 'fridges'} if you change phones.`
                 : 'Keep your fridges if you change phones.'}
             </Text>
-            <Pressable style={styles.saveBtnRow} onPress={() => void link('google')}>
-              <MaterialCommunityIcons name="google" size={20} color={colors.pine} />
-              <Text style={styles.saveRowText}>Save with Google</Text>
-            </Pressable>
+            {googleAvailable ? (
+              <Pressable style={styles.saveBtnRow} onPress={() => void link('google')}>
+                <MaterialCommunityIcons name="google" size={20} color={colors.pine} />
+                <Text style={styles.saveRowText}>Save with Google</Text>
+              </Pressable>
+            ) : null}
             {savingEmail ? (
               <EmailCode
                 mode="link"

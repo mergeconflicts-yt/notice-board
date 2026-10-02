@@ -1,0 +1,20 @@
+appId: com.fridgeboard.app
+---
+# Account deletion on a signed build: profile -> Delete account -> confirm.
+# Ends back at Welcome with the account gone.
+# Covers prod-checklist §2 "deleting an account".
+- runFlow: _guest.yaml
+- tapOn:
+    text: "You · E2E Guest"
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
+- assertVisible: "E2E Guest"
+- tapOn:
+    text: "Delete account"
+    retryTapIfNoChange: true
+- tapOn:
+    text: "Delete account"
+    rightOf: "Cancel"
+- extendedWaitUntil:
+    visible: "Use as guest"
+    timeout: 60000

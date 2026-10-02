@@ -1,0 +1,25 @@
+appId: com.fridgeboard.app
+---
+# Relaunch persistence on a signed build: post a note, kill the app,
+# relaunch, and confirm the board content survived. Approximates the
+# background/lock + relaunch journey in prod-checklist §2 (a real device
+# lock step stays manual: lock the phone between kill and relaunch).
+- runFlow: _board.yaml
+- tapOn:
+    text: "+ Add note"
+    retryTapIfNoChange: true
+- tapOn:
+    id: note-field
+- inputText: "E2E survive relaunch"
+- tapOn:
+    text: "Post"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "E2E survive relaunch"
+    timeout: 30000
+- killApp
+- launchApp
+- extendedWaitUntil:
+    visible: "E2E survive relaunch"
+    timeout: 60000
+- runFlow: _teardown.yaml

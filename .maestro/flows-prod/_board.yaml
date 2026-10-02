@@ -1,0 +1,16 @@
+appId: com.fridgeboard.app
+---
+# Prod helper: guest signup + create "E2E Fridge". Ends on the empty board.
+- runFlow: _guest.yaml
+- tapOn:
+    text: "Create a fridge"
+    retryTapIfNoChange: true
+- tapOn:
+    id: fridge-name-field
+- inputText: "E2E Fridge"
+- tapOn:
+    text: "Create"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "+ Add note"
+    timeout: 30000

@@ -98,10 +98,12 @@ It is rebuilt in `..._item_position` so its expanded columns also carry
 
 | Bucket | Visibility | Access |
 |---|---|---|
-| `board-photos` | private | path `<board_id>/<item_id>/<uuid>.jpg`; read = board member; insert = board member **and** `owner = auth.uid()`; no update/delete |
+| `board-photos` | private | path `<board_id>/<item_id>/<uuid>.jpg`; read = board member; no client insert/update/delete (only the service-role `upload-photo` function writes, and purge deletes) |
 | `avatars` | private | path `<user_id>/<uuid>.jpg`; read = self or someone sharing a board; no client writes (write policies dropped — uploads unused) |
 
 Photo bytes are resized/re-encoded client-side (stripping EXIF) before upload.
+Intent issuance is limited to 20/hour and 20 pending per account, 500 live
+photos per board, 256 MB per account, and 768 MB project-wide.
 Display uses 24h signed URLs (re-signed every 12h / on foreground, so images
 aren't reloaded often).
 
@@ -128,8 +130,9 @@ Internal (no client grants): `hit_rate_limit`, `promote_longest_member`,
 `normalise_invite_code`, `default_keep_until`. `is_member`/`_path_board_id` are
 granted to `authenticated` only (RLS/storage policies run as the caller).
 Service-role only (the Edge jobs): `expired_for_purge`, `photo_paths_in_use`,
-`purge_items`, `purge_boards`, `inactive_anonymous_user_ids`,
-`is_inactive_anonymous_user`, `job_failures`, `http_failures`.
+`project_photo_bytes_used`, `purge_items`, `purge_boards`,
+`inactive_anonymous_user_ids`, `is_inactive_anonymous_user`, `job_failures`,
+`http_failures`.
 
 ## Triggers
 

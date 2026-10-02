@@ -30,11 +30,11 @@ Repeat per hosted project (`Fridge-Board-dev` first, then the prod twin).
 - [x] Rename to Fridge Board — `fridgeboard://`, `com.fridgeboard.app`.
 - [x] Local verify: reset + 487 pgTAP + lint + tsc + 33 unit pass, patch applied.
   CI `check` + `database` green on main 2026-09-28 after the JSR pin fix (see CI fix note).
-- [x] Auth: anonymous ON + manual linking ON confirmed (per-IP rate limit NOT set — discussed 2026-09-28, explicitly excluded; values proposed but not applied — see Rate limits note).
+- [ ] Auth rate limits: anonymous ON + manual linking ON are confirmed, but the hosted per-IP/signup limits are still unset. They must be applied in the Supabase dashboard before public registration; this repo cannot set hosted Auth limits. Use the proposed values in the Rate limits note.
 - [x] SMTP via Resend (key + subdomain + sender + 1s interval) + `{{ .Token }}` in 3 templates mirrored + Confirm email ON verified 2026-09-28.
 - [x] Turnstile CAPTCHA on (Managed, pre-clearance OFF, `fridge-board.kranehx.com`) + site key in EAS env (2026-09-28).
 - [x] Google OAuth: Web ID/secret + callback in Supabase; iOS + Android clients created (EAS SHA-1) — free, no Apple account needed (2026-09-28).
-- [ ] Apple (Services ID + `.p8`) — DEFERRED: no Apple Developer account. Blocks link-site `APPLE_TEAM_ID`/`APP_STORE_ID` too. The Apple buttons and `ios.usesAppleSignIn` were removed from the release (Welcome/Profile/app.json) so iOS ships Google + email + guest; re-add the entitlement and provider together. Watch App Store Guideline 4.8 (Apple must be offered when Google is).
+- [ ] Apple (Services ID + `.p8`) — DEFERRED: no Apple Developer account. Blocks link-site `APPLE_TEAM_ID`/`APP_STORE_ID` too. The Apple buttons and `ios.usesAppleSignIn` were removed from the release (Welcome/Profile/app.json), and Google is now release-gated off iOS (`src/lib/authProviders.ts`); iOS ships email + guest, while Android retains Google + email + guest. Re-enable Google on iOS only together with Apple login. Watch App Store Guideline 4.8 (do not advertise a third-party login on iOS unless Apple login is also offered).
 - [x] Run Deploy workflow → `SUPABASE-Dev` green 2026-09-28 (12 migrations, 4 functions, `JOB_SECRET`, lint, verify posture all pass).
 - [x] CI manual-only (2026-09-28): `ci.yml` is `workflow_dispatch` — nothing runs on push/merge/PR; dispatch `check` + `database` from Actions only when needed.
 - [ ] Link site — PARTIAL: Cloudflare serves `website/` directly, so the invite fallback is merged into it (`website/j.html`, `website/_redirects` `/j/* → /j.html`, and link-scoped rules in `website/_headers`). Still pending Apple IDs: `.well-known/apple-app-site-association` + `.well-known/assetlinks.json` (run `web/build.mjs` and copy `.well-known/*` in once `APPLE_TEAM_ID`/`ANDROID_SHA256`/`APP_STORE_ID` exist). Interim `EXPO_PUBLIC_INVITE_BASE_URL=https://fridge-board.kranehx.com`. `web/vercel.json` is the ignored historical equivalent.
@@ -206,7 +206,7 @@ Open:
 - **Apple**: Services ID + `.p8` — DEFERRED, needs paid Apple Developer
   account. Without it "Continue with Apple" opens a provider error page
   (acceptable for now; Google + email + guest cover testing).
-- **Rate limits**: NOT set (discussed 2026-09-28, excluded by choice).
+- **Rate limits**: still NOT set; do not publicly register accounts until the hosted dashboard values below are applied.
   Proposed values matching `supabase/config.toml:200-215` (dashboard shows
   per-hour; config is per-5min for 4 of them): emails/hour `30`
   (`email_sent`), SMS/hour `30`, token refreshes `1800` (=150/5min),
@@ -289,9 +289,11 @@ Open:
   `…11_vintage_fridge_colors`); the repo now also carries `…12_vintage_pastels`,
   `…13–15_keep_cycle*`, `…16_storage_abuse_limits` (avatar write policies
   dropped, 256 MB/account photo cap) and `…17_service_cleanup_accounts`
-  (service-only `cleanup_anonymous_user`). Repo = 18 migrations; pending
-  deploy via the Deploy workflow, which pushes all additive migrations before
-  redeploying the functions (so the RPC exists before `cleanup-users` calls it).
+  (service-only `cleanup_anonymous_user`), plus unpushed
+  `…18_storage_project_quota` (768 MB/project photo ceiling with a serialized
+  issuance check). Repo = 19 migrations; pending deploy via the Deploy
+  workflow, which pushes all additive migrations before redeploying the
+  functions (so the RPC exists before `cleanup-users` calls it).
 - 4 Edge Functions: `delete-account` (`verify_jwt = true`, admin deletes the
   auth user), `upload-photo` (`verify_jwt = true`, sole writer of
   `board-photos` bytes), `purge` + `cleanup-users` (`verify_jwt = false`,

@@ -155,7 +155,7 @@ project's dashboard:
   `{{ .ConfirmationURL }}` — the app only accepts the code. `[auth.email]` sets
   `otp_length = 6` and `otp_expiry = 600`; raise `[auth.rate_limit]
   email_sent` for the code flow.
-- **Anonymous sign-ins on** and a per-IP rate limit (Auth → Rate Limits).
+- **Anonymous sign-ins on** and the hosted per-IP/signup rate limits (Auth → Rate Limits). Local `config.toml` does not configure the hosted project, so apply these dashboard values before public registration.
 - **Apple provider on** (`Auth → Providers → Apple`): Apple Developer Services
   ID as Client ID + the `.p8` private key as Secret (needs a paid Apple
   Developer account). Without this, "Continue with Apple" opens a provider

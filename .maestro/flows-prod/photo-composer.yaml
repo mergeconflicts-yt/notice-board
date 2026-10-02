@@ -1,0 +1,26 @@
+appId: com.fridgeboard.app
+---
+# Photo composer on a signed build: photo tab UI + caption field.
+# The system picker (permission dialog + library grid) has no stable
+# selectors, so a human taps the dropzone, picks a real photo, and confirms
+# the upload lands on the board — this flow locks the composer UI in place
+# and leaves the board clean.
+# Covers prod-checklist §2 "real photo picking through the system picker".
+- runFlow: _board.yaml
+- tapOn:
+    text: "+ Add note"
+    retryTapIfNoChange: true
+- tapOn:
+    id: tab-photo
+    retryTapIfNoChange: true
+- tapOn:
+    id: caption-field
+- inputText: "E2E view"
+- assertVisible: "E2E view"
+- tapOn:
+    text: "Cancel"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "+ Add note"
+    timeout: 15000
+- runFlow: _teardown.yaml

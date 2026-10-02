@@ -18,6 +18,7 @@ import {
   previewInviteToken,
 } from '../lib/api';
 import type { InvitePreview } from '../types';
+import { isOAuthProviderAvailable, ProviderUnavailableError } from '../lib/authProviders';
 import { useSession } from '../store/session';
 
 type Props = {
@@ -101,6 +102,8 @@ export function Welcome({ inviteToken }: Props) {
   const [guestName, setGuestName] = useState('');
   const [guestCap, setGuestCap] = useState<string | null>(null);
   const isInvite = Boolean(inviteToken);
+  // No social login is advertised on iOS until Sign in with Apple is available.
+  const googleAvailable = isOAuthProviderAvailable('google', Platform.OS);
 
   // Token preview is public (token-only), so the invite screen can name the
   // board before any session exists.
@@ -124,7 +127,13 @@ export function Welcome({ inviteToken }: Props) {
       await fn();
       await afterAuth();
     } catch (e) {
-      if (!(e instanceof AuthCancelledError)) setError(friendlyMessage(e));
+      if (e instanceof AuthCancelledError) {
+        // The user backed out of the browser; keep the existing choice screen.
+      } else if (e instanceof ProviderUnavailableError) {
+        setError(e.message);
+      } else {
+        setError(friendlyMessage(e));
+      }
     } finally {
       setBusy(false);
     }
@@ -218,15 +227,17 @@ export function Welcome({ inviteToken }: Props) {
 
   const accountButtons = (
     <View style={styles.roundRow}>
-      <Pressable
-        style={[styles.round, styles.leafBtn]}
-        onPress={() => void runAuthed(() => continueWithProvider('google'))}
-        disabled={busy}
-        accessibilityRole="button"
-        accessibilityLabel="Continue with Google"
-      >
-        <MaterialCommunityIcons name="google" size={22} color={colors.pine} />
-      </Pressable>
+      {googleAvailable ? (
+        <Pressable
+          style={[styles.round, styles.leafBtn]}
+          onPress={() => void runAuthed(() => continueWithProvider('google'))}
+          disabled={busy}
+          accessibilityRole="button"
+          accessibilityLabel="Continue with Google"
+        >
+          <MaterialCommunityIcons name="google" size={22} color={colors.pine} />
+        </Pressable>
+      ) : null}
       <Pressable
         style={[styles.round, styles.orangeBtn]}
         onPress={() => setStep('email')}
@@ -241,13 +252,15 @@ export function Welcome({ inviteToken }: Props) {
 
   const roundAccounts = (
     <View style={styles.roundRow}>
-      <Pressable
-        style={[styles.round, styles.leafBtn]}
-        onPress={() => void runAuthed(() => continueWithProvider('google'))}
-        disabled={busy}
-      >
-        <MaterialCommunityIcons name="google" size={22} color={colors.pine} />
-      </Pressable>
+      {googleAvailable ? (
+        <Pressable
+          style={[styles.round, styles.leafBtn]}
+          onPress={() => void runAuthed(() => continueWithProvider('google'))}
+          disabled={busy}
+        >
+          <MaterialCommunityIcons name="google" size={22} color={colors.pine} />
+        </Pressable>
+      ) : null}
       <Pressable
         style={[styles.round, styles.orangeBtn]}
         onPress={() => setStep('email')}

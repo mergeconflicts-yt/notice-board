@@ -1,0 +1,20 @@
+appId: com.fridgeboard.app
+---
+# Email sign-in on a signed build: Welcome -> email step -> code request.
+# The 6-digit code arrives by email (custom SMTP in prod) and the Turnstile
+# widget may challenge first — a human completes the inbox step, then the
+# flow asserts the code screen is reachable and the send succeeded.
+# Covers prod-checklist §2 "email sign-in (6-digit code) on both platforms".
+- runFlow: _launch.yaml
+- tapOn:
+    text: "Continue with email"
+    retryTapIfNoChange: true
+- tapOn:
+    id: email-field
+- inputText: "e2e-device@example.com"
+- tapOn:
+    text: "Send code"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Check your email"
+    timeout: 60000

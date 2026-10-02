@@ -1,0 +1,18 @@
+appId: com.fridgeboard.app
+---
+# Prod helper: signed-build guest signup -> home. Ends on home with
+# display name E2E Guest. Turnstile-gated: on a high-risk device the
+# widget may need a challenge before "Continue as guest" succeeds.
+- runFlow: _launch.yaml
+- tapOn:
+    text: "Use as guest"
+    retryTapIfNoChange: true
+- tapOn:
+    id: guest-name
+- inputText: "E2E Guest"
+- tapOn:
+    text: "Continue as guest"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "Create a fridge"
+    timeout: 60000

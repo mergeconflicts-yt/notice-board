@@ -1,0 +1,18 @@
+appId: com.fridgeboard.app
+---
+# Negative join test on a signed build: a bogus code shows the
+# invalid-code error and joins nothing. No board is created, so no
+# teardown is needed.
+- runFlow: _guest.yaml
+- tapOn:
+    text: "Join a fridge"
+    retryTapIfNoChange: true
+- tapOn:
+    id: invite-code-field
+- inputText: "ZZZZZ-ZZZZZ"
+- tapOn:
+    text: "Join"
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: "That invite isn’t working. Ask for a fresh link."
+    timeout: 30000

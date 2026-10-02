@@ -1,3 +1,17 @@
+// Store buttons: links carrying data-placeholder point at listings that do
+// not exist yet (App Store id 0000000000, unpublished Play listing) and
+// would 404. Render them as inert "soon" pills until the attribute is
+// removed at launch (see docs/store-listing.md).
+document.querySelectorAll('a.store-btn[data-placeholder]').forEach((a) => {
+  a.removeAttribute('href');
+  a.classList.add('is-soon');
+  a.setAttribute('aria-disabled', 'true');
+  const strong = a.querySelector('strong');
+  if (strong && !/soon/i.test(strong.textContent || '')) {
+    strong.textContent += ' (soon)';
+  }
+});
+
 // FAQ: swap + / ✕ on toggle
 document.querySelectorAll('#faq details').forEach((d) => {
   const icon = d.querySelector('summary span');

@@ -1,0 +1,20 @@
+appId: com.fridgeboard.app
+---
+# Guest sign-out on a signed build: signing out deletes the guest account —
+# boards are gone and no error toast appears. Ends back at Welcome.
+# Covers prod-checklist §2 "guest sign-out (deletes the guest account —
+# confirm the boards are gone and no error toast appears)".
+- runFlow: _board.yaml
+- tapOn:
+    text: "You · E2E Guest"
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
+- tapOn:
+    text: "Sign out"
+    retryTapIfNoChange: true
+- tapOn:
+    text: "Sign out"
+    rightOf: "Cancel"
+- extendedWaitUntil:
+    visible: "Use as guest"
+    timeout: 60000

@@ -23,3 +23,11 @@ node store-screenshots/export.mjs
 
 Tip: capture at iPhone 16 Pro / 15 Pro resolution (1206×2622 or 1290×2796)
 with the status bar visible — the frame crops with `object-fit: cover`.
+
+## Release-matching rule (blocking)
+
+Captures must show only login options the release build offers. A capture
+showing a removed provider (e.g. Apple login, which is not shipped — see
+`src/lib/authProviders.ts`) is a store-review hazard and must be
+quarantined to `assets/stale/`, never exported. Capture `welcome.png` from
+the release build (iOS: email + guest only). See `docs/store-listing.md` §4.

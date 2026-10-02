@@ -35,11 +35,22 @@ menu), and real external auth/photo flows. That lives in `flows-prod/`:
 npm run test:e2e:prod   # maestro --config .maestro/config.prod.yaml .maestro/flows-prod
 ```
 
-`flows-prod/` currently has `_launch.yaml` (signed-build launch) and
-`smoke.yaml` (Welcome → guest → home). Add the device-only journeys — external
-Google/email auth, real photo picking, backgrounding, sign-out/account deletion
-— beside them. Maestro flow headers cannot read env vars, so `appId` is fixed
-per directory: keep Expo Go flows in `flows/` and prod flows in `flows-prod/`.
+`flows-prod/` holds the signed-build suite (`_launch.yaml` launch plus
+`_guest` / `_board` / `_teardown` helpers). Maestro flow headers cannot read
+env vars, so `appId` is fixed per directory: keep Expo Go flows in `flows/`
+and prod flows in `flows-prod/`.
+
+| Prod flow | Journey (needs `npm run build:prod` + real device) |
+| --- | --- |
+| `smoke` | Welcome → guest name → home |
+| `email-auth` | Welcome → email step → code send → "Check your email" (human redeems the inbox code; Turnstile may challenge) |
+| `photo-composer` | photo tab UI + caption field (human picks a real photo in the system picker; permission dialog + library have no stable selectors) |
+| `invite-code` | owner copies invite code → fresh guest pastes it → joins → leaves |
+| `invalid-code` | bogus code shows the invalid-code error |
+| `coldstart-invite` | `fridgeboard://j/<token>` from fresh state lands on the invite landing (https variant waits for the link-site fix + a rebuilt IPA/AAB) |
+| `relaunch` | post note → kill → relaunch → note persists (lock the phone mid-step for the full backgrounding check) |
+| `guest-signout` | guest sign-out deletes the guest account → back at Welcome, boards gone |
+| `account-deletion` | profile → Delete account → confirm → back at Welcome |
 
 ## What is covered
 
@@ -61,8 +72,9 @@ per directory: keep Expo Go flows in `flows/` and prod flows in `flows-prod/`.
   is locked by `photo-composer`; the server upload path was verified
   end-to-end during development.
 - **Google/email sign-in** (human/captcha gated) stays manual — guest signup
-  stands in for auth in every flow. Apple is not shipped this release (no
-  Apple Developer account; buttons + entitlement removed).
+  stands in for auth in every flow. Google is shown only off iOS in this
+  release; Apple is not shipped at all (no Apple Developer account; buttons +
+  entitlement removed).
 - `join-invite` leaves the owner's emptied board behind (the joiner leaves,
   only owners can delete). Local nightly cleanup jobs remove the debris;
   reruns are unaffected since every flow uses fixed names on fresh guests.

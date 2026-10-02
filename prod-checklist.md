@@ -18,14 +18,19 @@
   vulnerable code path is gone. Exposure was narrow regardless (only a tapped
   malicious deep link reaches the decoder; availability-only, no data impact).
   Re-check on every Expo SDK upgrade: drop the patch once `query-string`
-  ships the fix in a CJS-compatible release.
+  ships the fix in a CJS-compatible release. The `node-forge` chain
+  (GHSA-86w9-cpqp-85rv, RSA PKCS#1 v1.5 verification via
+  `@expo/code-signing-certificates` via `@expo/cli`) is local-CLI tooling
+  only — it never ships in the app bundle — and the only audit-proposed fix
+  is a breaking `expo@44` downgrade, so it is accepted like the above.
+  Re-check on every Expo SDK upgrade.
 
 ## 2. Device tests on a production build, not Expo Go:
 Start from `npm run build:prod` (signed IPA + AAB) and run the device suite:
 `npm run test:e2e:prod` (`.maestro/flows-prod/`, appId `com.fridgeboard.app`).
 Cover at least:
-- Google linking, email sign-in (6-digit code), and signing in on a second phone
-  (Apple is deferred this release — buttons + entitlement removed)
+- Android Google linking, email sign-in (6-digit code) on both platforms, iOS email/guest sign-in, and signing in on a second phone
+  (Apple is deferred this release — buttons + entitlement removed; Google is release-gated off iOS in `src/lib/authProviders.ts`)
 - real photo picking through the system picker (permission dialog + library),
   then the upload landing on the board
 - Turnstile
@@ -38,6 +43,7 @@ Cover at least:
 ## 3. Production Supabase settings
 `config.toml` only covers your local setup, so the hosted project needs:
 - captcha on (it's `enabled = false` locally)
+- hosted Auth signup/IP rate limits on (local `config.toml` does not apply to hosted; required before public registration)
 - email confirmations on
 - custom SMTP (the built-in sender only sends a couple of emails an hour)
 - `fridgeboard://auth` in the redirect URLs
@@ -50,7 +56,7 @@ Cover at least:
 - a check of `http_failures()` the next day to confirm the nightly jobs ran
 - photo uploads go through the `upload-photo` Edge Function (server-side
   decode, non-image rejection, 2048px downsize, JPEG re-encode stripping
-  EXIF/GPS; quotas 20 intents/hour/account, 256 MB/account). It deploys with
+  EXIF/GPS; quotas 20 intents/hour/account, 256 MB/account, 768 MB/project). It deploys with
   the other functions in deploy.yml; local dev needs `supabase functions
   serve` running or photo posts fail with a network error.
 
@@ -78,6 +84,9 @@ Cover at least:
   Fridge settings → Safety. Moderation was out of scope in your plan — this
   is the decided scope.
 - App Privacy details for the App Store and the Data safety form for Play.
+  Ready-to-paste answers plus the support-email, store-button, association
+  and screenshot gates live in `docs/store-listing.md` (`sh
+  scripts/verify-support-email.sh` must print OK before submission).
 - The bundle id `com.fridgeboard.app` is generic. Make sure you own it before you register it.
 
 ## 5. Migrations: 

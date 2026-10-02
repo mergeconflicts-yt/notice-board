@@ -15,7 +15,7 @@ Why these choices
 • Guest stays anonymous auth (not local-only data): boards are shared, so they must live on the server anyway. "Data
 I
 loss on uninstall" is really "loss of the key to that account" - the warning should say so plainly.
-• Apple must be offered on iOS when Google is (App Store login-services rule). Guest mode also helps review: Apple doesn't want an account forced before people can try the app.
+• iOS currently offers no third-party login at all: Google is hidden and rejected there until Sign in with Apple is configured. Android may still offer Google. Guest mode also helps review: Apple doesn't want an account forced before people can try the app.
 
 
 Changes:
@@ -77,6 +77,6 @@ Tests
 5. Invite link on a fresh install → preview → join as guest, and join with Google.
 6. Signed-up user signs out → Welcome, not a new guest.
 Store notes
-• iOS: Sign in with Apple entitlement and an Apple Services ID for Supabase. DEFERRED for this release (no paid Apple Developer account): the Apple buttons and `ios.usesAppleSignIn` were removed from Welcome/Profile/app.json, leaving Google + email + guest. Re-add the entitlement and provider together before offering Apple again; note App Store Guideline 4.8 (offer Apple when Google is offered).
+• iOS: Sign in with Apple entitlement and an Apple Services ID for Supabase. DEFERRED for this release (no paid Apple Developer account): the Apple buttons and `ios.usesAppleSignIn` were removed from Welcome/Profile/app.json, and Google is release-gated off iOS in `src/lib/authProviders.ts`. iOS therefore offers email + guest, while Android offers Google + email + guest. Re-enable Google on iOS only together with Apple login; note App Store Guideline 4.8 (do not advertise a third-party login on iOS unless Apple login is also offered).
 • Android: Google Auth client for the release SHA-1 (and the Play App Signing key).
 • Privacy policy must now mention email addresses and Apple/Google identity data.

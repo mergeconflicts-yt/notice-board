@@ -164,6 +164,10 @@ body {
 .store-btn span { display: flex; flex-direction: column; line-height: 1.15; }
 .store-btn small { font-size: 0.65rem; font-weight: 400; opacity: 0.8; }
 .store-btn strong { font-size: 0.95rem; }
+/* Pre-launch: placeholder store links are neutered by script.js (or the
+   inline snippet on pages without it) so they never 404. Remove the
+   data-placeholder attributes — not this rule — when the listings go live. */
+.store-btn.is-soon { opacity: 0.65; box-shadow: none; cursor: default; }
 .guest-note { margin-top: 0.9rem; font-size: 0.9rem; color: var(--ink-soft); }
 .tick { color: var(--board-sage); font-weight: 800; }
 

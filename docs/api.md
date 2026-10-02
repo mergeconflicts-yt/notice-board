@@ -107,14 +107,15 @@ the last two entries can't both recompute `keep_until` from stale state.
 ### Photo uploads
 | Function | Access | Notes |
 |---|---|---|
-| `start_photo_upload(p_board_id, p_item_id)` → path | member | issues a one-time intent path; 20 intents/hour/account, ≤20 pending/user, ≤500 live photos/board, 256 MB/account |
+| `start_photo_upload(p_board_id, p_item_id)` → path | member | issues a one-time intent path; 20 intents/hour/account, ≤20 pending/user, ≤500 live photos/board, 256 MB/account, 768 MB/project |
 
 Every photo upload is bound to a server-issued intent and the bytes go
 through the `upload-photo` Edge Function — never a direct storage write (the
 `board-photos` policy admits no client writes). The function decodes the
 upload (rejecting non-images), downsizes to 2048px, re-encodes as JPEG
 (stripping EXIF/GPS), stores it at the intent path, and records `byte_size`
-for the quota. `post_item` consumes the intent when the photo is linked.
+for the account and project quotas. `post_item` consumes the intent when the photo is linked.
+Intent issuance is serialized across accounts before the project ceiling is checked.
 Client-side resize/re-encode still runs first to keep oversized originals
 off the network; the server re-validates regardless.
 

@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
+import { assertOAuthProviderAvailable, OAuthProviderId } from '../lib/authProviders';
 import { supabase } from '../lib/supabase';
 import { KeychainError, LargeSecureStore } from '../lib/secureStore';
 import { forgetBoard } from '../lib/lastBoard';
@@ -27,8 +29,8 @@ type SessionState = {
   init: (captchaToken?: string, manual?: boolean) => Promise<void>;
   /** Guest path: explicit anonymous sign-in, then the normal ready path. */
   continueAsGuest: (captchaToken?: string) => Promise<void>;
-  /** Apple/Google path: provider sign-in, immediate name claim, then ready. */
-  continueWithProvider: (provider: 'apple' | 'google') => Promise<void>;
+  /** Available provider sign-in, immediate name claim, then ready. */
+  continueWithProvider: (provider: OAuthProviderId) => Promise<void>;
   /** Email path: send the 6-digit code (no state change). */
   sendEmailCode: (email: string, captchaToken?: string) => Promise<void>;
   /** Email path: redeem the code, then the normal ready path. */
@@ -260,6 +262,7 @@ export const useSession = create<SessionState>((set) => ({
   },
 
   continueWithProvider: async (provider) => {
+    assertOAuthProviderAvailable(provider, Platform.OS);
     await signInProvider(provider);
     // Apple only sends the name on first sign-in — claim it immediately.
     // (handle_new_user already set it server-side; this is the fallback.)

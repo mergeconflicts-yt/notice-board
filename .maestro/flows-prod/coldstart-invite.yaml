@@ -1,0 +1,17 @@
+appId: com.fridgeboard.app
+---
+# Cold-start deep-link invite on a signed build: fresh install state, open
+# a board link straight into the app with no session. With no session the
+# gate shows the invite landing ("Join as guest") instead of the board —
+# that landing IS the assertion: the link routed into the app cold and the
+# token survived (a stripped token would land on plain Welcome).
+# Covers prod-checklist §2 "invite and board links on a cold start".
+# NOTE: the https:// variant (https://<host>/j/<token>) needs the link-site
+# redirect fix + association files + a fresh prod build baking the applinks
+# host (app.config.ts). Until then this custom-scheme link covers the same
+# in-app path.
+- clearState
+- openLink: fridgeboard://j/ZZZZZZZZ
+- extendedWaitUntil:
+    visible: "Join as guest"
+    timeout: 60000
