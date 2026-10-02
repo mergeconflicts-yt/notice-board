@@ -1,12 +1,19 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 
-const MAX_SIDE = 2048;
-const QUALITY = 0.8;
+const MAX_SIDE = 1600;
+const QUALITY = 0.75;
 
 /**
- * Downscale to a longest side of 2048 and re-encode as JPEG. Re-encoding is
+ * Downscale to a longest side of 1600 and re-encode as JPEG. Re-encoding is
  * what strips EXIF (including GPS) — the original file is never uploaded
  * (docs/plan.md §7).
+ *
+ * 1600 is deliberately below the server's 2048 ceiling: the largest render
+ * anywhere is the note-detail popup (~1200px at 3x DPR; there is no
+ * fullscreen/zoom viewer), so 1600 keeps full displayed sharpness while
+ * roughly halving bytes against the per-account storage quota — and a
+ * smaller input also means less work for the edge function's CPU ceiling.
+ * The server still validates dimensions and EXIF itself regardless.
  *
  * The dimensions come from the rendered image itself (not `Image.getSize`,
  * which can fail for HEIC/cloud URIs). If it did fail we'd skip the resize and
