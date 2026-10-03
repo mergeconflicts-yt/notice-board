@@ -15,23 +15,37 @@
     width: 1200px; height: 630px; overflow: hidden;
     background: #FBF5E9; color: #143C34;
     font-family: 'Nunito', system-ui, sans-serif;
-    display: flex; align-items: center;
+    display: flex; align-items: stretch;
   }
-  .copy { width: 640px; padding: 0 20px 0 72px; }
-  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .top { padding: 56px 0 0 72px; }
+  .left { width: 700px; flex: none; }
+  .copy { padding: 22px 20px 0 72px; }
+  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
   .brand img { width: 44px; height: 44px; border-radius: 10px; display: block; }
   .brand span { font-weight: 800; font-size: 24px; letter-spacing: 4px; color: #0B4F41; }
-  .aud { font-weight: 800; font-size: 19px; letter-spacing: 3px; color: #0B4F41; margin: 2px 0 12px; }
+  .aud { font-weight: 700; font-size: 14px; letter-spacing: 3px; color: #0B4F41; margin: 50px 0 12px; }
   h1 {
     font-family: 'Caveat', cursive; font-weight: 700;
-    font-size: 96px; line-height: 0.98; letter-spacing: -1px; color: #0B4F41;
+    font-size: 78px; line-height: 1.02; letter-spacing: -1px; color: #0B4F41;
+    margin-top: 8px;
   }
-  h1 .hl { background: linear-gradient(transparent 62%, #F1D876 62%); }
-  .lede { margin-top: 20px; font-size: 27px; line-height: 1.45; font-weight: 700; color: #47645B; max-width: 520px; }
-  .art { width: 560px; height: 630px; position: relative; }
+  /* same No-noise shade as the website hero highlight */
+  h1 .hl-noise {
+    background: linear-gradient(transparent 45%, #CBE2C4 45%);
+    padding: 0 0.1em;
+  }
+  .lede { margin-top: 16px; font-size: 20px; line-height: 1.45; font-weight: 600; color: #47645B; max-width: 560px; }
+  .crossed { position: relative; }
+  .struck-line { display: block; white-space: nowrap; font-size: 18px; margin-top: 6px; }
+  .crossed::after {
+    content: ''; position: absolute; left: -2%; right: -2%; top: 54%;
+    height: 2px; background: #C96A27; border-radius: 2px; transform: rotate(-2deg);
+  }
+  .bottom { display: contents; }
+  .art { width: 500px; height: 630px; position: relative; flex: none; }
   .art img {
-    position: absolute; right: 40px; top: 50%; transform: translateY(-50%);
-    height: 600px; width: auto; display: block;
+    position: absolute; right: 56px; top: 50%; transform: translateY(-50%);
+    height: 560px; width: auto; display: block;
     filter: drop-shadow(0 24px 40px rgba(7,51,42,.30));
   }
   .note {
@@ -60,11 +74,15 @@
 </style>
 </head>
 <body>
-  <div class="copy">
+  <div class="left">
+  <div class="top">
     <div class="brand"><img src="../assets/icon.png" alt="" /><span>FRIDGE BOARD</span></div>
     <p class="aud">FOR FAMILIES, ROOMMATES &amp; TEAMS</p>
-    <h1>Stop losing stuff in the group chat.</h1>
-    <p class="lede">One shared board for your home. No replies, no pings — notes, lists, dates and photos that don't scroll away.</p>
+    <h1>Stop losing stuff<br />in the <span class="hl-noise">group chat.</span></h1>
+  </div>
+  <div class="copy">
+    <p class="lede">One shared board for the people you live, play or work with.<br /><span class="struck-line"><span class="crossed">Replies</span>, <span class="crossed">Reactions</span>, <span class="crossed">Read receipts</span>, <span class="crossed">Notifications</span>.</span></p>
+  </div>
   </div>
   <div class="art">
     <img id="fridgeShot" alt="Fridge Board fridge with pinned notes" />

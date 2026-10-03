@@ -152,6 +152,12 @@ body {
 /* hero headline: the one h1 the page owns, with marker highlights */
 .hero-copy h1 { font-size: clamp(2.7rem, 5vw, 3.9rem); line-height: 1.08; margin: 0.5rem 0 1rem; color: var(--pine); }
 .hl { background: var(--brand-yellow); box-decoration-break: clone; -webkit-box-decoration-break: clone; padding: 0 0.08em; }
+/* hero "group chat." in the No-noise shade: pale green underlay, like .kept-noise */
+.hl-noise {
+  background: linear-gradient(transparent 45%, #CBE2C4 45%);
+  box-decoration-break: clone; -webkit-box-decoration-break: clone;
+  padding: 0 0.1em;
+}
 .hl-line { text-decoration: underline; text-decoration-color: var(--brand-yellow); text-decoration-thickness: 4px; text-underline-offset: 6px; }
 .hero-copy .lede { margin-bottom: 1.4rem; max-width: 30rem; }
 .hero-copy .store-row { margin-bottom: 0.2rem; }
@@ -437,6 +443,8 @@ body {
 .struck-list { font-size: clamp(2.2rem, 4.5vw, 3.2rem); line-height: 1.25; margin: 0.8rem 0 1.6rem; word-spacing: 0.14em; }
 .crossed { position: relative; color: var(--ink-soft); }
 .crossed::after { content: ''; position: absolute; left: -2%; right: -2%; top: 52%; height: 4px; background: var(--accent-deep); border-radius: 2px; transform: rotate(-2deg); }
+/* hero lede strikes read at small sizes: thinner line than the display struck-list */
+.lede .crossed::after { height: 2px; }
 .kept { color: var(--ink); }
 .kept-noise {
   background: linear-gradient(transparent 55%, #CBE2C4 55%);
