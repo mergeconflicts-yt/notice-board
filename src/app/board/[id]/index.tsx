@@ -19,13 +19,16 @@ import { FridgeDoor } from '../../../components/FridgeDoor';
 import { MemberDot } from '../../../components/MemberDot';
 import { AddNoteSheet, NoteDraft } from '../../../components/AddNoteSheet';
 import { BoardSwitcher } from '../../../components/BoardSwitcher';
+import { MagnetLayer } from '../../../components/MagnetLayer';
+import { DecorationsTray } from '../../../components/DecorationsTray';
 import { useBoard, randomId } from '../../../hooks/useBoard';
+import { useDecorations } from '../../../hooks/useDecorations';
 import { useSession } from '../../../store/session';
 import { useToast } from '../../../store/toast';
 import { friendlyMessage, keepLonger as apiKeepLonger, uploadPhoto } from '../../../lib/api';
 import { cachedPhotoUri, dropCachedPhoto } from '../../../lib/photoCache';
 import { rememberBoard } from '../../../lib/lastBoard';
-import { ItemWithAuthor } from '../../../types';
+import { ItemWithAuthor, Magnet } from '../../../types';
 
 /** Share of the board height reserved for the pinned-forever strip. */
 const PINNED_FLEX = 3.2;
@@ -66,6 +69,7 @@ export default function BoardScreen() {
   const { height: windowH } = useWindowDimensions();
   const {
     board,
+    members,
     items,
     entries,
     loading,
@@ -76,8 +80,12 @@ export default function BoardScreen() {
     removeItem,
     restoreItem,
   } = useBoard(boardId);
+  const decorations = useDecorations(boardId);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [decorateMode, setDecorateMode] = useState(false);
+  const [trayOpen, setTrayOpen] = useState(false);
+  const [hideDecorations, setHideDecorations] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [entering, setEntering] = useState<Set<string>>(() => new Set());
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
@@ -109,6 +117,65 @@ export default function BoardScreen() {
   // Two board regions: pinned-forever posts up top (30%), everything else below.
   const pinnedItems = useMemo(() => items.filter((i) => i.pinned), [items]);
   const restItems = useMemo(() => items.filter((i) => !i.pinned), [items]);
+
+  // --- Decorations (magnets) -----------------------------------------------
+  const artById = useMemo(
+    () => new Map(decorations.art.map((a) => [a.artId, a] as const)),
+    [decorations.art],
+  );
+  const ownerId = useMemo(
+    () => members.find((m) => m.role === 'owner')?.userId ?? null,
+    [members],
+  );
+  const canRemoveMagnet = useCallback(
+    (m: { placedBy: string | null }) => m.placedBy === (me?.id ?? null) || ownerId === me?.id,
+    [me?.id, ownerId],
+  );
+  // Only magnets on the main door render here: door-anchored ones plus those
+  // attached to a main-door note. Attached to a pinned note is a later pass.
+  const restItemIds = useMemo(() => new Set(restItems.map((i) => i.id)), [restItems]);
+  const doorMagnets = useMemo(
+    () => decorations.magnets.filter((m) => m.itemId === null || restItemIds.has(m.itemId)),
+    [decorations.magnets, restItemIds],
+  );
+
+  const handlePlaceMagnet = useCallback(
+    (artId: string) => {
+      void decorations
+        .place({
+          artId,
+          // Drop near the top of the main door, fanned out a little.
+          x: 0.25 + Math.random() * 0.5,
+          y: 40 + Math.random() * 120,
+          itemId: null,
+          rotation: Math.round((Math.random() * 20 - 10) * 10) / 10,
+        })
+        .catch(() => {});
+    },
+    [decorations],
+  );
+
+  const handleMoveMagnet = useCallback(
+    (m: Magnet, x: number, y: number, itemId: string | null) => {
+      void decorations.move(m, x, y, itemId).catch(() => {});
+    },
+    [decorations],
+  );
+
+  const handleTapMagnet = useCallback(
+    (m: Magnet) => {
+      const label = artById.get(m.artId)?.label ?? 'Magnet';
+      const placer = members.find((mm) => mm.userId === m.placedBy)?.user.displayName;
+      const parts = [m.giftNote ? `${label} · ${m.giftNote}` : label, placer ? `added by ${placer}` : null];
+      useToast.getState().show(parts.filter(Boolean).join(' · '));
+    },
+    [artById, members],
+  );
+
+  const handleOpenUnder = useCallback(
+    (itemId: string) => router.push(`/board/${boardId}/note/${itemId}`),
+    [boardId],
+  );
 
   // Animate freshly-arrived items, ignoring the first paint.
   useEffect(() => {
@@ -404,6 +471,25 @@ export default function BoardScreen() {
 
               <Pressable
                 hitSlop={8}
+                onPress={() => {
+                  setDecorateMode((v) => !v);
+                  setTrayOpen((v) => !v);
+                }}
+                style={styles.decorateBtn}
+                accessibilityRole="button"
+                accessibilityState={{ selected: decorateMode }}
+                accessibilityLabel={decorateMode ? 'Finish decorating' : 'Decorate the fridge'}
+                testID="decorate-toggle"
+              >
+                <MaterialCommunityIcons
+                  name={decorateMode ? 'check' : 'star-four-points-outline'}
+                  size={20}
+                  color={doorInk(board.color)}
+                />
+              </Pressable>
+
+              <Pressable
+                hitSlop={8}
                 onPress={() => router.push('/profile')}
                 style={styles.profileBtn}
                 accessibilityRole="button"
@@ -453,6 +539,25 @@ export default function BoardScreen() {
               onDragEnd={handleDragEnd}
               resetKey={dragReset}
               emptyHint="Everything else lives here."
+              renderOverlay={({ layout, boardW, scale }) => (
+                <>
+                  {!hideDecorations ? (
+                    <MagnetLayer
+                      magnets={doorMagnets}
+                      artById={artById}
+                      layout={layout}
+                      boardW={boardW}
+                      scale={scale}
+                      decorate={decorateMode}
+                      canRemove={canRemoveMagnet}
+                      onMove={handleMoveMagnet}
+                      onRemove={(m) => void decorations.remove(m).catch(() => {})}
+                      onTap={handleTapMagnet}
+                      onOpenUnder={handleOpenUnder}
+                    />
+                  ) : null}
+                </>
+              )}
               />
             )}
           </FridgeDoor>
@@ -514,6 +619,17 @@ export default function BoardScreen() {
         currentBoardId={boardId}
         onClose={() => setSwitcherOpen(false)}
       />
+      <DecorationsTray
+        visible={trayOpen && decorateMode}
+        art={decorations.art}
+        hideDecorations={hideDecorations}
+        onToggleHide={() => setHideDecorations((v) => !v)}
+        onPlace={handlePlaceMagnet}
+        onClose={() => {
+          setTrayOpen(false);
+          setDecorateMode(false);
+        }}
+      />
     </View>
   );
 }
@@ -530,6 +646,14 @@ const styles = StyleSheet.create({
     height: 56,
   },
   profileBtn: { alignItems: 'center', justifyContent: 'center' },
+  decorateBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 36,
+    height: 36,
+    marginRight: 8,
+    borderRadius: 18,
+  },
   // Fridge brand badge: the board name embossed straight onto the door
   // enamel, like an appliance logo — uppercase, letterspaced, no plate.
   // Still tappable: opens the fridge switcher.

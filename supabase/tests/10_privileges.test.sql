@@ -39,7 +39,9 @@ select ok(
         'get_invite_link', 'reset_invite_link', 'preview_invite', 'preview_invite_token',
         'accept_invite', 'delete_account', 'start_photo_upload',
         'report_post', 'list_reported_items', 'dismiss_reports',
-        'block_member', 'unblock_member', 'list_blocked', 'remove_and_block'
+        'block_member', 'unblock_member', 'list_blocked', 'remove_and_block',
+        'board_can_use', 'place_magnet', 'move_magnet', 'remove_magnet',
+        'set_board_theme'
       )
   ),
   'no unexpected function is executable by authenticated');

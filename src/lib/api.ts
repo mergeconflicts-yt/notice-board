@@ -13,7 +13,10 @@ import {
   ItemType,
   ItemWithAuthor,
   ListEntry,
+  Magnet,
   MemberRole,
+  Pack,
+  PackArt,
   User,
 } from '../types';
 
@@ -31,7 +34,10 @@ export type ApiErrorCode =
   | 'invalid_input'
   | 'version_conflict'
   | 'rate_limited'
-  | 'invite_invalid';
+  | 'invite_invalid'
+  | 'not_allowed'
+  | 'not_entitled'
+  | 'board_full';
 
 export class ApiError extends Error {
   constructor(
@@ -61,6 +67,9 @@ const CODES: ApiErrorCode[] = [
   'version_conflict',
   'rate_limited',
   'invite_invalid',
+  'not_allowed',
+  'not_entitled',
+  'board_full',
 ];
 
 function classify(message: string | undefined): ApiErrorCode | 'unknown' {
@@ -101,6 +110,12 @@ export function friendlyMessage(error: unknown): string {
       return 'You\'re doing that too quickly. Please wait a moment.';
     case 'invite_invalid':
       return 'That invite isn\'t working. Ask for a fresh link.';
+    case 'not_allowed':
+      return 'Only the person who put it there or the owner can take it off.';
+    case 'not_entitled':
+      return 'Someone on this fridge needs to unlock that pack first.';
+    case 'board_full':
+      return 'This fridge is full. Take one off to add another.';
     case 'network':
       return 'Can\'t reach the fridge. Check your connection.';
     default:
@@ -154,6 +169,7 @@ function mapBoard(row: any): Board {
     name: row.name,
     color: row.color as BoardColor,
     timezone: row.timezone,
+    themePack: row.theme_pack ?? 'starter',
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -208,6 +224,48 @@ function mapEntry(row: any): ListEntry {
 }
 
 const ITEM_SELECT = '*, author:profiles!items_created_by_fkey(*)';
+
+function mapMagnet(row: any): Magnet {
+  return {
+    id: row.id,
+    boardId: row.board_id,
+    artId: row.art_id,
+    packId: row.pack_id,
+    itemId: row.item_id ?? null,
+    x: row.x,
+    y: row.y,
+    rotation: row.rotation ?? 0,
+    z: row.z,
+    placedBy: row.placed_by ?? null,
+    giftNote: row.gift_note ?? null,
+    version: row.version ?? 1,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at ?? row.created_at,
+  };
+}
+
+function mapPackArt(row: any): PackArt {
+  return {
+    artId: row.art_id,
+    packId: row.pack_id,
+    kind: row.kind,
+    label: row.label,
+    path: row.path,
+    w: row.w ?? null,
+    h: row.h ?? null,
+  };
+}
+
+function mapPack(row: any): Pack {
+  return {
+    id: row.id,
+    kind: row.kind,
+    name: row.name,
+    blurb: row.blurb ?? null,
+    priceLabel: row.price_label ?? null,
+    status: row.status,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Reads
@@ -305,6 +363,109 @@ export async function getRemovedItems(boardId: string): Promise<ItemWithAuthor[]
   const { data, error } = await supabase.rpc('list_removed_items', { p_board_id: boardId });
   if (error) raise(error);
   return (data ?? []).map(mapItem);
+}
+
+// ---------------------------------------------------------------------------
+// Decorations (magnets) and pack catalogue
+// ---------------------------------------------------------------------------
+
+/** All magnets (door- and note-anchored) for a board. */
+export async function getDecorations(boardId: string): Promise<{ magnets: Magnet[] }> {
+  const { data, error } = await supabase
+    .from('board_magnets')
+    .select('*')
+    .eq('board_id', boardId)
+    .order('z', { ascending: true });
+  if (error) raise(error);
+  return { magnets: (data ?? []).map(mapMagnet) };
+}
+
+/** Live pack artwork (magnets, stickers, papers, …) for the shop and tray. */
+export async function getPackArt(): Promise<PackArt[]> {
+  const { data, error } = await supabase.from('pack_art').select('*');
+  if (error) raise(error);
+  return (data ?? []).map(mapPackArt);
+}
+
+/** Live packs in shop order. */
+export async function getPacks(): Promise<Pack[]> {
+  const { data, error } = await supabase
+    .from('pack_catalog')
+    .select('*')
+    .order('sort', { ascending: true });
+  if (error) raise(error);
+  return (data ?? []).map(mapPack);
+}
+
+export type NewMagnet = {
+  boardId: string;
+  artId: string;
+  x: number;
+  y: number;
+  itemId?: string | null;
+  rotation?: number;
+  giftNote?: string | null;
+};
+
+export async function placeMagnet(input: NewMagnet): Promise<Magnet> {
+  const { data, error } = await supabase.rpc('place_magnet', {
+    p_board_id: input.boardId,
+    p_art_id: input.artId,
+    p_x: input.x,
+    p_y: input.y,
+    p_item_id: input.itemId ?? null,
+    p_rotation: input.rotation ?? 0,
+    p_gift_note: input.giftNote ?? null,
+  } as never);
+  if (error) raise(error);
+  return mapMagnet(data);
+}
+
+export async function moveMagnet(
+  id: string,
+  x: number,
+  y: number,
+  itemId: string | null,
+  version: number,
+): Promise<Magnet> {
+  const { data, error } = await supabase.rpc('move_magnet', {
+    p_id: id,
+    p_x: x,
+    p_y: y,
+    p_item_id: itemId,
+    p_expected_version: version,
+  } as never);
+  if (error) raise(error);
+  return mapMagnet(data);
+}
+
+export async function removeMagnet(id: string): Promise<void> {
+  const { error } = await supabase.rpc('remove_magnet', { p_id: id });
+  if (error) raise(error);
+}
+
+/** True when the pack is free or any current member holds a live entitlement. */
+export async function boardCanUse(boardId: string, packId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc('board_can_use', {
+    p_board_id: boardId,
+    p_pack_id: packId,
+  } as never);
+  if (error) raise(error);
+  return Boolean(data);
+}
+
+/** Owner-only door theme (H-1). */
+export async function setBoardTheme(boardId: string, packId: string): Promise<void> {
+  const { error } = await supabase.rpc('set_board_theme', {
+    p_board_id: boardId,
+    p_pack_id: packId,
+  });
+  if (error) raise(error);
+}
+
+/** Public URL for a pack-art Storage path (the `packs` bucket is public). */
+export function packArtUrl(path: string): string {
+  return supabase.storage.from('packs').getPublicUrl(path).data.publicUrl;
 }
 
 // ---------------------------------------------------------------------------

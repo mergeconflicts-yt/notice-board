@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import { colors, fonts } from '../theme';
 import { BoardNote } from './BoardNote';
-import { boardCanvasHeight, computeBoardLayout, REF_W, settleNoOverlap } from '../utils/layout';
+import { boardCanvasHeight, computeBoardLayout, BoardLayout, REF_W, settleNoOverlap } from '../utils/layout';
 import { ItemWithAuthor, ListEntry } from '../types';
 
 type Props = {
@@ -21,6 +21,9 @@ type Props = {
   emptyHint?: string;
   /** Bumped when a drop wasn't persisted, to snap the note back. */
   resetKey?: number;
+  /** Decoration overlay drawn above the notes, in the same canvas space.
+   *  Receives the computed layout so attached magnets can find their note. */
+  renderOverlay?: (ctx: { layout: BoardLayout; boardW: number; scale: number }) => ReactNode;
 };
 
 /**
@@ -40,6 +43,7 @@ export function BoardSection({
   onDragEnd,
   emptyHint,
   resetKey,
+  renderOverlay,
 }: Props) {
   const [boardW, setBoardW] = useState(0);
   const [measured, setMeasured] = useState<Record<string, number>>({});
@@ -124,6 +128,7 @@ export function BoardSection({
               );
             })
           : null}
+        {boardW > 0 && renderOverlay ? renderOverlay({ layout, boardW, scale }) : null}
       </View>
     </ScrollView>
   );

@@ -37,6 +37,8 @@ export type Board = {
   name: string;
   color: BoardColor;
   timezone: string;
+  /** Door theme pack id; owner-set (H-1). Defaults to 'starter'. */
+  themePack: string;
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;
@@ -99,6 +101,53 @@ export type ListEntry = {
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type PackKind = 'theme' | 'travel' | 'festival' | 'bundle' | 'gift';
+export type PackArtKind = 'magnet' | 'sticker' | 'paper' | 'fastener' | 'door';
+
+/** A decoration placed on the fridge door (docs/prd-magents-stickers.md §5). */
+export type Magnet = {
+  id: string;
+  boardId: string;
+  artId: string;
+  packId: string;
+  /** Attached note; null = anchored to the door. */
+  itemId: string | null;
+  /** Door: fraction of width; attached: fraction of note width. */
+  x: number;
+  /** Door: ref points; attached: ref points from the note's top. */
+  y: number;
+  rotation: number;
+  z: number;
+  placedBy: string | null;
+  giftNote: string | null;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** A flat die-cut reaction artwork is part of the pack catalogue as data, but
+ *  reactions themselves are not part of the board UI. */
+
+/** One piece of pack artwork (magnets, stickers, papers, fasteners, doors). */
+export type PackArt = {
+  artId: string;
+  packId: string;
+  kind: PackArtKind;
+  label: string;
+  path: string;
+  w: number | null;
+  h: number | null;
+};
+
+export type Pack = {
+  id: string;
+  kind: PackKind;
+  name: string;
+  blurb: string | null;
+  priceLabel: string | null;
+  status: 'draft' | 'live' | 'retired';
 };
 
 export type InviteLink = {
