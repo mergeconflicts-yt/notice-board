@@ -182,14 +182,7 @@ const privacyBody = `
 <h2>What we don't collect</h2>
 <p>No advertising identifiers, no location tracking, no contacts access, no behavioural analytics. There is nothing to opt out of because there is nothing to track.</p>
 <h2>How your data is used</h2>
-<p>Your data is used only to run the app: to show your boards to the people you invite, and to keep the service working. We never sell data, never show ads, and never share content with third parties except the infrastructure providers below.</p>
-<h2>Processors</h2>
-<ul>
-<li><strong>Supabase</strong> — database, authentication and file storage.</li>
-<li><strong>Resend</strong> — sends the 6-digit email sign-in codes via our custom SMTP sender.</li>
-<li><strong>Apple / Google</strong> — only if you choose to save your account with them.</li>
-<li><strong>Cloudflare Turnstile</strong> — bot protection on sign-in.</li>
-</ul>
+<p>Your data is used only to run the app: to show your boards to the people you invite, and to keep the service working. We never sell data and never show ads.</p>
 <h2>Retention</h2>
 <ul>
 <li>Notes leave after a week, photos after two weeks, dates the day after the event, lists two days after everything is ticked. Pinned posts stay until unpinned.</li>

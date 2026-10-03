@@ -49,14 +49,14 @@
 }
 
 :root {
-  --bg: #EDF3EA;
-  --ink: #3e362e;
-  --ink-soft: #6b6156;
+  --bg: #FBF5E9;
+  --ink: #143C34;
+  --ink-soft: #47645B;
   --accent: #E8823C;
   --accent-deep: #C96A27;
-  --brown: #1E3B2A;
-  --paper: #F5F9F2;
-  --border: #D5E0CF;
+  --brown: #0B4F41;
+  --paper: #FFFDF7;
+  --border: #EDE4D3;
   --butter: #fff3a6;
   --blush: #f8dde0;
   --sage: #ddf3d5;
@@ -65,15 +65,15 @@
   --lilac: #e9e0f6;
   --mint: #d4f0dc;
   --dark: #1E3B2A;
-  --pine: #1E3B2A;
-  --pine-deep: #152A1F;
+  --pine: #0B4F41;
+  --pine-deep: #07332A;
   --on-pine: #F6F0DC;
   --leaf: #A9CFB2;
   --brand-yellow: #F1D876;
   --cream: #FFF3D6;
   --accent-wash: #FFF0E4;
   --selected: #FBEFC3;
-  --shadow: rgba(92, 76, 54, 0.18);
+  --shadow: rgba(20, 60, 52, 0.16);
   --hand: 'Caveat', cursive;
   --ui: 'Nunito', system-ui, sans-serif;
 }
@@ -87,7 +87,7 @@ img { max-width: 100%; }
 body {
   font-family: var(--ui);
   background: var(--bg);
-  background-image: radial-gradient(rgba(30, 59, 42, 0.07) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(11, 79, 65, 0.08) 1px, transparent 1px);
   background-size: 22px 22px;
   color: var(--ink);
   line-height: 1.6;
@@ -95,7 +95,7 @@ body {
   overflow-x: clip;
 }
 
-.hand { font-family: var(--hand); font-weight: 600; }
+.hand { font-family: var(--hand); font-weight: 700; }
 
 .eyebrow {
   text-transform: uppercase;
@@ -109,33 +109,35 @@ body {
 .section { max-width: 1120px; margin: 0 auto; padding: 4.5rem 1.5rem; }
 .section-tight-bottom { padding-bottom: 1.5rem; }
 .section-tight-top { padding-top: 1.5rem; }
-/* alternating full-bleed bands: light greens on the light-green page */
+/* alternating full-bleed bands: cream ↔ white only */
 .band { padding: 0; }
-.band-cream { background: #E2EBDD; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-.band-white { background: #F2F7EF; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-.band-sage { background: #D9E9D5; border-top: 1px solid #C2D6BE; border-bottom: 1px solid #C2D6BE; }
+.band-cream { background: var(--bg); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.band-white { background: #FDF8EC; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.band-sage { background: var(--bg); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 /* handwritten bridge stitching the pain section to the fix section */
 .section-connector { text-align: center; padding: 0.5rem 1rem 0; color: var(--ink-soft); }
 .section-connector p { font-size: 1.6rem; transform: rotate(-2deg); }
 .connector-arrow { font-size: 1.8rem; color: var(--board-sage); line-height: 1; }
 .section-title { font-size: clamp(2.4rem, 5vw, 3.6rem); line-height: 1.05; margin-bottom: 1.5rem; }
 .lede { color: var(--ink-soft); font-size: 1.05rem; max-width: 34rem; }
+/* OG-card lede treatment: Nunito semibold, larger, softer pine. */
+.hero-copy .lede { font-size: 1.3rem; font-weight: 600; line-height: 1.5; }
 
-/* nav */
+/* nav — same theme as the footer: deep pine bar, cream type */
 .nav {
   position: sticky; top: 0; z-index: 50;
   display: flex; align-items: center; gap: 1.5rem;
   padding: 0.8rem 1.5rem;
-  background: rgba(237, 243, 234, 0.92);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--border);
+  background: var(--pine-deep);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.3);
 }
-.brand { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; color: var(--ink); }
+.brand { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; color: var(--on-pine); }
 .brand-pin { width: 24px; height: 24px; border-radius: 6px; display: inline-block; }
 .brand-name { font-size: 1.5rem; }
 .nav-links { display: flex; gap: 1.4rem; margin-left: auto; }
-.nav-links a { text-decoration: none; color: var(--ink); font-weight: 600; font-size: 0.95rem; }
-.nav-links a:hover { color: var(--board-sage); }
+.nav-links a { text-decoration: none; color: var(--on-pine); font-weight: 600; font-size: 0.95rem; }
+.nav-links a:hover { color: var(--leaf); }
+.nav .btn-dark { background: var(--on-pine); color: var(--pine); }
 
 .btn { display: inline-block; text-decoration: none; font-weight: 800; border-radius: 999px; }
 .btn-dark { background: var(--pine); color: var(--on-pine); }
@@ -148,8 +150,9 @@ body {
 }
 .hero-copy { min-width: 0; }
 /* hero headline: the one h1 the page owns, with marker highlights */
-.hero-copy h1 { font-size: clamp(2.7rem, 5vw, 3.9rem); line-height: 1.08; margin: 0.5rem 0 1rem; color: var(--ink); }
-.hl { background: #CBE2C4; box-decoration-break: clone; -webkit-box-decoration-break: clone; padding: 0 0.08em; }
+.hero-copy h1 { font-size: clamp(2.7rem, 5vw, 3.9rem); line-height: 1.08; margin: 0.5rem 0 1rem; color: var(--pine); }
+.hl { background: var(--brand-yellow); box-decoration-break: clone; -webkit-box-decoration-break: clone; padding: 0 0.08em; }
+.hl-line { text-decoration: underline; text-decoration-color: var(--brand-yellow); text-decoration-thickness: 4px; text-underline-offset: 6px; }
 .hero-copy .lede { margin-bottom: 1.4rem; max-width: 30rem; }
 .hero-copy .store-row { margin-bottom: 0.2rem; }
 .gn-sep { color: #B8CCB2; margin: 0 0.15rem; }
@@ -159,7 +162,7 @@ body {
   display: inline-flex; align-items: center; gap: 0.6rem;
   background: var(--pine); color: var(--on-pine); text-decoration: none;
   border-radius: 999px; padding: 0.55rem 1.3rem;
-  box-shadow: 0 4px 10px rgba(30, 59, 42, 0.35);
+  box-shadow: 0 4px 10px rgba(11, 79, 65, 0.35);
 }
 .store-btn span { display: flex; flex-direction: column; line-height: 1.15; }
 .store-btn small { font-size: 0.65rem; font-weight: 400; opacity: 0.8; }
