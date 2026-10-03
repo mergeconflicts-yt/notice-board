@@ -11,6 +11,8 @@ const {
   keepUntilLabel,
   colorForItem,
   rotationForItem,
+  projectedLeaveMs,
+  leaveBoardCopy,
 } = require(`${BUILD}/utils/note.js`);
 
 describe('paperVariantFor', () => {
@@ -60,5 +62,52 @@ describe('color/rotation', () => {
     assert.equal(colorForItem('abc'), colorForItem('abc'));
     assert.equal(rotationForItem('abc'), rotationForItem('abc'));
     assert.ok(Math.abs(rotationForItem('abc')) <= 5);
+  });
+});
+
+describe('projectedLeaveMs', () => {
+  const DAY = 86400000;
+  // Fixed local noon avoids DST-boundary flakiness in day arithmetic.
+  const NOW = new Date(2026, 9, 3, 12).getTime();
+  it('notes leave 7 days out, photos 14, each +7d per Keep tap', () => {
+    assert.equal(
+      projectedLeaveMs({ type: 'note', eventAtMs: NOW, pinned: false, keepExtra: 0, nowMs: NOW }),
+      NOW + 7 * DAY,
+    );
+    assert.equal(
+      projectedLeaveMs({ type: 'photo', eventAtMs: NOW, pinned: false, keepExtra: 2, nowMs: NOW }),
+      NOW + 28 * DAY,
+    );
+  });
+  it('dates leave the day after the event, plus Keep taps', () => {
+    const event = new Date(2026, 9, 10, 18, 30).getTime(); // Oct 10 evening
+    assert.equal(
+      projectedLeaveMs({ type: 'date', eventAtMs: event, pinned: false, keepExtra: 1, nowMs: NOW }),
+      new Date(2026, 9, 11).getTime() + 7 * DAY,
+    );
+  });
+  it('caps at +30d and never expires pinned posts or lists', () => {
+    assert.equal(
+      projectedLeaveMs({ type: 'photo', eventAtMs: NOW, pinned: false, keepExtra: 3, nowMs: NOW }),
+      NOW + 30 * DAY,
+    );
+    assert.equal(
+      projectedLeaveMs({ type: 'note', eventAtMs: NOW, pinned: true, keepExtra: 0, nowMs: NOW }),
+      null,
+    );
+    assert.equal(
+      projectedLeaveMs({ type: 'list', eventAtMs: NOW, pinned: false, keepExtra: 0, nowMs: NOW }),
+      null,
+    );
+  });
+});
+
+describe('leaveBoardCopy', () => {
+  const DAY = 86400000;
+  const NOW = new Date(2026, 9, 3, 12).getTime();
+  it('says today / tomorrow / on-date', () => {
+    assert.equal(leaveBoardCopy(NOW + 2 * 3600000, NOW), 'Leaves board today');
+    assert.equal(leaveBoardCopy(NOW + DAY, NOW), 'Leaves board tomorrow');
+    assert.equal(leaveBoardCopy(NOW + 9 * DAY, NOW), 'Leaves board on 12 Oct');
   });
 });

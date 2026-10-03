@@ -17,7 +17,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { DateTimePopup } from './DateTimePopup';
 import { colors, fonts, noteColors, noteColorKeys } from '../theme';
 import { ItemColor, ItemType, ItemWithAuthor } from '../types';
-import { colorForItem, parseListItems } from '../utils/note';
+import { colorForItem, leaveBoardCopy, parseListItems, projectedLeaveMs } from '../utils/note';
 import { randomId } from '../hooks/useBoard';
 
 type ComposerTab = 'note' | 'photo' | 'list' | 'date';
@@ -104,6 +104,11 @@ export function AddNoteSheet({
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
   const [picking, setPicking] = useState(false);
   const [wasOpen, setWasOpen] = useState(false);
+  // Anchor for expiry preview labels. Wall-clock by necessity (there is no
+  // reactive "today" source); day-granularity display, so a re-render
+  // mid-visit cannot visibly shift it.
+  // eslint-disable-next-line react-hooks/purity -- wall-clock anchor, see above
+  const nowMs = Date.now();
   const rowInputRefs = useRef(new Map<string, TextInput | null>());
   const pendingFocusRowId = useRef<string | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
@@ -147,6 +152,19 @@ export function AddNoteSheet({
   }
 
   const cycleKeep = () => setKeepExtra((e) => (e + 1) % KEEP_STOPS);
+
+  // What tapping Keep currently buys, in the user's own terms: the projected
+  // expiry for these exact settings (mirrors the server rules in
+  // projectedLeaveMs). Null means it stays — pinned posts never expire and
+  // the row is hidden for lists, so null here is always "pinned".
+  const leaveAt = projectedLeaveMs({
+    type: tab === 'date' ? 'date' : tab === 'photo' ? 'photo' : 'note',
+    eventAtMs: eventAt.getTime(),
+    pinned,
+    keepExtra,
+    nowMs,
+  });
+  const keepLabel = leaveAt == null ? 'Stays pinned' : leaveBoardCopy(leaveAt, nowMs);
 
   const openDatePicker = () => {
     setPickerMode('date');
@@ -579,7 +597,7 @@ export function AddNoteSheet({
                       keepExtra > 0 && !pinned && styles.keepTextActive,
                     ]}
                   >
-                    {keepExtra > 0 ? `Keep +${keepExtra * 7}d` : 'Keep'}
+                    {keepLabel}
                   </Text>
                 </Pressable>
               ) : null}
@@ -595,7 +613,7 @@ export function AddNoteSheet({
                   size={20}
                     color={pinned ? colors.accentDeep : colors.ink}
                   />
-                  <Text style={styles.keepText}>Keep at top</Text>
+                  <Text style={styles.keepText}>Pin</Text>
               </Pressable>
               <View style={styles.createSpacer} />
               <Pressable onPress={submit} disabled={!canPost} style={[styles.postBtn, !canPost && styles.postDisabled]}>

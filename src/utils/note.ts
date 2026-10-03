@@ -133,6 +133,56 @@ export function keepUntilLabel(keepUntil: string | null): string | null {
   return `Leaves the board ${label}`;
 }
 
+const DAY_MS = 86400000;
+
+/**
+ * Projected expiry for the composer, mirroring the server's lifetime rules
+ * (`default_keep_until` + `keep_cycle` semantics) so the Keep row can show
+ * "Leaves board on …" before posting. Returns null when nothing expires:
+ * pinned posts stay, lists leave on an event (all ticked) the client can't
+ * date. keepExtra is composer taps (0–3, +7d each); the +30d cap mirrors
+ * keep_cycle, and the wrap it triggers is unreachable within 3 taps, so the
+ * min() below is exact, not approximate.
+ *
+ * Dates use the device tz for "day after the event"; the server uses the
+ * board tz. Same calendar day everywhere except across-zone edge cases —
+ * noted, not fixed: the composer doesn't know the board tz.
+ */
+export function projectedLeaveMs(args: {
+  type: 'note' | 'photo' | 'date' | 'list';
+  eventAtMs: number;
+  pinned: boolean;
+  keepExtra: number;
+  nowMs: number;
+}): number | null {
+  const { type, eventAtMs, pinned, keepExtra, nowMs } = args;
+  if (pinned || type === 'list') return null;
+  let base: number;
+  if (type === 'note') base = nowMs + 7 * DAY_MS;
+  else if (type === 'photo') base = nowMs + 14 * DAY_MS;
+  else {
+    const e = new Date(eventAtMs);
+    base = new Date(e.getFullYear(), e.getMonth(), e.getDate() + 1).getTime();
+  }
+  return Math.min(base + keepExtra * 7 * DAY_MS, nowMs + 30 * DAY_MS);
+}
+
+const SHORT_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** Friendly "Leaves board …" copy for a projected timestamp. Locale-free
+ *  (fixed month names) so unit tests are deterministic everywhere. */
+export function leaveBoardCopy(atMs: number, nowMs: number): string {
+  const startOf = (t: number): number => {
+    const d = new Date(t);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  };
+  const diff = Math.round((startOf(atMs) - startOf(nowMs)) / DAY_MS);
+  if (diff <= 0) return 'Leaves board today';
+  if (diff === 1) return 'Leaves board tomorrow';
+  const d = new Date(atMs);
+  return `Leaves board on ${d.getDate()} ${SHORT_MON[d.getMonth()]}`;
+}
+
 export const AVATAR_EMOJIS = [
   '🐻', '🦊', '🐰', '🐼', '🐨', '🦁', '🐸', '🐙', '🦉', '🐳',
   '🐶', '🐱', '🦄', '🐯', '🐮', '🐷', '🦋', '🐢', '🦜', '🦔',

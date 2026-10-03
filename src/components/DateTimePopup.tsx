@@ -96,13 +96,16 @@ function DateGrid({
   const [cursor, setCursor] = useState(() => new Date(value.getFullYear(), value.getMonth(), 1));
   const minDay = startOfDay(minimumDate);
 
-  const cells = useMemo(() => {
+  const weeks = useMemo(() => {
     const y = cursor.getFullYear();
     const m = cursor.getMonth();
-    const out: (number | null)[] = [];
-    for (let i = 0; i < new Date(y, m, 1).getDay(); i++) out.push(null);
-    for (let d = 1; d <= new Date(y, m + 1, 0).getDate(); d++) out.push(d);
-    return out;
+    const cells: (number | null)[] = [];
+    for (let i = 0; i < new Date(y, m, 1).getDay(); i++) cells.push(null);
+    for (let d = 1; d <= new Date(y, m + 1, 0).getDate(); d++) cells.push(d);
+    while (cells.length % 7 !== 0) cells.push(null);
+    const rows: (number | null)[][] = [];
+    for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
+    return rows;
   }, [cursor]);
 
   const shiftMonth = (delta: number) =>
@@ -145,41 +148,48 @@ function DateGrid({
         ))}
       </View>
       <View style={styles.grid}>
-        {cells.map((day, i) => {
-          if (day == null) return <View key={`blank-${i}`} style={styles.day} />;
-          const date = new Date(cursor.getFullYear(), cursor.getMonth(), day);
-          const disabled = date < minDay;
-          const selected = sameDay(date, value);
-          const isToday = sameDay(date, new Date());
-          return (
-              <Pressable
-                key={`day-${day}`}
-                disabled={disabled}
-                onPress={() => pickDay(day)}
-                style={styles.day}
-              accessibilityRole="button"
-              accessibilityLabel={date.toLocaleDateString(undefined, {
-                weekday: 'long',
-                month: 'long',
-                day: 'numeric',
-              })}
-              accessibilityState={{ selected, disabled }}
-            >
-              <View style={[styles.dayCircle, selected && styles.dayCircleSelected]}>
-                <Text
-                  style={[
-                    styles.dayText,
-                    disabled && styles.dayTextDisabled,
-                    selected && styles.dayTextSelected,
-                    !selected && isToday && styles.dayTextToday,
-                  ]}
+        {weeks.map((week, wi) => (
+          // Real week rows (not a wrapping flat list): fractional %-width
+          // cells accumulate pixel rounding and push Saturday onto the next
+          // row, emptying the Saturday column and shifting every date.
+          <View key={`week-${wi}`} style={styles.weekDaysRow}>
+            {week.map((day, i) => {
+              if (day == null) return <View key={`blank-${wi}-${i}`} style={styles.day} />;
+              const date = new Date(cursor.getFullYear(), cursor.getMonth(), day);
+              const disabled = date < minDay;
+              const selected = sameDay(date, value);
+              const isToday = sameDay(date, new Date());
+              return (
+                <Pressable
+                  key={`day-${day}`}
+                  disabled={disabled}
+                  onPress={() => pickDay(day)}
+                  style={styles.day}
+                  accessibilityRole="button"
+                  accessibilityLabel={date.toLocaleDateString(undefined, {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric',
+                  })}
+                  accessibilityState={{ selected, disabled }}
                 >
-                  {day}
-                </Text>
-              </View>
-            </Pressable>
-          );
-        })}
+                  <View style={[styles.dayCircle, selected && styles.dayCircleSelected]}>
+                    <Text
+                      style={[
+                        styles.dayText,
+                        disabled && styles.dayTextDisabled,
+                        selected && styles.dayTextSelected,
+                        !selected && isToday && styles.dayTextToday,
+                      ]}
+                    >
+                      {day}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        ))}
       </View>
       <Pressable
         onPress={() => {
@@ -369,9 +379,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.inkSoft,
   },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  grid: { flexDirection: 'column' },
+  weekDaysRow: { flexDirection: 'row' },
   day: {
-    width: `${100 / 7}%`,
+    flex: 1,
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
