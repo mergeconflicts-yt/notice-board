@@ -12,9 +12,15 @@ appId: com.fridgeboard.app
 - tapOn:
     text: "Delete account"
     retryTapIfNoChange: true
+# Two "Delete account" texts match while the alert is up (profile row behind
+# the modal + alert button) and the row sorts first — index 1 selects the
+# alert button. A wrong pick taps the inert row (no UI change) and fails
+# loudly via retry instead of silently passing.
 - tapOn:
     text: "Delete account"
-    rightOf: "Cancel"
+    above: "Cancel"
+    index: 1
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible: "Use as guest"
     timeout: 60000

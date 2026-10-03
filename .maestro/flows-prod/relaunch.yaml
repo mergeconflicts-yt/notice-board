@@ -4,6 +4,9 @@ appId: com.fridgeboard.app
 # relaunch, and confirm the board content survived. Approximates the
 # background/lock + relaunch journey in prod-checklist §2 (a real device
 # lock step stays manual: lock the phone between kill and relaunch).
+# Card text isn't matchable (handwriting glyphs — same as the local flows),
+# so the post-relaunch sync taps the card by testID, opens detail, and
+# removes the post to land back on the board.
 - runFlow: _board.yaml
 - tapOn:
     text: "+ Add note"
@@ -14,12 +17,27 @@ appId: com.fridgeboard.app
 - tapOn:
     text: "Post"
     retryTapIfNoChange: true
-- extendedWaitUntil:
-    visible: "E2E survive relaunch"
-    timeout: 30000
+# No text assert here: card glyphs aren't matchable, and tapOn below both
+# waits for the post to land and proves it rendered (it opens detail).
+- tapOn:
+    id: "note-card"
+    retryTapIfNoChange: true
+# A server round trip before the kill: posts apply optimistically, so killing
+# instantly could outrun the sync and lose a post that was never actually
+# at risk. Keep also proves the detail screen is live.
+- tapOn:
+    id: "action-keep"
+    retryTapIfNoChange: true
 - killApp
 - launchApp
-- extendedWaitUntil:
-    visible: "E2E survive relaunch"
-    timeout: 60000
+# No text asserts right after cold launch: the hierarchy snapshot is
+# unreliable in that window even with the pixels on screen (the assert above
+# failed with the button visible). The id channel works, so sync by tapping
+# the restored card, then remove it to land back on the board.
+- tapOn:
+    id: "note-card"
+    retryTapIfNoChange: true
+- tapOn:
+    id: "action-remove"
+    retryTapIfNoChange: true
 - runFlow: _teardown.yaml

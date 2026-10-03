@@ -4,17 +4,26 @@ appId: com.fridgeboard.app
 # boards are gone and no error toast appears. Ends back at Welcome.
 # Covers prod-checklist §2 "guest sign-out (deletes the guest account —
 # confirm the boards are gone and no error toast appears)".
+# Navigation: the board has no "You ·" row (that's home-only) — the header
+# avatar opens profile, and the sign-out row carries a leading icon so it
+# needs a regex match.
 - runFlow: _board.yaml
 - tapOn:
-    text: "You · E2E Guest"
+    text: "Your profile and settings"
     retryTapIfNoChange: true
 - waitForAnimationToEnd
 - tapOn:
-    text: "Sign out"
+    text: ".*Sign out"
     retryTapIfNoChange: true
+# Two "Sign out" texts match while the alert is up (profile row behind the
+# modal + alert button) and the row sorts first — index 1 selects the alert
+# button. A wrong pick taps the inert row (no UI change) and fails loudly
+# via retry instead of silently passing.
 - tapOn:
     text: "Sign out"
     rightOf: "Cancel"
+    index: 1
+    retryTapIfNoChange: true
 - extendedWaitUntil:
     visible: "Use as guest"
     timeout: 60000
