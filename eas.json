@@ -12,6 +12,14 @@
     "preview": {
       "distribution": "internal"
     },
+    "preview-simulator": {
+      "distribution": "internal",
+      "environment": "production",
+      "ios": {
+        "simulator": true,
+        "buildConfiguration": "Release"
+      }
+    },
     "production": {
       "distribution": "store",
       "credentialsSource": "remote",
