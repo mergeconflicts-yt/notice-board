@@ -1,0 +1,76 @@
+<!doctype html>
+<!-- Open Graph card source (1200×630). NOT deployed as a page — it lives
+     next to the App Store panels and is screenshotted to website/og.png via
+     node store-screenshots/export-og.mjs. Brand tokens mirror
+     store-screenshots/styles.css and the app theme. -->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1200px; height: 630px; overflow: hidden;
+    background: #FBF5E9; color: #143C34;
+    font-family: 'Nunito', system-ui, sans-serif;
+    display: flex; align-items: center;
+  }
+  .copy { width: 640px; padding: 0 20px 0 72px; }
+  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .brand img { width: 44px; height: 44px; border-radius: 10px; display: block; }
+  .brand span { font-weight: 800; font-size: 24px; letter-spacing: 4px; color: #0B4F41; }
+  h1 {
+    font-family: 'Caveat', cursive; font-weight: 700;
+    font-size: 96px; line-height: 0.98; letter-spacing: -1px; color: #0B4F41;
+  }
+  h1 .hl { background: linear-gradient(transparent 62%, #F1D876 62%); }
+  .lede { margin-top: 20px; font-size: 27px; line-height: 1.45; font-weight: 600; color: #47645B; max-width: 520px; }
+  .art { width: 560px; height: 630px; position: relative; }
+  .art img {
+    position: absolute; right: 40px; top: 50%; transform: translateY(-50%);
+    height: 600px; width: auto; display: block;
+    filter: drop-shadow(0 24px 40px rgba(7,51,42,.30));
+  }
+  .note {
+    position: absolute; width: 252px;
+    border-radius: 6px 8px 6px 8px; padding: 16px 14px 12px;
+    box-shadow: 0 12px 30px rgba(7,51,42,.30);
+  }
+  .note h4 { font-family: 'Caveat', cursive; font-weight: 700; font-size: 34px; line-height: 1.05; }
+  .note small { display: block; margin-top: 6px; font-size: 15px; font-weight: 700; opacity: .6; }
+  .n1 { background: #FFF3A6; color: #4A3E22; transform: rotate(-3deg); left: 6px; top: 92px; }
+  .n2 { background: #fff; color: #3E362E; border: 2px solid #F2EEE5; transform: rotate(2deg); right: 22px; top: 356px; }
+  .pin {
+    position: absolute; top: -11px; left: 50%; width: 22px; height: 22px;
+    border-radius: 50%; margin-left: -11px; background: #E23E2B;
+    box-shadow: 0 2px 5px rgba(0,0,0,.35);
+  }
+  .pin::after {
+    content: ''; position: absolute; top: 4px; left: 4px; width: 7px; height: 7px;
+    border-radius: 50%; background: rgba(255,255,255,.55);
+  }
+  .ticket { display: flex; gap: 12px; align-items: center; }
+  .cal { text-align: center; }
+  .cal .dow { font-weight: 800; font-size: 15px; color: #D9564A; letter-spacing: 1px; }
+  .cal .day { font-weight: 800; font-size: 40px; line-height: 1; }
+  .ticket .tt { font-family: 'Caveat', cursive; font-weight: 700; font-size: 30px; line-height: 1.05; }
+</style>
+</head>
+<body>
+  <div class="copy">
+    <div class="brand"><img src="../assets/icon.png" alt="" /><span>FRIDGE BOARD</span></div>
+    <h1>Stop losing stuff in the group chat.</h1>
+    <p class="lede">One shared board for your home. Notes, lists, dates and photos that don't scroll away.</p>
+  </div>
+  <div class="art">
+    <img id="fridgeShot" alt="Fridge Board fridge with pinned notes" />
+  </div>
+<script>
+  // Fridge source is injected by export-og.mjs (?fridge=<captured PNG>).
+  const src = new URLSearchParams(window.location.search).get('fridge');
+  if (src) document.getElementById('fridgeShot').src = src;
+</script>
+</body>
+</html>
