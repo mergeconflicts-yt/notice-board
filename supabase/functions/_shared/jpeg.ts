@@ -96,30 +96,55 @@ export function stripJpegMetadata(input: Uint8Array): StrippedJpeg | null {
 
     if (marker === SOS) {
       if (!sawSOF) return null;
-      // Scan data runs to EOI. FF00 is a stuffed data byte, FF D0–D7 are
-      // restart markers inside the scan; anything else starting with FF
-      // must be the terminating EOI.
-      let p = pos;
-      let found = -1;
-      while (p + 1 < n) {
-        if (input[p] !== 0xff) {
-          p += 1;
-          continue;
-        }
-        const m = input[p + 1];
-        if (m === 0x00 || (m >= 0xd0 && m <= 0xd7)) {
-          p += 2;
-          continue;
-        }
-        if (m === EOI) {
-          found = p + 2;
+      keep(segStart, end);
+      pos = end;
+      // One or more scans (progressive JPEGs chain SOS segments and may
+      // redefine DHT/DQT/DRI tables between scans). FF00 is stuffed data,
+      // FF D0–D7 are restart markers inside the scan, FF FF are fill bytes;
+      // FF DA starts the next scan, FF DC is DNL, FF D9 ends the image, and
+      // other length-bearing segments (tables, APPn) are skipped with the
+      // same keep/drop rules as the header. Anything else inside scan data
+      // means corruption.
+      for (;;) {
+        let p = pos;
+        let markerPos = -1;
+        let m2 = 0;
+        while (p + 1 < n) {
+          if (input[p] !== 0xff) {
+            p += 1;
+            continue;
+          }
+          const m = input[p + 1];
+          if (m === 0xff) {
+            p += 1; // Fill byte before a marker: skip it.
+            continue;
+          }
+          if (m === 0x00 || (m >= 0xd0 && m <= 0xd7)) {
+            p += 2;
+            continue;
+          }
+          markerPos = p;
+          m2 = m;
           break;
         }
-        return null;
+        if (markerPos < 0) return null;
+        if (m2 === EOI) {
+          keep(pos, markerPos + 2);
+          pos = markerPos + 2;
+          break;
+        }
+        if (isStandalone(m2) || isStartOfFrame(m2)) return null;
+        if (markerPos + 3 >= n) return null;
+        const l2 = u16(markerPos + 2);
+        const e2 = markerPos + 2 + l2;
+        if (l2 < 2 || e2 > n) return null;
+        if (m2 === APP1 || m2 === APP13 || m2 === COM) {
+          pos = e2; // Drop inter-scan metadata like header metadata.
+          continue;
+        }
+        keep(pos, e2); // Next scan header, DNL, or table segment.
+        pos = e2;
       }
-      if (found < 0) return null;
-      keep(segStart, found); // SOS header + scan + EOI verbatim.
-      pos = found;
       break; // Trailing bytes after EOI are never rendered — drop them.
     }
 

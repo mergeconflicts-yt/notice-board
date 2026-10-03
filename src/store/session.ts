@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 import { KeychainError, LargeSecureStore } from '../lib/secureStore';
 import { forgetBoard } from '../lib/lastBoard';
 import { resetAllBoardStores } from '../lib/boardStores';
+import { clearPhotoCache } from '../lib/photoCache';
 import {
   ApiError,
   deleteAccount as apiDeleteAccount,
@@ -348,6 +349,9 @@ export const useSession = create<SessionState>((set) => ({
       await forgetBoard();
       // Drop every cached board store so the next account starts clean.
       resetAllBoardStores();
+      // Board photos are private to the abandoned identity: wipe the disk
+      // cache too, instead of leaving it for the next account (or the OS).
+      await clearPhotoCache();
       set({ user: null, status: 'loading', error: null, markerAnon: null });
     } finally {
       // Always clear the flag — if it stayed set, the next real sign-out would
@@ -368,6 +372,7 @@ export const useSession = create<SessionState>((set) => ({
       await clearMarker();
       await forgetBoard();
       resetAllBoardStores();
+      await clearPhotoCache();
       await useSession.getState().init();
     } finally {
       intentionalSignOut = false;
@@ -382,6 +387,7 @@ export const useSession = create<SessionState>((set) => ({
       await clearMarker();
       await forgetBoard();
       resetAllBoardStores();
+      await clearPhotoCache();
     } finally {
       intentionalSignOut = false;
     }
@@ -428,6 +434,11 @@ supabase.auth.onAuthStateChange((event, session) => {
           error: 'Sign in to restore your fridges.',
           markerAnon: marker.isAnonymous,
         });
+      } else {
+        // No marker, so no restore is possible: the identity behind any
+        // cached board photos is unrecoverable — wipe them rather than
+        // leaving another account's photos on disk.
+        void clearPhotoCache();
       }
     });
   }

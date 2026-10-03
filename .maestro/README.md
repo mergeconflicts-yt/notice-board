@@ -67,6 +67,16 @@ and prod flows in `flows-prod/`.
 
 ## Deliberate gaps
 
+- **Rendered card content is not asserted** (note/list/date/keep): the
+  handwriting glyphs in transformed note cards are invisible to Maestro's
+  iOS text channel — exact text, regex, and even the card's single-line
+  `accessibilityLabel` all fail to match (verified 2026-10-02), while
+  `testID`s match fine. Flows sync on `note-card` (proving the post landed
+  and rendered) and saved-type/content correctness is covered at the data
+  layer by pgTAP `supabase/tests/03_items.test.sql` (body/title round-trips
+  through the RPCs). If card text ever becomes matchable, restore content
+  asserts in `note/list/date/keep.yaml`.
+
 - **Photo upload through the system picker** is not automated: the iOS photo
   permission alert and library grid have no stable selectors. The composer UI
   is locked by `photo-composer`; the server upload path was verified

@@ -75,14 +75,31 @@ describe('stripJpegMetadata', () => {
     assert.ok(bytes.length < input.length, 'output is smaller without metadata');
   });
 
-  it('parses progressive (SOF2) dimensions', () => {
-    const sof2 = seg(0xc2, [
+  it('parses progressive (SOF2) dimensions', () => {    const sof2 = seg(0xc2, [
       8, 0, 10, 0, 20, 3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1,
     ]); // 20x10
     const out = stripJpegMetadata(jpeg([SOI, sof2, sosScan(), EOI]));
     assert.ok(out);
     assert.equal(out.width, 20);
     assert.equal(out.height, 10);
+  });
+
+  it('follows chained scans (progressive multi-SOS) to the real EOI', () => {
+    const scan2 = [...seg(0xda, [1, 1, 0, 0, 0x3f, 0]), 0x44, 0xff, 0xff]; // +FF fills
+    const input = jpeg([
+      SOI,
+      seg(0xc2, [8, 0, 8, 0, 8, 3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]),
+      ...seg(0xda, [1, 1, 0, 0, 0x3f, 0]),
+      0x11, 0xff, 0xd0, 0x22, // data + RST0 inside first scan
+      ...scan2, // second SOS (FF fills precede the final EOI)
+      ...EOI,
+    ]);
+    const out = stripJpegMetadata(input);
+    assert.ok(out, 'multi-scan JPEG must survive, not fail closed');
+    assert.equal(out.width, 8);
+    assert.equal(out.height, 8);
+    const tail = [...out.bytes].slice(-2);
+    assert.deepEqual(tail, [0xff, 0xd9]);
   });
 
   it('reports oversized dimensions instead of rejecting (caller decides)', () => {

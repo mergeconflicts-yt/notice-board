@@ -46,16 +46,14 @@ by `web/build.mjs`, which fails fast without `APPLE_TEAM_ID`,
 account. Until then `fridgeboard://` links + code paste cover invites, and
 the Maestro `coldstart-invite` prod flow covers the same in-app path.
 
-## 4. Screenshots (BLOCKED — files currently invalid, exporter fixed)
+## 4. Screenshots (regenerated 2026-10-02 — one retake outstanding)
 
-`store-screenshots/out/` files are currently **362×783, NOT 1290×2796** —
-the exporter captured the preview's `scale(0.28)` transform instead of true
-pixels (root cause fixed in `store-screenshots/export.mjs`: the preview
-transform is now neutralised before element screenshots). Do NOT submit
-these files. Regenerate then validate before submission:
+`store-screenshots/out/` holds six validated **1290×2796** (6.7") PNGs
+(`sips` confirms every file; exporter root cause — preview `scale(0.28)` —
+fixed in `store-screenshots/export.mjs`, which neutralises the transform
+before capture). Regenerate + revalidate with:
 
 ```bash
-npm i -D playwright   # one time — fetches Chromium
 node store-screenshots/export.mjs
 sips -g pixelWidth -g pixelHeight store-screenshots/out/*.png  # every file must read 1290 × 2796
 ```

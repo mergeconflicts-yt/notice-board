@@ -41,6 +41,16 @@ check "invite link keeps token" "$BASE/j/$TOKEN" "200"
 check "apple association" "$BASE/.well-known/apple-app-site-association" "200"
 check "android assetlinks" "$BASE/.well-known/assetlinks.json" "200"
 
+# Status 200 is not enough on either check: Pages' SPA fallback serves
+# index.html with 200 for unknown paths, which would false-pass a status
+# check while carrying no invite logic. The invite page must contain its
+# deep-link template.
+invite_body="$(curl -sS --max-time 20 "$BASE/j/$TOKEN")"
+case "$invite_body" in
+  *"fridgeboard://j/"*) echo "ok   invite page body carries the deep-link template" ;;
+  *) echo "FAIL invite page body is not the invite fallback (likely the SPA fallback page)"; fail=1 ;;
+esac
+
 # Status 200 is not enough: Pages' SPA fallback serves index.html with 200
 # for unknown paths (and /.well-known/* even labels it application/json via
 # _headers), which Apple/Google reject. The bodies must be the real JSON.

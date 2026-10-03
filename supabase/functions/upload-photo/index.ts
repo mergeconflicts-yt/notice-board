@@ -104,12 +104,33 @@ Deno.serve(async (req: Request) => {
   // and trips the hosted edge CPU ceiling (WORKER_RESOURCE_LIMIT; local dev
   // has no such limit, which is why it passed there). Header-validating and
   // segment-stripping the JPEG is O(bytes) milliseconds with identical
-  // guarantees for this input class: real dimensions parsed from SOF,
-  // EXIF/XMP/IPTC/comments dropped. Anything else (non-JPEG, oversized,
-  // malformed) falls through to the full pipeline below.
+  // privacy guarantees for this input class: real dimensions parsed from
+  // SOF, EXIF/XMP/IPTC/comments dropped. A decode-only pass over the exact
+  // bytes being stored (~200ms measured for 2048px) then proves they are
+  // genuinely decodable — structure alone is not proof, and undecodable
+  // bytes are rejected, never stored. Anything else (non-JPEG, oversized,
+  // malformed/undecodable) falls through to the full pipeline below, which
+  // rejects what it cannot decode.
   if (bytes.length > 2 && bytes[0] === 0xff && bytes[1] === 0xd8) {
     const fast = stripJpegMetadata(bytes);
     if (fast && Math.max(fast.width, fast.height) <= MAX_SIDE) {
+      // Dynamic import (unchanged): a static CJS import trips a TDZ cycle
+      // ("Cannot access 'jpeg' before initialization") under the edge
+      // bundler — see the fallback path below.
+      const { default: jpeg } = await import('npm:jpeg-js@0.4.4');
+      let decoded;
+      try {
+        decoded = jpeg.decode(fast.bytes);
+      } catch (e) {
+        console.error('upload-photo fast-path decode failed:', (e as Error)?.message ?? String(e));
+        return bad('invalid_input');
+      }
+      if (decoded.width !== fast.width || decoded.height !== fast.height) {
+        console.error(
+          `upload-photo SOF/decode dimension mismatch: sof=${fast.width}x${fast.height} decoded=${decoded.width}x${decoded.height}`,
+        );
+        return bad('invalid_input');
+      }
       const { error: uploadError } = await admin.storage
         .from(BUCKET)
         .upload(path, fast.bytes, { contentType: 'image/jpeg', upsert: true });
