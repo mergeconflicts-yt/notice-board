@@ -78,7 +78,10 @@ export function FridgeDoor({ color, placement, children }: Props) {
         style={styles.bottomShade}
         pointerEvents="none"
       />
-      {/* Chrome bar handle: bright face, dark spine, bright edge. */}
+      {/* Chrome bar handle: bright face, dark spine, bright edge. Painted
+          above the content so it floats over the door (and any note tucked
+          near the edge) instead of reserving a full-height gutter. */}
+      <View style={styles.content}>{children}</View>
       <LinearGradient
         colors={['#87A5A8', '#FBFBFB', '#A4ABB3']}
         locations={[0, 0.45, 1]}
@@ -87,7 +90,6 @@ export function FridgeDoor({ color, placement, children }: Props) {
         style={[styles.handle, placement === 'top' ? styles.handleTop : styles.handleBottom]}
         pointerEvents="none"
       />
-      <View style={styles.content}>{children}</View>
       </View>
     </View>
   );
@@ -150,7 +152,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingLeft: 30,
+    paddingLeft: 14,
     paddingRight: 10,
     paddingTop: 4,
     paddingBottom: 10,
