@@ -27,6 +27,7 @@ import { useToast } from '../../../store/toast';
 import { friendlyMessage, keepLonger as apiKeepLonger, uploadPhoto } from '../../../lib/api';
 import { cachedPhotoUri, dropCachedPhoto } from '../../../lib/photoCache';
 import { rememberBoard } from '../../../lib/lastBoard';
+import { consumePinReveal } from '../../../lib/pinReveal';
 import { REF_W } from '../../../utils/layout';
 import type { BoardLayout } from '../../../utils/layout';
 import { ItemWithAuthor, Magnet } from '../../../types';
@@ -91,10 +92,17 @@ export default function BoardScreen() {
   // Tapping a magnet selects it (shows ×); tapping anywhere else clears it.
   const [selectedMagnet, setSelectedMagnet] = useState<string | null>(null);
   const [entering, setEntering] = useState<Set<string>>(() => new Set());
-  // Just-posted item to reveal once (BoardSection scrolls it into view, then
-  // reports back so this clears). Pinned posts land in the always-visible
-  // strip, so only unpinned posts need it.
+  // Just-posted item to reveal once (BoardSection scrolls unpinned posts
+  // into view, PinnedStrip scrolls pinned ones sideways, then each reports
+  // back so this clears). Pinning an existing note in the viewer records a
+  // request picked up here on return.
   const [focusId, setFocusId] = useState<string | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      const pinned = consumePinReveal();
+      if (pinned) setFocusId(pinned);
+    }, []),
+  );
   // Same for a freshly placed magnet (dropped near the door top, which can
   // be off-screen when scrolled deep). Moves need none — the finger is
   // already there.
@@ -474,7 +482,7 @@ export default function BoardScreen() {
         }
       }
       pendingDraftRef.current = null;
-      if (!draft.pinned) setFocusId(itemId);
+      setFocusId(itemId);
       setSheetOpen(false);
     } catch {
       // createItem already surfaced the error via useBoard; keep the pending
@@ -606,6 +614,8 @@ export default function BoardScreen() {
               photoUrls={photoUrls}
               onOpen={openItem}
               doorColor={board.color}
+              focusId={focusId}
+              onFocusShown={clearFocus}
             />
           </FridgeDoor>
         </View>

@@ -13,6 +13,7 @@ import { useToast } from '../../../../store/toast';
 import { cachedPhotoUri } from '../../../../lib/photoCache';
 import { friendlyMessage, reportPost } from '../../../../lib/api';
 import { keepUntilLabel } from '../../../../utils/note';
+import { requestPinReveal } from '../../../../lib/pinReveal';
 
 const MAX_SCALE = 2.4;
 const CLOSE_SIZE = 40;
@@ -268,7 +269,15 @@ export default function ItemDetailScreen() {
             icon={item.pinned ? 'pin-off-outline' : 'pin-outline'}
             label={item.pinned ? 'Unpin' : 'Pin'}
             active={item.pinned}
-            onPress={() => setPinned(item, !item.pinned).catch(noop)}
+            onPress={() => {
+              const pinning = !item.pinned;
+              setPinned(item, pinning)
+                .then(() => {
+                  // The board reveals fresh pins on return; unpins need none.
+                  if (pinning) requestPinReveal(item.id);
+                })
+                .catch(noop);
+            }}
           />
           {canKeepLonger ? (
             <ActionButton

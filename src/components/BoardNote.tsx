@@ -162,11 +162,13 @@ export function BoardNote({
   // A just-posted note mounts while the composer sheet is still closing, so
   // its mount pop plays unseen behind the sheet. Replay it once as the
   // reveal scroll lands, timed just after BoardSection's 250ms scroll kick.
+  // No timeout cleanup: the latched pop must survive the focus request being
+  // cleared (the section reports back before the pop plays).
   const spotlitRef = useRef(false);
   useEffect(() => {
     if (!spotlight || spotlitRef.current) return;
     spotlitRef.current = true;
-    const t = setTimeout(() => {
+    setTimeout(() => {
       enter.setValue(0);
       Animated.spring(enter, {
         toValue: 1,
@@ -175,7 +177,6 @@ export function BoardNote({
         useNativeDriver: false,
       }).start();
     }, 450);
-    return () => clearTimeout(t);
   }, [spotlight, enter]);
 
   const gesture = useMemo(() => {
