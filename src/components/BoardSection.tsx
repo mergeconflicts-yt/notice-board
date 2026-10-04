@@ -393,7 +393,7 @@ export function BoardSection({
 
 const styles = StyleSheet.create({
   wrap: { flex: 1 },
-  content: { paddingHorizontal: 6, paddingBottom: 40 },
+  content: { paddingHorizontal: 4, paddingBottom: 40 },
   canvas: { position: 'relative' },
   hint: {
     position: 'absolute',
