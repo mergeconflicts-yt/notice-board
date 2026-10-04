@@ -23,6 +23,7 @@
     "production": {
       "distribution": "store",
       "credentialsSource": "remote",
+      "autoIncrement": true,
       "ios": {
         "buildConfiguration": "Release"
       },
