@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import * as Haptics from 'expo-haptics';
 import { ItemWithAuthor, ListEntry } from '../types';
 import { NotePaper } from './NotePaper';
 
@@ -137,6 +138,7 @@ export function BoardNote({
         startRef.current = { ...posRef.current };
         setDragging(true);
         Animated.spring(lift, { toValue: 1, friction: 7, tension: 90, useNativeDriver: false }).start();
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         handlers.current.onDragStart?.(handlers.current.item);
       })
       // eslint-disable-next-line react-hooks/refs -- gesture callbacks run off-render
@@ -174,6 +176,7 @@ export function BoardNote({
           handlers.current.onDragEnd?.(handlers.current.item);
           return;
         }
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         handlers.current.onMove?.(handlers.current.item, posRef.current.x, posRef.current.y);
       });
 

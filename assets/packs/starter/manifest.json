@@ -1,0 +1,110 @@
+[
+  {
+    "art_id": "st_boba",
+    "pack_id": "starter",
+    "kind": "magnet",
+    "label": "Bubble tea",
+    "path": "assets/packs/starter/st_boba@3x.webp",
+    "w": 64,
+    "h": 64
+  },
+  {
+    "art_id": "st_bus",
+    "pack_id": "starter",
+    "kind": "magnet",
+    "label": "City bus",
+    "path": "assets/packs/starter/st_bus@3x.webp",
+    "w": 64,
+    "h": 64
+  },
+  {
+    "art_id": "st_cat",
+    "pack_id": "starter",
+    "kind": "magnet",
+    "label": "Fridge cat",
+    "path": "assets/packs/starter/st_cat@3x.webp",
+    "w": 64,
+    "h": 64
+  },
+  {
+    "art_id": "st_shell",
+    "pack_id": "starter",
+    "kind": "magnet",
+    "label": "Seashell",
+    "path": "assets/packs/starter/st_shell@3x.webp",
+    "w": 64,
+    "h": 64
+  },
+  {
+    "art_id": "st_love",
+    "pack_id": "starter",
+    "kind": "sticker",
+    "label": "Love",
+    "path": "assets/packs/starter/st_love@3x.webp",
+    "w": 64,
+    "h": 64
+  },
+  {
+    "art_id": "st_gotit",
+    "pack_id": "starter",
+    "kind": "sticker",
+    "label": "Got it",
+    "path": "assets/packs/starter/st_gotit@3x.webp",
+    "w": 64,
+    "h": 64
+  },
+  {
+    "art_id": "st_done",
+    "pack_id": "starter",
+    "kind": "sticker",
+    "label": "Done",
+    "path": "assets/packs/starter/st_done@3x.webp",
+    "w": 64,
+    "h": 64
+  },
+  {
+    "art_id": "st_great",
+    "pack_id": "starter",
+    "kind": "sticker",
+    "label": "Great",
+    "path": "assets/packs/starter/st_great@3x.webp",
+    "w": 64,
+    "h": 64
+  },
+  {
+    "art_id": "st_haha",
+    "pack_id": "starter",
+    "kind": "sticker",
+    "label": "Haha",
+    "path": "assets/packs/starter/st_haha@3x.webp",
+    "w": 64,
+    "h": 64
+  },
+  {
+    "art_id": "st_thanks",
+    "pack_id": "starter",
+    "kind": "sticker",
+    "label": "Thanks",
+    "path": "assets/packs/starter/st_thanks@3x.webp",
+    "w": 64,
+    "h": 64
+  },
+  {
+    "art_id": "st_yum",
+    "pack_id": "starter",
+    "kind": "sticker",
+    "label": "Yum",
+    "path": "assets/packs/starter/st_yum@3x.webp",
+    "w": 64,
+    "h": 64
+  },
+  {
+    "art_id": "st_onit",
+    "pack_id": "starter",
+    "kind": "sticker",
+    "label": "On it",
+    "path": "assets/packs/starter/st_onit@3x.webp",
+    "w": 64,
+    "h": 64
+  }
+]

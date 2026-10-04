@@ -1,5 +1,5 @@
 // Store buttons: links carrying data-placeholder point at listings that do
-// not exist yet (App Store id 0000000000, unpublished Play listing) and
+// not exist yet (App Store id 6818976344, unpublished Play listing) and
 // would 404. Render them as inert "soon" pills until the attribute is
 // removed at launch (see docs/store-listing.md).
 document.querySelectorAll('a.store-btn[data-placeholder]').forEach((a) => {

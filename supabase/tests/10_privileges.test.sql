@@ -33,13 +33,15 @@ select ok(
         'update_profile', 'create_board', 'rename_board', 'delete_board',
         'leave_board', 'remove_member',
         'post_item', 'edit_item', 'edit_list', 'set_pinned', 'set_done',
-        'keep_longer', 'keep_cycle',
+        'keep_longer', 'keep_cycle', 'post_shared_item',
         'remove_item', 'restore_item', 'list_removed_items', 'set_item_position',
         'add_entry', 'set_entry_checked', 'edit_entry', 'remove_entry',
         'get_invite_link', 'reset_invite_link', 'preview_invite', 'preview_invite_token',
         'accept_invite', 'delete_account', 'start_photo_upload',
         'report_post', 'list_reported_items', 'dismiss_reports',
-        'block_member', 'unblock_member', 'list_blocked', 'remove_and_block'
+        'block_member', 'unblock_member', 'list_blocked', 'remove_and_block',
+        'board_can_use', 'place_magnet', 'move_magnet', 'remove_magnet',
+        'set_board_theme'
       )
   ),
   'no unexpected function is executable by authenticated');

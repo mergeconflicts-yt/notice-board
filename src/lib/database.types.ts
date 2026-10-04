@@ -53,7 +53,109 @@ export type Database = {
           board_id?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "board_blocks_blocked_by_fkey"
+            columns: ["blocked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "board_blocks_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "boards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "board_blocks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      board_magnets: {
+        Row: {
+          art_id: string
+          board_id: string
+          created_at: string
+          gift_note: string | null
+          id: string
+          item_id: string | null
+          pack_id: string
+          placed_by: string | null
+          rotation: number
+          updated_at: string
+          version: number
+          x: number
+          y: number
+          z: number
+        }
+        Insert: {
+          art_id: string
+          board_id: string
+          created_at?: string
+          gift_note?: string | null
+          id?: string
+          item_id?: string | null
+          pack_id: string
+          placed_by?: string | null
+          rotation?: number
+          updated_at?: string
+          version?: number
+          x: number
+          y: number
+          z: number
+        }
+        Update: {
+          art_id?: string
+          board_id?: string
+          created_at?: string
+          gift_note?: string | null
+          id?: string
+          item_id?: string | null
+          pack_id?: string
+          placed_by?: string | null
+          rotation?: number
+          updated_at?: string
+          version?: number
+          x?: number
+          y?: number
+          z?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "board_magnets_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "boards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "board_magnets_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "board_magnets_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "visible_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "board_magnets_placed_by_fkey"
+            columns: ["placed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       board_members: {
         Row: {
@@ -99,6 +201,7 @@ export type Database = {
           deleted_at: string | null
           id: string
           name: string
+          theme_pack: string
           timezone: string
           updated_at: string
         }
@@ -109,6 +212,7 @@ export type Database = {
           deleted_at?: string | null
           id?: string
           name: string
+          theme_pack?: string
           timezone?: string
           updated_at?: string
         }
@@ -119,6 +223,7 @@ export type Database = {
           deleted_at?: string | null
           id?: string
           name?: string
+          theme_pack?: string
           timezone?: string
           updated_at?: string
         }
@@ -198,9 +303,12 @@ export type Database = {
           id: string
           keep_until: string | null
           layout: Json | null
+          paper_style: string | null
           photo_path: string | null
           pinned: boolean
           place: string | null
+          shared_from_app: string | null
+          shared_from_author: string | null
           title: string | null
           type: Database["public"]["Enums"]["item_type"]
           updated_at: string
@@ -221,9 +329,12 @@ export type Database = {
           id: string
           keep_until?: string | null
           layout?: Json | null
+          paper_style?: string | null
           photo_path?: string | null
           pinned?: boolean
           place?: string | null
+          shared_from_app?: string | null
+          shared_from_author?: string | null
           title?: string | null
           type: Database["public"]["Enums"]["item_type"]
           updated_at?: string
@@ -244,9 +355,12 @@ export type Database = {
           id?: string
           keep_until?: string | null
           layout?: Json | null
+          paper_style?: string | null
           photo_path?: string | null
           pinned?: boolean
           place?: string | null
+          shared_from_app?: string | null
+          shared_from_author?: string | null
           title?: string | null
           type?: Database["public"]["Enums"]["item_type"]
           updated_at?: string
@@ -359,27 +473,92 @@ export type Database = {
           },
         ]
       }
-      profiles: {
+      pack_art: {
         Row: {
-          avatar_path: string | null
-          created_at: string
-          display_name: string
-          id: string
-          updated_at: string
+          art_id: string
+          h: number | null
+          kind: string
+          label: string
+          pack_id: string
+          path: string
+          w: number | null
         }
         Insert: {
-          avatar_path?: string | null
-          created_at?: string
-          display_name: string
-          id: string
-          updated_at?: string
+          art_id: string
+          h?: number | null
+          kind: string
+          label: string
+          pack_id: string
+          path: string
+          w?: number | null
         }
         Update: {
-          avatar_path?: string | null
-          created_at?: string
-          display_name?: string
+          art_id?: string
+          h?: number | null
+          kind?: string
+          label?: string
+          pack_id?: string
+          path?: string
+          w?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pack_art_pack_id_fkey"
+            columns: ["pack_id"]
+            isOneToOne: false
+            referencedRelation: "pack_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pack_catalog: {
+        Row: {
+          assets_version: number
+          available_from: string | null
+          available_until: string | null
+          blurb: string | null
+          bundle_of: string[] | null
+          id: string
+          kind: string
+          min_renderer: number
+          name: string
+          price_label: string | null
+          sort: number
+          spec: Json
+          status: string
+          store_product_id: string | null
+        }
+        Insert: {
+          assets_version?: number
+          available_from?: string | null
+          available_until?: string | null
+          blurb?: string | null
+          bundle_of?: string[] | null
+          id: string
+          kind: string
+          min_renderer?: number
+          name: string
+          price_label?: string | null
+          sort?: number
+          spec?: Json
+          status?: string
+          store_product_id?: string | null
+        }
+        Update: {
+          assets_version?: number
+          available_from?: string | null
+          available_until?: string | null
+          blurb?: string | null
+          bundle_of?: string[] | null
           id?: string
-          updated_at?: string
+          kind?: string
+          min_renderer?: number
+          name?: string
+          price_label?: string | null
+          sort?: number
+          spec?: Json
+          status?: string
+          store_product_id?: string | null
         }
         Relationships: []
       }
@@ -414,7 +593,22 @@ export type Database = {
           path?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "photo_upload_intents_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "boards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "photo_upload_intents_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       post_reports: {
         Row: {
@@ -441,6 +635,59 @@ export type Database = {
           reason?: string | null
           reporter_id?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "post_reports_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "boards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_reports_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_reports_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "visible_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_path: string | null
+          created_at: string
+          display_name: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_path?: string | null
+          created_at?: string
+          display_name: string
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_path?: string | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          updated_at?: string
+        }
         Relationships: []
       }
       rate_limits: {
@@ -464,6 +711,41 @@ export type Database = {
         }
         Relationships: []
       }
+      user_entitlements: {
+        Row: {
+          created_at: string
+          pack_id: string
+          revoked_at: string | null
+          source: string
+          store_txn_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          pack_id: string
+          revoked_at?: string | null
+          source: string
+          store_txn_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          pack_id?: string
+          revoked_at?: string | null
+          source?: string
+          store_txn_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_entitlements_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       visible_items: {
@@ -480,6 +762,7 @@ export type Database = {
           event_at: string | null
           id: string | null
           keep_until: string | null
+          layout: Json | null
           photo_path: string | null
           pinned: boolean | null
           place: string | null
@@ -502,6 +785,7 @@ export type Database = {
           event_at?: string | null
           id?: string | null
           keep_until?: string | null
+          layout?: Json | null
           photo_path?: string | null
           pinned?: boolean | null
           place?: string | null
@@ -524,6 +808,7 @@ export type Database = {
           event_at?: string | null
           id?: string | null
           keep_until?: string | null
+          layout?: Json | null
           photo_path?: string | null
           pinned?: boolean | null
           place?: string | null
@@ -573,6 +858,10 @@ export type Database = {
       }
     }
     Functions: {
+      _consume_photo_intent: {
+        Args: { p_board_id: string; p_item_id: string; p_photo_path: string }
+        Returns: undefined
+      }
       _path_board_id: { Args: { p_path: string }; Returns: string }
       accept_invite: {
         Args: { p_display_name?: string; p_token_or_code: string }
@@ -599,6 +888,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      block_member: {
+        Args: { p_board_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      board_can_use: {
+        Args: { p_board_id: string; p_pack_id: string }
+        Returns: boolean
+      }
+      cleanup_anonymous_user: { Args: { p_id: string }; Returns: boolean }
       cleanup_rate_limits: { Args: never; Returns: number }
       create_board: {
         Args: { p_color?: string; p_name: string; p_timezone?: string }
@@ -609,6 +907,7 @@ export type Database = {
           deleted_at: string | null
           id: string
           name: string
+          theme_pack: string
           timezone: string
           updated_at: string
         }
@@ -631,7 +930,20 @@ export type Database = {
       }
       delete_account: { Args: never; Returns: undefined }
       delete_board: { Args: { p_board_id: string }; Returns: undefined }
+      dismiss_reports: { Args: { p_item_id: string }; Returns: undefined }
       edit_entry: { Args: { p_id: string; p_text: string }; Returns: undefined }
+      edit_item: {
+        Args: {
+          p_body: string
+          p_color: Database["public"]["Enums"]["item_color"]
+          p_event_at: string
+          p_expected_version: number
+          p_id: string
+          p_place: string
+          p_title: string
+        }
+        Returns: undefined
+      }
       edit_list: {
         Args: {
           p_adds?: Json
@@ -641,18 +953,6 @@ export type Database = {
           p_expected_version: number
           p_item_id: string
           p_removes?: string[]
-          p_title: string
-        }
-        Returns: undefined
-      }
-      edit_item: {
-        Args: {
-          p_body: string
-          p_color: Database["public"]["Enums"]["item_color"]
-          p_event_at: string
-          p_expected_version: number
-          p_id: string
-          p_place: string
           p_title: string
         }
         Returns: undefined
@@ -674,9 +974,12 @@ export type Database = {
           id: string
           keep_until: string | null
           layout: Json | null
+          paper_style: string | null
           photo_path: string | null
           pinned: boolean
           place: string | null
+          shared_from_app: string | null
+          shared_from_author: string | null
           title: string | null
           type: Database["public"]["Enums"]["item_type"]
           updated_at: string
@@ -702,11 +1005,42 @@ export type Database = {
         Args: { p_action: string; p_max: number; p_window: string }
         Returns: undefined
       }
+      http_failures: {
+        Args: { p_since_hours?: number }
+        Returns: {
+          created: string
+          error_msg: string
+          id: number
+          status_code: number
+        }[]
+      }
+      inactive_anonymous_user_ids: {
+        Args: { p_limit?: number }
+        Returns: string[]
+      }
       invite_key: { Args: never; Returns: string }
+      is_inactive_anonymous_user: { Args: { p_id: string }; Returns: boolean }
       is_member: { Args: { p_board: string }; Returns: boolean }
+      job_failures: {
+        Args: { p_since_hours?: number }
+        Returns: {
+          jobname: string
+          return_message: string
+          start_time: string
+          status: string
+        }[]
+      }
       keep_cycle: { Args: { p_id: string }; Returns: undefined }
       keep_longer: { Args: { p_id: string }; Returns: undefined }
       leave_board: { Args: { p_board_id: string }; Returns: undefined }
+      list_blocked: {
+        Args: { p_board_id: string }
+        Returns: {
+          blocked_at: string
+          display_name: string
+          user_id: string
+        }[]
+      }
       list_removed_items: {
         Args: { p_board_id: string }
         Returns: {
@@ -723,9 +1057,12 @@ export type Database = {
           id: string
           keep_until: string | null
           layout: Json | null
+          paper_style: string | null
           photo_path: string | null
           pinned: boolean
           place: string | null
+          shared_from_app: string | null
+          shared_from_author: string | null
           title: string | null
           type: Database["public"]["Enums"]["item_type"]
           updated_at: string
@@ -739,52 +1076,101 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      normalise_invite_code: { Args: { p_raw: string }; Returns: string }
-      pick_invite_code: { Args: never; Returns: string }
-      purge_stale_upload_intents: { Args: never; Returns: number }
-      block_member: {
-        Args: { p_board_id: string; p_user_id: string }
-        Returns: undefined
-      }
-      dismiss_reports: { Args: { p_item_id: string }; Returns: undefined }
-      list_blocked: {
-        Args: { p_board_id: string }
-        Returns: {
-          blocked_at: string
-          display_name: string
-          user_id: string
-        }[]
-      }
       list_reported_items: {
         Args: { p_board_id: string }
         Returns: {
-          author_name: string | null
+          author_name: string
           board_id: string
-          body: string | null
+          body: string
           color: Database["public"]["Enums"]["item_color"]
           created_at: string
-          created_by: string | null
-          event_at: string | null
+          created_by: string
+          event_at: string
           id: string
-          keep_until: string | null
-          photo_path: string | null
+          keep_until: string
+          photo_path: string
           pinned: boolean
-          place: string | null
+          place: string
           reasons: string[]
           report_count: number
-          title: string | null
+          title: string
           type: Database["public"]["Enums"]["item_type"]
           updated_at: string
           version: number
         }[]
       }
-      report_post: {
-        Args: { p_item_id: string; p_reason?: string }
-        Returns: undefined
+      move_magnet: {
+        Args: {
+          p_expected_version?: number
+          p_id: string
+          p_item_id?: string
+          p_x: number
+          p_y: number
+        }
+        Returns: {
+          art_id: string
+          board_id: string
+          created_at: string
+          gift_note: string | null
+          id: string
+          item_id: string | null
+          pack_id: string
+          placed_by: string | null
+          rotation: number
+          updated_at: string
+          version: number
+          x: number
+          y: number
+          z: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "board_magnets"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
-      unblock_member: {
-        Args: { p_board_id: string; p_user_id: string }
-        Returns: undefined
+      normalise_invite_code: { Args: { p_raw: string }; Returns: string }
+      photo_paths_in_use: {
+        Args: never
+        Returns: {
+          paths: string[]
+          total: number
+        }[]
+      }
+      pick_invite_code: { Args: never; Returns: string }
+      place_magnet: {
+        Args: {
+          p_art_id: string
+          p_board_id: string
+          p_gift_note?: string
+          p_item_id?: string
+          p_rotation?: number
+          p_x: number
+          p_y: number
+        }
+        Returns: {
+          art_id: string
+          board_id: string
+          created_at: string
+          gift_note: string | null
+          id: string
+          item_id: string | null
+          pack_id: string
+          placed_by: string | null
+          rotation: number
+          updated_at: string
+          version: number
+          x: number
+          y: number
+          z: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "board_magnets"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       post_item: {
         Args: {
@@ -814,9 +1200,61 @@ export type Database = {
           id: string
           keep_until: string | null
           layout: Json | null
+          paper_style: string | null
           photo_path: string | null
           pinned: boolean
           place: string | null
+          shared_from_app: string | null
+          shared_from_author: string | null
+          title: string | null
+          type: Database["public"]["Enums"]["item_type"]
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "items"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      post_shared_item: {
+        Args: {
+          p_board_id: string
+          p_body: string
+          p_color: Database["public"]["Enums"]["item_color"]
+          p_entries?: Json
+          p_event_at: string
+          p_id: string
+          p_photo_path: string
+          p_pinned?: boolean
+          p_place: string
+          p_shared_from_app?: string
+          p_shared_from_author?: string
+          p_title: string
+          p_type: Database["public"]["Enums"]["item_type"]
+        }
+        Returns: {
+          board_id: string
+          body: string | null
+          color: Database["public"]["Enums"]["item_color"]
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          done_at: string | null
+          done_by: string | null
+          event_at: string | null
+          id: string
+          keep_until: string | null
+          layout: Json | null
+          paper_style: string | null
+          photo_path: string | null
+          pinned: boolean
+          place: string | null
+          shared_from_app: string | null
+          shared_from_author: string | null
           title: string | null
           type: Database["public"]["Enums"]["item_type"]
           updated_at: string
@@ -848,13 +1286,19 @@ export type Database = {
           member_first_names: string[]
         }[]
       }
+      project_photo_bytes_used: { Args: never; Returns: number }
       promote_longest_member: {
         Args: { p_board_id: string }
         Returns: undefined
       }
-      remove_entry: { Args: { p_id: string }; Returns: undefined }
+      purge_boards: { Args: never; Returns: number }
+      purge_items: { Args: { p_ids: string[] }; Returns: number }
+      purge_stale_invites: { Args: never; Returns: number }
+      purge_stale_upload_intents: { Args: never; Returns: number }
       remove_and_block: { Args: { p_item_id: string }; Returns: undefined }
+      remove_entry: { Args: { p_id: string }; Returns: undefined }
       remove_item: { Args: { p_id: string }; Returns: undefined }
+      remove_magnet: { Args: { p_id: string }; Returns: undefined }
       remove_member: {
         Args: { p_board_id: string; p_user_id: string }
         Returns: undefined
@@ -863,10 +1307,18 @@ export type Database = {
         Args: { p_board_id: string; p_color: string; p_name: string }
         Returns: undefined
       }
+      report_post: {
+        Args: { p_item_id: string; p_reason?: string }
+        Returns: undefined
+      }
       reset_invite_link: { Args: { p_board_id: string }; Returns: undefined }
       restore_item: { Args: { p_id: string }; Returns: undefined }
       run_edge_job: { Args: { p_path: string }; Returns: undefined }
       run_list_lifetime: { Args: { p_item_id: string }; Returns: undefined }
+      set_board_theme: {
+        Args: { p_board_id: string; p_pack_id: string }
+        Returns: undefined
+      }
       set_done: { Args: { p_done: boolean; p_id: string }; Returns: undefined }
       set_entry_checked: {
         Args: { p_checked: boolean; p_id: string }
@@ -884,8 +1336,16 @@ export type Database = {
         Args: { p_board_id: string; p_item_id: string }
         Returns: string
       }
+      unblock_member: {
+        Args: { p_board_id: string; p_user_id: string }
+        Returns: undefined
+      }
       update_profile: {
-        Args: { p_avatar_path?: string; p_clear_avatar?: boolean; p_display_name: string }
+        Args: {
+          p_avatar_path?: string
+          p_clear_avatar?: boolean
+          p_display_name: string
+        }
         Returns: {
           avatar_path: string | null
           created_at: string
