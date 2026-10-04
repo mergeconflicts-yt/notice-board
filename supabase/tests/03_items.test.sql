@@ -1,7 +1,7 @@
 -- Phase 1d: item RPCs — validation, authorship, versions, lifetimes.
 -- Roles: O owner/author, M member, S stranger.
 begin;
-select plan(111);
+select plan(115);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000021', 'authenticated', 'authenticated'),
@@ -207,11 +207,34 @@ select throws_ok(
   $$select public.edit_item('c0000000-0000-0000-0000-000000000021', 5, 'sneak', null, null, null, 'butter')$$,
   'P0001', 'not_member', 'stranger cannot edit');
 reset role;
+-- Owner may remove a member's post.
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000022', true);
 set role authenticated;
 select lives_ok(
+  $$select public.post_item('c0000000-0000-0000-0000-000000000029', (select id from t_b),
+    'note', 'butter', 'mine', null, null, null, null, false, null)$$,
+  'member posts a note');
+reset role;
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000021', true);
+set role authenticated;
+select lives_ok(
+  $$select public.remove_item('c0000000-0000-0000-0000-000000000029')$$,
+  'owner removes a member''s post');
+select lives_ok(
+  $$select public.restore_item('c0000000-0000-0000-0000-000000000029')$$,
+  'owner restores it');
+reset role;
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000022', true);
+set role authenticated;
+select throws_ok(
   $$select public.remove_item('c0000000-0000-0000-0000-000000000021')$$,
-  'non-author removes');
+  'P0001', 'not_allowed', 'member cannot remove another member''s post');
+reset role;
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000021', true);
+set role authenticated;
+select lives_ok(
+  $$select public.remove_item('c0000000-0000-0000-0000-000000000021')$$,
+  'author removes');
 select is(
   (select count(*)::integer from public.visible_items where id = 'c0000000-0000-0000-0000-000000000021'),
   0, 'removed item hidden from the board view');

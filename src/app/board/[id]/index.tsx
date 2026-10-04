@@ -106,6 +106,9 @@ export default function BoardScreen() {
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [dragActive, setDragActive] = useState(false);
   const [deleteHover, setDeleteHover] = useState(false);
+  // Whether the held note may be deleted by me (its author or a fridge
+  // owner): controls the delete FAB. Re-checked on drop.
+  const [canDeleteDrag, setCanDeleteDrag] = useState(false);
   // Bumped when a delete drop fails, so the held note snaps back instead of
   // staying under the finger at the delete zone.
   const [resetKey, setResetKey] = useState(0);
@@ -335,6 +338,13 @@ export default function BoardScreen() {
     setDragActive(true);
     setDeleteHover(false);
     fingerRef.current = null;
+    // The delete FAB is author-or-owner only (the server enforces the same
+    // rule): everyone else just moves the note.
+    setCanDeleteDrag(
+      item.createdBy != null &&
+        (item.createdBy === me?.id ||
+          members.some((m) => m.userId === me?.id && m.role === 'owner')),
+    );
     // The FAB mounts with the drag: measure once it's laid out.
     setTimeout(measureDeleteFab, 50);
   };
@@ -351,6 +361,7 @@ export default function BoardScreen() {
   const handleDragEnd = () => {
     setDragActive(false);
     setDeleteHover(false);
+    setCanDeleteDrag(false);
     fingerRef.current = null;
   };
 
@@ -376,9 +387,10 @@ export default function BoardScreen() {
   const handleDrop = (item: ItemWithAuthor, x: number, y: number) => {
     setDragActive(false);
     setDeleteHover(false);
+    setCanDeleteDrag(false);
     const finger = fingerRef.current;
     fingerRef.current = null;
-    if (finger && isOverDelete(finger.x, finger.y)) {
+    if (finger && canDeleteDrag && isOverDelete(finger.x, finger.y)) {
       const snapshot = item;
       detachMagnetsFrom(item.id);
       removeItem(item)
@@ -698,7 +710,7 @@ export default function BoardScreen() {
           </Pressable>
       ) : null}
 
-      {dragActive ? (
+      {dragActive && canDeleteDrag ? (
         <View
           ref={deleteFabRef}
           collapsable={false}

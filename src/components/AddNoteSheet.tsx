@@ -604,7 +604,7 @@ export function AddNoteSheet({
               <Pressable
                 onPress={() => setPinned((p) => !p)}
                 hitSlop={8}
-                style={styles.keepBtn}
+                style={styles.pinBtn}
                 accessibilityRole="button"
                 accessibilityState={{ selected: pinned }}
               >
@@ -613,7 +613,7 @@ export function AddNoteSheet({
                   size={20}
                     color={pinned ? colors.accentDeep : colors.ink}
                   />
-                  <Text style={styles.keepText}>Pin</Text>
+                  <Text style={styles.keepText}>At top forever</Text>
               </Pressable>
               <View style={styles.createSpacer} />
               <Pressable onPress={submit} disabled={!canPost} style={[styles.postBtn, !canPost && styles.postDisabled]}>
@@ -863,6 +863,7 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
   createRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 10 },
   keepBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  pinBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   keepBtnActive: {
     backgroundColor: colors.highlight,
     borderWidth: 1,
@@ -873,7 +874,7 @@ const styles = StyleSheet.create({
     marginHorizontal: -10,
     marginVertical: -5,
   },
-  keepText: { fontFamily: fonts.ui.semibold, fontSize: 15, color: colors.ink },
+  keepText: { fontFamily: fonts.ui.semibold, fontSize: 13, color: colors.ink },
   keepTextActive: { color: colors.accentDeep, fontFamily: fonts.ui.bold },
   createSpacer: { flex: 1 },
   postBtn: { backgroundColor: colors.pine, borderRadius: 999, paddingHorizontal: 22, paddingVertical: 9 },

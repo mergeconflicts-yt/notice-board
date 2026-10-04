@@ -106,8 +106,8 @@ describe('leaveBoardCopy', () => {
   const DAY = 86400000;
   const NOW = new Date(2026, 9, 3, 12).getTime();
   it('says today / tomorrow / on-date', () => {
-    assert.equal(leaveBoardCopy(NOW + 2 * 3600000, NOW), 'Leaves board today');
-    assert.equal(leaveBoardCopy(NOW + DAY, NOW), 'Leaves board tomorrow');
-    assert.equal(leaveBoardCopy(NOW + 9 * DAY, NOW), 'Leaves board on 12 Oct');
+    assert.equal(leaveBoardCopy(NOW + 2 * 3600000, NOW), 'Leaves today');
+    assert.equal(leaveBoardCopy(NOW + DAY, NOW), 'Leaves tomorrow');
+    assert.equal(leaveBoardCopy(NOW + 9 * DAY, NOW), 'Leaves on 12 Oct');
   });
 });

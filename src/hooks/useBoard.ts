@@ -554,9 +554,13 @@ function startBoard(store: BoardStoreApi, boardId: string): () => void {
         }
         store.setState((s) => {
           const previous = s.items.find((i) => i.id === mapped.id);
-          const without = s.items.filter((i) => i.id !== mapped.id);
-          if (expired) return { items: without };
-          return { items: [...without, resolveAuthor(mapped, s.members, previous)] };
+          if (expired) return { items: s.items.filter((i) => i.id !== mapped.id) };
+          const next = resolveAuthor(mapped, s.members, previous);
+          // Replace in place so an edit never reorders the board (the array
+          // mirrors the server's created_at order, which the pinned strip
+          // renders as-is). Truly new items append at the end.
+          if (!previous) return { items: [...s.items, next] };
+          return { items: s.items.map((i) => (i.id === mapped.id ? next : i)) };
         });
       },
     )

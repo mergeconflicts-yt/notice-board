@@ -19,7 +19,8 @@ Implementation plan for the Fridge Board backend (Supabase + Expo). Written for 
 | Writes | The client never writes tables directly. All writes go through Postgres functions (RPC). Reads use tables/views with row-level security (RLS). |
 | Roles | `owner` and `member` only. |
 | Editing text | Only the author can edit an item's text, title, date, place or caption. |
-| Everything else on items | Any member can pin, unpin, mark done, undo done, keep longer, remove, restore. |
+| Everything else on items | Any member can pin, unpin, mark done, undo done, keep longer, restore. |
+| Removing posts | Only the author or a fridge owner can remove a post. |
 | List entries | Any member can add, tick, untick, edit, remove entries. |
 | Deleted account | Their posts stay. Author shows as "Former member" (`created_by` becomes `NULL`). |
 | Default lifetime | Note 7 days, photo 14 days, date until the day after the event, list until 2 days after all entries are checked, done items 2 days after done. |

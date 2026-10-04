@@ -44,6 +44,9 @@ export default function ItemDetailScreen() {
   const itemEntries = entries.filter((e) => e.itemId === noteId);
 
   const isCreator = !!me && me.id === item?.createdBy;
+  const isOwner = me ? members.find((m) => m.userId === me.id)?.role === 'owner' : false;
+  // Remove is author-or-owner only (the server enforces the same rule).
+  const canRemove = isCreator || isOwner;
   const done = Boolean(item?.doneAt);
   const completedBy = item?.doneBy
     ? (members.find((m) => m.userId === item?.doneBy)?.user.displayName ?? null)
@@ -139,6 +142,7 @@ export default function ItemDetailScreen() {
   };
 
   const handleRemove = async () => {
+    if (!canRemove) return;
     const snapshot = item;
     try {
       await removeItem(item);
@@ -293,13 +297,15 @@ export default function ItemDetailScreen() {
           ) : (
             <ActionButton icon="flag-outline" label="Report" onPress={handleReport} />
           )}
-          <ActionButton
-            icon="trash-can-outline"
-            label="Remove"
-            destructive
-            onPress={handleRemove}
-            testID="action-remove"
-          />
+          {canRemove ? (
+            <ActionButton
+              icon="trash-can-outline"
+              label="Remove"
+              destructive
+              onPress={handleRemove}
+              testID="action-remove"
+            />
+          ) : null}
         </View>
       </View>
 

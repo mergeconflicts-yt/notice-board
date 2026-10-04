@@ -138,7 +138,7 @@ const DAY_MS = 86400000;
 /**
  * Projected expiry for the composer, mirroring the server's lifetime rules
  * (`default_keep_until` + `keep_cycle` semantics) so the Keep row can show
- * "Leaves board on …" before posting. Returns null when nothing expires:
+ *  "Leaves on …" before posting. Returns null when nothing expires:
  * pinned posts stay, lists leave on an event (all ticked) the client can't
  * date. keepExtra is composer taps (0–3, +7d each); the +30d cap mirrors
  * keep_cycle, and the wrap it triggers is unreachable within 3 taps, so the
@@ -169,7 +169,7 @@ export function projectedLeaveMs(args: {
 
 const SHORT_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-/** Friendly "Leaves board …" copy for a projected timestamp. Locale-free
+/** Friendly "Leaves …" copy for a projected timestamp. Locale-free
  *  (fixed month names) so unit tests are deterministic everywhere. */
 export function leaveBoardCopy(atMs: number, nowMs: number): string {
   const startOf = (t: number): number => {
@@ -177,10 +177,10 @@ export function leaveBoardCopy(atMs: number, nowMs: number): string {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   };
   const diff = Math.round((startOf(atMs) - startOf(nowMs)) / DAY_MS);
-  if (diff <= 0) return 'Leaves board today';
-  if (diff === 1) return 'Leaves board tomorrow';
+  if (diff <= 0) return 'Leaves today';
+  if (diff === 1) return 'Leaves tomorrow';
   const d = new Date(atMs);
-  return `Leaves board on ${d.getDate()} ${SHORT_MON[d.getMonth()]}`;
+  return `Leaves on ${d.getDate()} ${SHORT_MON[d.getMonth()]}`;
 }
 
 export const AVATAR_EMOJIS = [

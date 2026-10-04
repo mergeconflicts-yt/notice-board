@@ -90,7 +90,8 @@ of any per-action bucket (`post_item`, `add_entry`, invites).
 | `set_done(p_id, p_done)` | member | notes/dates only; first done wins; no-op if already in that state |
 | `keep_longer(p_id)` | member | +7 days, capped at 30 days from now; not pinned/lists |
 | `set_item_position(p_id, p_x, p_y)` | member | hand-place a note (`items.layout`); NULL clears to auto; does **not** bump `version` or stamp `updated_by` |
-| `remove_item(p_id)` / `restore_item(p_id)` | member | soft delete; restore within 30 days |
+| `remove_item(p_id)` | author or owner | soft delete; members otherwise get `not_allowed` |
+| `restore_item(p_id)` | member | restore within 30 days |
 | `list_removed_items(p_board_id)` | member | last 30 days |
 
 ### List entries
