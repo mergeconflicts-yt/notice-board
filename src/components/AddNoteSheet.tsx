@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   Modal,
   View,
   Text,
@@ -112,6 +113,11 @@ export function AddNoteSheet({
   const rowInputRefs = useRef(new Map<string, TextInput | null>());
   const pendingFocusRowId = useRef<string | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
+  const scrollYRef = useRef(0);
+  const bodyRef = useRef<TextInput | null>(null);
+  const captionRef = useRef<TextInput | null>(null);
+  const listTitleRef = useRef<TextInput | null>(null);
+  const dateRef = useRef<TextInput | null>(null);
   const todayStart = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -238,6 +244,32 @@ export function AddNoteSheet({
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, text: value } : r)));
 
   const focusRow = (id: string) => rowInputRefs.current.get(id)?.focus();
+
+  // Keep the caret visible: the color dots + footer sit below the scroll
+  // viewport, so a focused field near the bottom would otherwise tuck under
+  // them. Once the keyboard animation has settled, scroll just enough to
+  // bring the whole field into view with a little breathing room.
+  const revealInput = (node: TextInput | null) => {
+    if (!node) return;
+    setTimeout(() => {
+      const sv = scrollRef.current as unknown as {
+        measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void;
+        scrollTo?: (opts: { y: number; animated?: boolean }) => void;
+      } | null;
+      if (!sv?.measureInWindow || !sv?.scrollTo) return;
+      sv.measureInWindow((_sx, sy, _sw, sh) => {
+        node.measureInWindow((_ix, iy, _iw, ih) => {
+          const PAD = 12;
+          const viewBottom = sy + sh;
+          if (iy + ih > viewBottom - PAD) {
+            sv.scrollTo?.({ y: scrollYRef.current + (iy + ih - viewBottom) + PAD, animated: true });
+          } else if (iy < sy + PAD) {
+            sv.scrollTo?.({ y: Math.max(0, scrollYRef.current - (sy - iy) - PAD), animated: true });
+          }
+        });
+      });
+    }, 350);
+  };
 
   const addRowAndFocus = () => {
     if (filledRows.length >= MAX_ROWS) return;
@@ -381,6 +413,10 @@ export function AddNoteSheet({
             ref={scrollRef}
             keyboardShouldPersistTaps="handled"
             bounces={false}
+            scrollEventThrottle={16}
+            onScroll={(e) => {
+              scrollYRef.current = e.nativeEvent.contentOffset.y;
+            }}
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
           >
@@ -398,6 +434,10 @@ export function AddNoteSheet({
                   textAlignVertical="top"
                   maxLength={2000}
                   selectionColor={palette.ink}
+                  ref={(el) => {
+                    bodyRef.current = el;
+                  }}
+                  onFocus={() => revealInput(bodyRef.current)}
                 />
               </View>
             ) : null}
@@ -444,6 +484,10 @@ export function AddNoteSheet({
                   multiline
                   textAlignVertical="top"
                   maxLength={2000}
+                  ref={(el) => {
+                    captionRef.current = el;
+                  }}
+                  onFocus={() => revealInput(captionRef.current)}
                 />
               </View>
             ) : null}
@@ -468,6 +512,10 @@ export function AddNoteSheet({
                   maxLength={120}
                   returnKeyType="next"
                   blurOnSubmit={false}
+                  ref={(el) => {
+                    listTitleRef.current = el;
+                  }}
+                  onFocus={() => revealInput(listTitleRef.current)}
                   onSubmitEditing={() => {
                     if (rows.length > 0) focusRow(rows[0].id);
                     else addRowAndFocus();
@@ -492,6 +540,7 @@ export function AddNoteSheet({
                           if (el) rowInputRefs.current.set(row.id, el);
                           else rowInputRefs.current.delete(row.id);
                         }}
+                        onFocus={() => revealInput(rowInputRefs.current.get(row.id) ?? null)}
                       />
                       <Pressable
                         hitSlop={8}
@@ -524,6 +573,10 @@ export function AddNoteSheet({
                     textAlignVertical="top"
                     maxLength={120}
                     selectionColor={palette.ink}
+                    ref={(el) => {
+                      dateRef.current = el;
+                    }}
+                    onFocus={() => revealInput(dateRef.current)}
                   />
                 </View>
                 <View style={styles.dtRow}>
@@ -619,8 +672,14 @@ export function AddNoteSheet({
               <Pressable onPress={submit} disabled={!canPost} style={[styles.postBtn, !canPost && styles.postDisabled]}>
                 {submitting ? (
                   <View style={styles.postBusy}>
-                    <ActivityIndicator size="small" color={colors.onPine} />
-                    <Text style={styles.postText}>{tab === 'photo' ? 'Uploading…' : 'Posting…'}</Text>
+                    {tab === 'photo' ? (
+                      <BusyDots color={colors.onPine} />
+                    ) : (
+                      <>
+                        <ActivityIndicator size="small" color={colors.onPine} />
+                        <Text style={styles.postText}>Posting…</Text>
+                      </>
+                    )}
                   </View>
                 ) : (
                   <Text style={styles.postText}>Post</Text>
@@ -650,8 +709,44 @@ export function AddNoteSheet({
   );
 }
 
-function ColorDots({ color, onPick }: { color: ItemColor; onPick: (c: ItemColor) => void }) {
+/** Three pulsing dots for the photo-upload busy state: fits where the
+ *  "Uploading…" label used to get cut off. Native-driven opacity + scale,
+ *  staggered across the dots. */
+function BusyDots({ color }: { color: string }) {
+  const [dots] = useState(() => [new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]);
+  useEffect(() => {
+    const loops = dots.map((d, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 180),
+          Animated.timing(d, { toValue: 1, duration: 320, useNativeDriver: true }),
+          Animated.timing(d, { toValue: 0, duration: 320, useNativeDriver: true }),
+        ]),
+      ),
+    );
+    loops.forEach((l) => l.start());
+    return () => loops.forEach((l) => l.stop());
+  }, [dots]);
   return (
+    <View style={styles.busyDots} accessible accessibilityRole="progressbar" accessibilityLabel="Uploading">
+      {dots.map((d, i) => (
+        <Animated.View
+          key={i}
+          style={[
+            styles.busyDot,
+            {
+              backgroundColor: color,
+              opacity: d.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
+              transform: [{ scale: d.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1.2] }) }],
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+function ColorDots({ color, onPick }: { color: ItemColor; onPick: (c: ItemColor) => void }) {  return (
     <View style={styles.dots}>
       {noteColorKeys.map((k) => {
         const p = noteColors[k];
@@ -881,4 +976,7 @@ const styles = StyleSheet.create({
   postDisabled: { backgroundColor: colors.inkFaint },
   postText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.onPine },
   postBusy: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  // Same line-height as the Post label so the button doesn't jump height.
+  busyDots: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 20 },
+  busyDot: { width: 7, height: 7, borderRadius: 3.5 },
 });

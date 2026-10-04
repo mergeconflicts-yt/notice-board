@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { View, Text, Pressable, ScrollView, StyleSheet, Alert, Linking, Platform } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { View, Text, Pressable, ScrollView, StyleSheet, Alert, Linking, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { router } from 'expo-router';
@@ -46,6 +46,11 @@ export default function ProfileScreen() {
   const init = useSession((s) => s.init);
   const { boards } = useMyBoards();
   const [savingEmail, setSavingEmail] = useState(false);
+  // Sign-out / delete-account is slow (server cleanup + fresh guest init):
+  // show progress on the row and ignore repeat taps while one is running.
+  // The ref is the real guard (alert closures go stale); the state drives UI.
+  const [leaving, setLeaving] = useState<null | 'signout' | 'delete'>(null);
+  const leavingRef = useRef(false);
   const [account, setAccount] = useState<{ email: string | null; provider: string | null } | null>(
     null,
   );
@@ -98,16 +103,23 @@ export default function ProfileScreen() {
   };
 
   const signOutHere = async () => {
+    if (leavingRef.current) return;
+    leavingRef.current = true;
+    setLeaving('signout');
     try {
       await signOut();
       await init();
       router.replace('/');
     } catch (e) {
       useToast.getState().show(friendlyMessage(e));
+    } finally {
+      leavingRef.current = false;
+      setLeaving(null);
     }
   };
 
   const confirmSignOut = () => {
+    if (leaving) return;
     // A guest identity is deleted on sign-out (there is no sign-in to come
     // back to); a saved account just ends the session.
     Alert.alert(
@@ -127,6 +139,7 @@ export default function ProfileScreen() {
   };
 
   const confirmDelete = () => {
+    if (leaving) return;
     Alert.alert(
       'Delete your account?',
       'Your posts stay on shared fridges, shown as “Former member”. Fridges where you are the only person are removed.',
@@ -136,12 +149,18 @@ export default function ProfileScreen() {
           text: 'Delete account',
           style: 'destructive',
           onPress: async () => {
+            if (leavingRef.current) return;
+            leavingRef.current = true;
+            setLeaving('delete');
             try {
               await deleteAccount();
               await init();
               router.replace('/');
             } catch (e) {
               useToast.getState().show(friendlyMessage(e));
+            } finally {
+              leavingRef.current = false;
+              setLeaving(null);
             }
           },
         },
@@ -202,13 +221,36 @@ export default function ProfileScreen() {
           </View>
         ) : null}
 
-        <Pressable style={styles.signOutRow} onPress={confirmSignOut}>
-          <MaterialCommunityIcons name="logout" size={20} color={colors.ink} />
-          <Text style={styles.signOutText}>Sign out</Text>
+        <Pressable
+          style={[styles.signOutRow, leaving !== null && styles.rowBusy]}
+          onPress={confirmSignOut}
+          disabled={leaving !== null}
+          accessibilityRole="button"
+          accessibilityLabel={leaving === 'signout' ? 'Signing out' : 'Sign out'}
+        >
+          {leaving === 'signout' ? (
+            <ActivityIndicator size="small" color={colors.ink} />
+          ) : (
+            <MaterialCommunityIcons name="logout" size={20} color={colors.ink} />
+          )}
+          <Text style={styles.signOutText}>{leaving === 'signout' ? 'Signing out…' : 'Sign out'}</Text>
         </Pressable>
 
-        <Pressable style={styles.dangerRow} onPress={confirmDelete}>
-          <Text style={styles.dangerText}>Delete account</Text>
+        <Pressable
+          style={[styles.dangerRow, leaving !== null && styles.rowBusy]}
+          onPress={confirmDelete}
+          disabled={leaving !== null}
+          accessibilityRole="button"
+          accessibilityLabel={leaving === 'delete' ? 'Deleting account' : 'Delete account'}
+        >
+          {leaving === 'delete' ? (
+            <View style={styles.dangerBusy}>
+              <ActivityIndicator size="small" color={colors.danger} />
+              <Text style={styles.dangerText}>Deleting account…</Text>
+            </View>
+          ) : (
+            <Text style={styles.dangerText}>Delete account</Text>
+          )}
         </Pressable>
 
         <View style={styles.legalRow}>
@@ -267,6 +309,8 @@ const styles = StyleSheet.create({
   signOutText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.ink },
   dangerRow: { marginTop: 6, paddingVertical: 12 },
   dangerText: { fontFamily: fonts.ui.semibold, fontSize: 16, color: colors.danger },
+  dangerBusy: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  rowBusy: { opacity: 0.6 },
   legalRow: {
     flexDirection: 'row',
     alignItems: 'center',

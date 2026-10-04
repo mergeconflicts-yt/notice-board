@@ -555,7 +555,7 @@ export default function BoardScreen() {
                 testID="decorate-toggle"
               >
                 <MaterialCommunityIcons
-                  name={decorateMode ? 'check' : 'star-four-points-outline'}
+                  name={decorateMode ? 'check' : 'sticker-plus-outline'}
                   size={20}
                   color={doorInk(board.color)}
                 />
