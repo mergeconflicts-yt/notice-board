@@ -10,6 +10,10 @@ import { ItemWithAuthor, ListEntry } from '../types';
 
 /** Fixed width of each pinned card; height fills the strip. */
 const CARD_W = 150;
+/** Row insets around the cards: left clears the door handle, right the edge. */
+const ROW_PAD_LEFT = 33;
+const ROW_PAD_RIGHT = 12;
+const ROW_GAP = 10;
 const V_PAD = 4;
 
 type Props = {
@@ -40,10 +44,16 @@ export function PinnedStrip({
   onFocusShown,
 }: Props) {
   const [height, setHeight] = useState(0);
+  const [stripW, setStripW] = useState(0);
   // Full content height per card, so the fade only renders when the card is
   // actually clipped (a short card must not get a gradient washed over it).
   const [contentH, setContentH] = useState<Record<string, number>>({});
   const cardH = height > 0 ? Math.max(40, height - V_PAD * 2) : undefined;
+  // Two cards across, always: each card takes half the strip minus insets
+  // and the gap, so widths follow the screen instead of a fixed 150pt.
+  const cardW = stripW > 0
+    ? Math.max(100, (stripW - ROW_PAD_LEFT - ROW_PAD_RIGHT - ROW_GAP) / 2)
+    : CARD_W;
   // How many checklist rows fit before the card is clipped: card height minus
   // room for the compact padding, title and meta line, then ~24px per row,
   // with space kept for the "+N more" line.
@@ -60,8 +70,9 @@ export function PinnedStrip({
     const index = items.findIndex((i) => i.id === focusId);
     if (index < 0) return;
     shownRef.current = focusId;
-    // Row pads 12 left with a 10pt gap: card `index` starts at 12 + 160·index.
-    const x = Math.max(0, 12 + index * (CARD_W + 10) - 12);
+    // Card `index` starts at ROW_PAD_LEFT + (cardW + gap)·index; scroll so
+    // its left edge lands exactly where the row starts — clear of the handle.
+    const x = index * (cardW + ROW_GAP);
     const t = setTimeout(() => {
       scrollRef.current?.scrollTo({ x, animated: true });
       onFocusShown?.();
@@ -70,10 +81,16 @@ export function PinnedStrip({
       clearTimeout(t);
       shownRef.current = null;
     };
-  }, [focusId, items, onFocusShown]);
+  }, [focusId, items, onFocusShown, cardW]);
 
   return (
-    <View style={styles.wrap} onLayout={(e) => setHeight(e.nativeEvent.layout.height)}>
+    <View
+      style={styles.wrap}
+      onLayout={(e) => {
+        setHeight(e.nativeEvent.layout.height);
+        setStripW(e.nativeEvent.layout.width);
+      }}
+    >
       {items.length === 0 ? (
         <Text style={[styles.hint, { color: doorSoft(doorColor) }]}>Pin a note to keep it up here.</Text>
       ) : (
@@ -89,6 +106,7 @@ export function PinnedStrip({
               item={item}
               entries={entries.filter((e) => e.itemId === item.id)}
               photoUrl={item.photoPath ? photoUrls[item.photoPath] ?? null : null}
+              cardW={cardW}
               cardH={cardH}
               maxEntries={maxEntries}
               naturalH={contentH[item.id] ?? 0}
@@ -119,6 +137,7 @@ function PinnedCard({
   item,
   entries,
   photoUrl,
+  cardW,
   cardH,
   maxEntries,
   naturalH,
@@ -129,6 +148,7 @@ function PinnedCard({
   item: ItemWithAuthor;
   entries: ListEntry[];
   photoUrl: string | null;
+  cardW: number;
   cardH: number | undefined;
   maxEntries: number;
   naturalH: number;
@@ -162,7 +182,7 @@ function PinnedCard({
     >
       <Pressable
         onPress={() => onOpen(item)}
-        style={[styles.card, styles.cardShadow, cardH != null && { height: cardH }]}
+        style={[styles.card, styles.cardShadow, { width: cardW }, cardH != null && { height: cardH }]}
         accessibilityRole="button"
         accessibilityLabel={item.title ?? item.body ?? 'Pinned post'}
       >
@@ -228,11 +248,14 @@ function PinnedCard({
 const styles = StyleSheet.create({
   wrap: { flex: 1 },
   row: {
-    paddingHorizontal: 12,
+    paddingLeft: ROW_PAD_LEFT,
+    paddingRight: ROW_PAD_RIGHT,
     paddingVertical: V_PAD,
-    gap: 10,
+    gap: ROW_GAP,
   },
-  card: { width: CARD_W },
+  card: {
+    // Width is set per-card from the measured strip (two across, always).
+  },
   // The shadow lives on the card wrapper (not the paper) so `overflow:
   // 'hidden' on the clip can't cut it off.
   cardShadow: {

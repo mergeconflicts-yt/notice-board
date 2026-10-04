@@ -10,6 +10,13 @@ import { ItemWithAuthor, ListEntry } from '../types';
  *  (x = fraction of width, y = ref points). */
 export type DisplacedMove = { item: ItemWithAuthor; x: number; y: number };
 
+/** Canvas-px keep-out around the lower door's chrome handle (FridgeDoor:
+ *  left 12, width 13, top 16, height 130). Breathing room covers a tilted
+ *  note's swung corner (~6px at ±4.5°) plus its shadow (~8px), so the paper
+ *  lands visibly clear instead of just edge-clear. Notes slide right of it
+ *  instead of tucking underneath. */
+const HANDLE_KEEP_OUT = { x: 8, y: 8, w: 32, h: 146 };
+
 type Props = {
   items: ItemWithAuthor[];
   entries: ListEntry[];
@@ -167,8 +174,17 @@ export function BoardSection({
       if (!base || boardW <= 0) return layout;
       const next: BoardLayout = new Map();
       const placed: { x: number; y: number; w: number; h: number }[] = [];
-      const dx = clampBoardX(xPx / boardW, base.w);
+      let dx = clampBoardX(xPx / boardW, base.w);
       const dy = Math.max(0, yPx / scale);
+      // The held note never tucks under the handle: slide it right of the
+      // keep-out zone (same rule BoardNote applies live).
+      const kx = HANDLE_KEEP_OUT.x / boardW;
+      const kw = HANDLE_KEEP_OUT.w / boardW;
+      const ky = HANDLE_KEEP_OUT.y / scale;
+      const kh = HANDLE_KEEP_OUT.h / scale;
+      if (dx < kx + kw && dx + base.w > kx && dy < ky + kh && dy + base.h > ky) {
+        dx = clampBoardX(kx + kw, base.w);
+      }
       placed.push({ x: dx, y: dy, w: base.w, h: base.h });
       next.set(dragId, { ...base, x: dx, y: dy });
       const ordered = [...items].sort(
@@ -380,6 +396,7 @@ export function BoardSection({
                   resetKey={resetKey}
                   adjustRef={adjustRef}
                   spotlight={focusId === item.id}
+                  keepOut={HANDLE_KEEP_OUT}
                 />
               );
             })

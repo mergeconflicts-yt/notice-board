@@ -38,6 +38,9 @@ type Props = {
    *  the reveal scroll lands (the mount animation plays behind the closing
    *  composer sheet, so without this the user never sees it). */
   spotlight?: boolean;
+  /** Canvas-px rect the held note may not cover (the door handle): an
+   *  overlapping drag slides right of it instead of tucking underneath. */
+  keepOut?: { x: number; y: number; w: number; h: number } | null;
   /** Reports the note's rendered height so the layout reserves enough room. */
   onMeasure?: (id: string, heightPx: number) => void;
   /** Bumped by the board when a drop wasn't persisted, to snap the note back. */
@@ -105,6 +108,7 @@ export function BoardNote({
   resetKey = 0,
   adjustRef,
   spotlight = false,
+  keepOut = null,
 }: Props) {
   const [enter] = useState(() => new Animated.Value(animateIn ? 0 : 1));
   const [posX] = useState(() => new Animated.Value(left));
@@ -115,6 +119,26 @@ export function BoardNote({
   const draggingRef = useRef(false);
   const posRef = useRef({ x: left, y: top });
   const startRef = useRef({ x: left, y: top });
+  // Rendered height (px), tracked for the keep-out test below.
+  const heightRef = useRef(0);
+  const keepOutRef = useRef(keepOut);
+  useEffect(() => {
+    keepOutRef.current = keepOut;
+  }, [keepOut]);
+
+  // Slide a dragged rect right of the keep-out zone instead of under it,
+  // keeping the vertical position glued to the finger. Ref-stable for the
+  // memoised gesture below; reads live values through refs.
+  const avoidKeepOut = useMemo(() => {
+    return (x: number, y: number, w: number, h: number) => {
+      const o = keepOutRef.current;
+      if (!o || h <= 0) return { x, y };
+      if (x < o.x + o.w && x + w > o.x && y < o.y + o.h && y + h > o.y) {
+        return { x: o.x + o.w, y };
+      }
+      return { x, y };
+    };
+  }, []);
 
   // Keeps the held note under the finger while the board auto-scrolls:
   // every programmatic scroll delta shifts both the live position and the
@@ -195,10 +219,11 @@ export function BoardNote({
       })
       // eslint-disable-next-line react-hooks/refs -- gesture callbacks run off-render
       .onUpdate((e) => {
-        const x = startRef.current.x + e.translationX;
+        const rawX = startRef.current.x + e.translationX;
         // Never let a held note cross the divider into the pinned strip:
         // clamp its top edge to the section's top.
-        const y = Math.max(0, startRef.current.y + e.translationY);
+        const rawY = Math.max(0, startRef.current.y + e.translationY);
+        const { x, y } = avoidKeepOut(rawX, rawY, width, heightRef.current);
         posRef.current = { x, y };
         posX.setValue(x);
         posY.setValue(y);
@@ -246,7 +271,7 @@ export function BoardNote({
       });
 
     return Gesture.Race(pan, tap);
-  }, [posX, posY, lift, adjustFn, adjustRef]);
+  }, [posX, posY, lift, adjustFn, adjustRef, avoidKeepOut, width]);
 
   const enterTranslateY = enter.interpolate({ inputRange: [0, 1], outputRange: [-24, 0] });
   const enterScale = enter.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] });
@@ -273,7 +298,10 @@ export function BoardNote({
           ],
         },
       ]}
-      onLayout={(e) => onMeasure?.(item.id, e.nativeEvent.layout.height)}
+      onLayout={(e) => {
+        heightRef.current = e.nativeEvent.layout.height;
+        onMeasure?.(item.id, e.nativeEvent.layout.height);
+      }}
     >
       <GestureDetector gesture={gesture}>
         <Animated.View
