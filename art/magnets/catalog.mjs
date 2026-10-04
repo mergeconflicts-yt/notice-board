@@ -30,16 +30,10 @@ export const PACKS = [
 ];
 
 export const MAGNETS = [
+  // NOTE: st_fuji is photorealistic and owned by scripts/bake-fuji-photo.mjs
+  // (cut from art/ref/fuji.jpeg.webp), not by this vector catalog. Run the
+  // photo script after `npm run bake:packs -- --pack starter`.
   // --- Starter (bundled in the app) ---------------------------------------
-  {
-    id: 'st_fuji',
-    pack: 'starter',
-    label: 'Mt. Fuji',
-    svg: `
-      <path ${o('d="M3 36 L17 9 L20 13.5 L23 9 L37 36 Z"')} fill="#3F6FA8"/>
-      <path d="M9.5 22 L13.5 16.5 L15.5 19.5 L17 12.5 L20 9 L23 12.5 L24.5 19.5 L26.5 16.5 L30.5 22 L28 21 L25.5 22.5 L20 20.5 L14.5 22.5 L12 21 Z" fill="#F4F8FC"/>
-    `,
-  },
   {
     id: 'st_boba',
     pack: 'starter',
