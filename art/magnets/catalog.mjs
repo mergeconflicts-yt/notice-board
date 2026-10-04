@@ -36,8 +36,8 @@ export const MAGNETS = [
     pack: 'starter',
     label: 'Mt. Fuji',
     svg: `
-      <path ${o('d="M3 34 L14.5 12.5 L20 20 L25.5 12.5 L37 34 Z"')} fill="#7FA8D8"/>
-      <path ${o('d="M12.2 16.6 L14.5 12.5 L20 20 L25.5 12.5 L27.8 16.6 L24 14.6 L20 21 L16 14.6 Z"')} fill="#FFFFFF"/>
+      <path ${o('d="M3 36 L17 9 L20 13.5 L23 9 L37 36 Z"')} fill="#3F6FA8"/>
+      <path d="M9.5 22 L13.5 16.5 L15.5 19.5 L17 12.5 L20 9 L23 12.5 L24.5 19.5 L26.5 16.5 L30.5 22 L28 21 L25.5 22.5 L20 20.5 L14.5 22.5 L12 21 Z" fill="#F4F8FC"/>
     `,
   },
   {
@@ -45,13 +45,13 @@ export const MAGNETS = [
     pack: 'starter',
     label: 'Bubble tea',
     svg: `
-      <path ${o('d="M26.5 8 L28.5 10 L23 22"')} fill="none" stroke-linecap="round"/>
-      <path ${o('d="M11 12 H29 L26.6 34 H13.4 Z"')} fill="#EAD9BC"/>
-      <path ${o('d="M11 12 H29 L28.3 17 H11.7 Z"')} fill="#C9A27E"/>
-      <path ${o('d="M13.4 30 H26.6 L26.1 34 H13.9 Z"')} fill="#8A5A3B"/>
-      <circle ${o('cx="16" cy="28.4" r="2"')} fill="#3A2A20"/>
-      <circle ${o('cx="21" cy="30.2" r="2"')} fill="#3A2A20"/>
-      <circle ${o('cx="24.4" cy="27.6" r="1.7"')} fill="#3A2A20"/>
+      <path ${o('d="M21.5 2.5 L23.7 3.8 L20.2 14.5 L18 13.2 Z"')} fill="#D63A3A"/>
+      <path ${o('d="M12 15 H28 L26.2 32 Q25.8 34.5 23.2 34.5 H16.8 Q14.2 34.5 13.8 32 Z"')} fill="#EFD9B8"/>
+      <path ${o('d="M11 15 C11 10.5 14.5 9 20 9 C25.5 9 29 10.5 29 15 Z"')} fill="#F3C2C8"/>
+      <circle ${o('cx="16.3" cy="29.2" r="1.8"')} fill="#3A2A20"/>
+      <circle ${o('cx="20" cy="30.6" r="1.8"')} fill="#3A2A20"/>
+      <circle ${o('cx="23.4" cy="28.9" r="1.6"')} fill="#3A2A20"/>
+      <circle ${o('cx="18.6" cy="27.3" r="1.4"')} fill="#3A2A20"/>
     `,
   },
   {
