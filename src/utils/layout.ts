@@ -22,13 +22,19 @@ function overlaps(a: Rect, b: Rect): boolean {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
+/** Keep a stored x on the board horizontally (same clamp `settleNoOverlap`
+ *  starts with, without pushing anything down). */
+export function clampBoardX(x: number, w: number): number {
+  return Math.max(EDGE, Math.min(1 - EDGE - w, x));
+}
+
 /**
  * Nudge a rect so it touches no other rect: keep it on the board horizontally,
  * then push it straight down past everything it overlaps. Positions are in the
  * layout's own space (x a fraction of width, y in ref points).
  */
 export function settleNoOverlap(x: number, y: number, w: number, h: number, others: Rect[]) {
-  const nx = Math.max(EDGE, Math.min(1 - EDGE - w, x));
+  const nx = clampBoardX(x, w);
   let ny = Math.max(0, y);
   for (let guard = 0; guard < 200; guard++) {
     let nextBottom = ny;

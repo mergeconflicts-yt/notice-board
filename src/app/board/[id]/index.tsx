@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { setStatusBarStyle } from 'expo-status-bar';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { boardColors, colors, darkDoors, doorInk, doorSoft, fonts } from '../../../theme';
-import { BoardSection } from '../../../components/BoardSection';
+import { BoardSection, DisplacedMove } from '../../../components/BoardSection';
 import { PinnedStrip } from '../../../components/PinnedStrip';
 import { FridgeDoor } from '../../../components/FridgeDoor';
 import { MemberDot } from '../../../components/MemberDot';
@@ -383,8 +383,14 @@ export default function BoardScreen() {
   };
 
   // A held note was dropped: over the delete FAB it removes the post (with
-  // Undo), otherwise it remembers the new spot.
-  const handleDrop = (item: ItemWithAuthor, x: number, y: number) => {
+  // Undo) and the others glide back; otherwise it persists the new spot plus
+  // every note the drop displaced (they made way live, so they stay).
+  const handleDrop = (
+    item: ItemWithAuthor,
+    x: number,
+    y: number,
+    others: DisplacedMove[] = [],
+  ) => {
     setDragActive(false);
     setDeleteHover(false);
     setCanDeleteDrag(false);
@@ -407,6 +413,10 @@ export default function BoardScreen() {
     }
     detachMagnetsFrom(item.id);
     moveItem(item, x, y).catch(() => {});
+    for (const o of others) {
+      detachMagnetsFrom(o.item.id);
+      moveItem(o.item, o.x, o.y).catch(() => {});
+    }
   };
 
   const handleAdd = async (draft: NoteDraft) => {

@@ -20,8 +20,15 @@ type Props = {
   onToggleEntry?: (entry: ListEntry) => void;
   /** A note was picked up and is following the finger. */
   onDragStart?: (item: ItemWithAuthor) => void;
-  /** The held note moved; `screenX`/`screenY` is the finger's position in the window. */
-  onDragUpdate?: (item: ItemWithAuthor, screenX: number, screenY: number) => void;
+  /** The held note moved; `screenX`/`screenY` is the finger's position in the
+   *  window, `canvasX`/`canvasY` the note's new top-left corner in canvas px. */
+  onDragUpdate?: (
+    item: ItemWithAuthor,
+    screenX: number,
+    screenY: number,
+    canvasX: number,
+    canvasY: number,
+  ) => void;
   /** Called on drop with the note's new top-left corner, in canvas pixels. */
   onMove?: (item: ItemWithAuthor, left: number, top: number) => void;
   /** A drag ended without a real move (e.g. a long-press in place), so the
@@ -194,7 +201,7 @@ export function BoardNote({
         posRef.current = { x, y };
         posX.setValue(x);
         posY.setValue(y);
-        handlers.current.onDragUpdate?.(handlers.current.item, e.absoluteX, e.absoluteY);
+        handlers.current.onDragUpdate?.(handlers.current.item, e.absoluteX, e.absoluteY, x, y);
       })
       // eslint-disable-next-line react-hooks/refs -- gesture callbacks run off-render
       .onFinalize(() => {

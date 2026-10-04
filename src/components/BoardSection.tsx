@@ -1,10 +1,14 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import { colors, fonts } from '../theme';
 import { BoardNote } from './BoardNote';
-import { boardCanvasHeight, computeBoardLayout, BoardLayout, REF_W, settleNoOverlap } from '../utils/layout';
+import { boardCanvasHeight, clampBoardX, computeBoardLayout, BoardLayout, REF_W, settleNoOverlap } from '../utils/layout';
 import { ItemWithAuthor, ListEntry } from '../types';
+
+/** A note the drop displaced, with its new spot in stored coordinates
+ *  (x = fraction of width, y = ref points). */
+export type DisplacedMove = { item: ItemWithAuthor; x: number; y: number };
 
 type Props = {
   items: ItemWithAuthor[];
@@ -12,10 +16,18 @@ type Props = {
   photoUrls: Record<string, string>;
   entering: Set<string>;
   onOpen: (item: ItemWithAuthor) => void;
-  /** Called with the drop point normalized (x = fraction of width, y = ref points). */
-  onMove: (item: ItemWithAuthor, x: number, y: number) => void;
+  /** Called with the drop point in stored coordinates (x = fraction of width,
+   *  y = ref points) plus every other note the drop displaced, so the board
+   *  can persist the whole new arrangement. */
+  onMove: (item: ItemWithAuthor, x: number, y: number, others: DisplacedMove[]) => void;
   onDragStart?: (item: ItemWithAuthor) => void;
-  onDragUpdate?: (item: ItemWithAuthor, screenX: number, screenY: number) => void;
+  onDragUpdate?: (
+    item: ItemWithAuthor,
+    screenX: number,
+    screenY: number,
+    canvasX: number,
+    canvasY: number,
+  ) => void;
   onDragEnd?: (item: ItemWithAuthor) => void;
   /** Shown in place of the canvas when the section has no items. */
   emptyHint?: string;
@@ -45,6 +57,11 @@ type Props = {
  * While a note is held, the section edge-auto-scrolls: dragging near the top
  * or bottom edge scrolls the fridge along with the finger, and the held note
  * is shifted by the same delta so it stays glued to the finger.
+ *
+ * The other notes also make way live: with the held note pinned at the
+ * finger, every other note settles around it (same rule as the board layout),
+ * gliding aside to preview the drop. On drop the whole arrangement is
+ * reported so it persists; on cancel everything glides back.
  */
 export function BoardSection({
   items,
@@ -83,6 +100,12 @@ export function BoardSection({
   const loopRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [dragScrolling, setDragScrolling] = useState(false);
   const scheduledRef = useRef<string | null>(null);
+  // Live make-way preview: the held note + its canvas position (px). State
+  // updates are throttled (~20Hz); the drop path recomputes from the exact
+  // gesture values, so throttle staleness never affects persistence.
+  const [dragLive, setDragLive] = useState<{ id: string; x: number; y: number } | null>(null);
+  const dragIdRef = useRef<string | null>(null);
+  const lastPreviewAt = useRef(0);
 
   // A freshly posted note can land anywhere in the masonry (shortest
   // column), so reveal it by position — not by scrolling to the end.
@@ -133,6 +156,41 @@ export function BoardSection({
     );
   };
 
+  // --- Make-way preview --------------------------------------------------
+  // With the held note pinned at the finger (canvas px), every other note
+  // settles around it with the board's own no-overlap rule — same column
+  // order as computeBoardLayout, so neighbours glide aside to preview the
+  // drop instead of being covered by it.
+  const computePreview = useCallback(
+    (dragId: string, xPx: number, yPx: number): BoardLayout => {
+      const base = layout.get(dragId);
+      if (!base || boardW <= 0) return layout;
+      const next: BoardLayout = new Map();
+      const placed: { x: number; y: number; w: number; h: number }[] = [];
+      const dx = clampBoardX(xPx / boardW, base.w);
+      const dy = Math.max(0, yPx / scale);
+      placed.push({ x: dx, y: dy, w: base.w, h: base.h });
+      next.set(dragId, { ...base, x: dx, y: dy });
+      const ordered = [...items].sort(
+        (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+      );
+      for (const it of ordered) {
+        if (it.id === dragId) continue;
+        const q = layout.get(it.id);
+        if (!q) continue;
+        const s = settleNoOverlap(q.x, q.y, q.w, q.h, placed);
+        placed.push({ x: s.x, y: s.y, w: q.w, h: q.h });
+        next.set(it.id, { ...q, ...s });
+      }
+      return next;
+    },
+    [items, layout, boardW, scale],
+  );
+
+  const previewLayout = useMemo(
+    () => (dragLive ? computePreview(dragLive.id, dragLive.x, dragLive.y) : null),
+    [dragLive, computePreview],
+  );
   // --- Drag auto-scroll --------------------------------------------------
   // Finger distance from the viewport edge that starts pulling the fridge.
   const EDGE_PX = 110;
@@ -206,42 +264,66 @@ export function BoardSection({
     setDragScrolling(true);
     measureContainer();
     if (loopRef.current == null) loopRef.current = setInterval(tickAutoScroll, 16);
+    // Seed the make-way preview at the note's current spot; finger updates
+    // refine it from here.
+    dragIdRef.current = item.id;
+    const p = layout.get(item.id);
+    if (p && boardW > 0) setDragLive({ id: item.id, x: p.x * boardW, y: p.y * scale });
     onDragStart?.(item);
   };
 
-  const handleDragUpdateInner = (item: ItemWithAuthor, screenX: number, screenY: number) => {
+  const handleDragUpdateInner = (
+    item: ItemWithAuthor,
+    screenX: number,
+    screenY: number,
+    canvasX: number,
+    canvasY: number,
+  ) => {
     fingerYRef.current = screenY;
     fingerSeenRef.current = true;
-    onDragUpdate?.(item, screenX, screenY);
+    onDragUpdate?.(item, screenX, screenY, canvasX, canvasY);
+    if (dragIdRef.current !== item.id) return;
+    // Throttle preview re-renders (~20Hz): the held note itself stays at
+    // full rate on its own animated values, and the drop path recomputes
+    // from the exact gesture values.
+    const now = Date.now();
+    if (now - lastPreviewAt.current > 50) {
+      lastPreviewAt.current = now;
+      setDragLive({ id: item.id, x: canvasX, y: canvasY });
+    }
   };
 
   const handleDragEndInner = (item: ItemWithAuthor) => {
     stopAutoScroll();
+    dragIdRef.current = null;
+    setDragLive(null);
     onDragEnd?.(item);
   };
 
   const handleMove = (item: ItemWithAuthor, left: number, top: number) => {
     stopAutoScroll();
+    dragIdRef.current = null;
+    setDragLive(null);
     if (boardW <= 0) return;
-    // Belt and braces with BoardNote's live clamp: a fast drop must not
-    // persist above the section's top edge (under the pinned strip).
-    top = Math.max(0, top);
-    const placement = layout.get(item.id);
-    if (!placement) return;
-    const refScale = boardW / REF_W;
-    const others: { x: number; y: number; w: number; h: number }[] = [];
-    layout.forEach((q, id) => {
-      if (id !== item.id) others.push(q);
+    // Persist the previewed arrangement, recomputed from the exact drop
+    // point: the held note plus every note it displaced. A bare long-press
+    // reports (nearly) its start spot, the preview matches the stored layout,
+    // and nothing else is persisted.
+    const preview = computePreview(item.id, left, Math.max(0, top));
+    const dropped = preview.get(item.id);
+    if (!dropped) return;
+    const byId = new Map(items.map((i) => [i.id, i] as const));
+    const others: DisplacedMove[] = [];
+    preview.forEach((p, id) => {
+      if (id === item.id) return;
+      const q = layout.get(id);
+      const it = byId.get(id);
+      if (!q || !it) return;
+      if (Math.abs(p.x - q.x) > 0.001 || Math.abs(p.y - q.y) > 0.5) {
+        others.push({ item: it, x: p.x, y: p.y });
+      }
     });
-    // Never let a drop land on top of another post.
-    const settled = settleNoOverlap(
-      left / boardW,
-      top / refScale,
-      placement.w,
-      placement.h,
-      others,
-    );
-    onMove(item, settled.x, settled.y);
+    onMove(item, dropped.x, dropped.y, others);
   };
 
   return (
@@ -273,7 +355,10 @@ export function BoardSection({
         ) : null}
         {boardW > 0
           ? items.map((item) => {
-              const p = layout.get(item.id);
+              // While dragging, non-held notes render at their preview spots
+              // (gliding aside); the held note ignores left/top and follows
+              // the finger on its own animated values.
+              const p = previewLayout?.get(item.id) ?? layout.get(item.id);
               if (!p) return null;
               return (
                 <BoardNote
