@@ -16,7 +16,7 @@ export const INVITE_PAGE = `<!doctype html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="apple-itunes-app" content="app-id=0000000000" />
+    <meta name="apple-itunes-app" content="app-id=6818976344" />
     <title>Join a Fridge Board</title>
     <style>
       body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
@@ -33,7 +33,7 @@ export const INVITE_PAGE = `<!doctype html>
       <h1>You’re invited</h1>
       <p id="lead">Open this invite in the Fridge Board app.</p>
       <a class="btn" id="open" href="#" style="display:none">Open in the app</a>
-      <a class="secondary" href="https://apps.apple.com/app/id0000000000">Get it on the App Store</a>
+      <a class="secondary" href="https://apps.apple.com/app/id6818976344">Get it on the App Store</a>
       <a class="secondary" href="https://play.google.com/store/apps/details?id=com.fridgeboard.app">Get it on Google Play</a>
     </main>
     <script>

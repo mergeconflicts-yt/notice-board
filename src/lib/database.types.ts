@@ -307,6 +307,8 @@ export type Database = {
           photo_path: string | null
           pinned: boolean
           place: string | null
+          shared_from_app: string | null
+          shared_from_author: string | null
           title: string | null
           type: Database["public"]["Enums"]["item_type"]
           updated_at: string
@@ -331,6 +333,8 @@ export type Database = {
           photo_path?: string | null
           pinned?: boolean
           place?: string | null
+          shared_from_app?: string | null
+          shared_from_author?: string | null
           title?: string | null
           type: Database["public"]["Enums"]["item_type"]
           updated_at?: string
@@ -355,6 +359,8 @@ export type Database = {
           photo_path?: string | null
           pinned?: boolean
           place?: string | null
+          shared_from_app?: string | null
+          shared_from_author?: string | null
           title?: string | null
           type?: Database["public"]["Enums"]["item_type"]
           updated_at?: string
@@ -972,6 +978,8 @@ export type Database = {
           photo_path: string | null
           pinned: boolean
           place: string | null
+          shared_from_app: string | null
+          shared_from_author: string | null
           title: string | null
           type: Database["public"]["Enums"]["item_type"]
           updated_at: string
@@ -1053,6 +1061,8 @@ export type Database = {
           photo_path: string | null
           pinned: boolean
           place: string | null
+          shared_from_app: string | null
+          shared_from_author: string | null
           title: string | null
           type: Database["public"]["Enums"]["item_type"]
           updated_at: string
@@ -1194,6 +1204,57 @@ export type Database = {
           photo_path: string | null
           pinned: boolean
           place: string | null
+          shared_from_app: string | null
+          shared_from_author: string | null
+          title: string | null
+          type: Database["public"]["Enums"]["item_type"]
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "items"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      post_shared_item: {
+        Args: {
+          p_board_id: string
+          p_body: string
+          p_color: Database["public"]["Enums"]["item_color"]
+          p_entries?: Json
+          p_event_at: string
+          p_id: string
+          p_photo_path: string
+          p_pinned?: boolean
+          p_place: string
+          p_shared_from_app?: string
+          p_shared_from_author?: string
+          p_title: string
+          p_type: Database["public"]["Enums"]["item_type"]
+        }
+        Returns: {
+          board_id: string
+          body: string | null
+          color: Database["public"]["Enums"]["item_color"]
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          deleted_by: string | null
+          done_at: string | null
+          done_by: string | null
+          event_at: string | null
+          id: string
+          keep_until: string | null
+          layout: Json | null
+          paper_style: string | null
+          photo_path: string | null
+          pinned: boolean
+          place: string | null
+          shared_from_app: string | null
+          shared_from_author: string | null
           title: string | null
           type: Database["public"]["Enums"]["item_type"]
           updated_at: string

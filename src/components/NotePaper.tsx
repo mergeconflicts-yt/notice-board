@@ -186,6 +186,16 @@ export function NotePaper({
           {[authorName, age].filter(Boolean).join(' · ')}
         </Text>
       ) : null}
+      {item.sharedFromApp || item.sharedFromAuthor ? (
+        <Text
+          numberOfLines={1}
+          style={[styles.sharedFrom, { fontSize: compactFont(11, compact) }]}
+        >
+          {[item.sharedFromApp ? `Shared from ${item.sharedFromApp}` : null, item.sharedFromAuthor]
+            .filter(Boolean)
+            .join(' · ')}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -422,6 +432,14 @@ const styles = StyleSheet.create({
     fontFamily: fonts.ui.semibold,
     fontSize: 11.5,
     opacity: 0.7,
+    textAlign: 'right',
+  },
+  sharedFrom: {
+    marginTop: 2,
+    fontFamily: fonts.ui.regular,
+    fontSize: 11,
+    color: colors.inkSoft,
+    opacity: 0.85,
     textAlign: 'right',
   },
 });

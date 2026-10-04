@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "J94VN7TYYC.com.fridgeboard.app",
+        "paths": ["/j/*"]
+      }
+    ]
+  }
+}

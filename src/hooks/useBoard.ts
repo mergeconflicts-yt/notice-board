@@ -48,6 +48,8 @@ function mapRealtimeItem(row: Record<string, unknown>): ItemWithAuthor {
     eventAt: (row.event_at as string | null) ?? null,
     place: (row.place as string | null) ?? null,
     photoPath: (row.photo_path as string | null) ?? null,
+    sharedFromApp: (row.shared_from_app as string | null) ?? null,
+    sharedFromAuthor: (row.shared_from_author as string | null) ?? null,
     layout:
       row.layout && typeof (row.layout as { x?: unknown }).x === 'number'
         ? {
@@ -360,6 +362,8 @@ function createBoardStore(boardId: string) {
           eventAt: input.eventAt ?? null,
           place: input.place ?? null,
           photoPath: input.photoPath ?? null,
+          sharedFromApp: input.sharedFromApp ?? null,
+          sharedFromAuthor: input.sharedFromAuthor ?? null,
           layout: null,
           pinned: input.pinned ?? false,
           keepUntil: null,

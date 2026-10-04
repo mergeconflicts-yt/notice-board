@@ -189,6 +189,8 @@ function mapItem(row: any): ItemWithAuthor {
     eventAt: row.event_at,
     place: row.place,
     photoPath: row.photo_path,
+    sharedFromApp: row.shared_from_app ?? null,
+    sharedFromAuthor: row.shared_from_author ?? null,
     layout:
       row.layout && typeof row.layout.x === 'number' && typeof row.layout.y === 'number'
         ? { x: row.layout.x, y: row.layout.y, manual: row.layout.manual === true }
@@ -605,6 +607,9 @@ export type NewItem = {
   photoPath?: string | null;
   pinned?: boolean;
   entries?: { id: string; text: string }[];
+  /** Share-extension attribution ("Shared from WhatsApp · Paul"). */
+  sharedFromApp?: string | null;
+  sharedFromAuthor?: string | null;
 };
 
 export async function postItem(input: NewItem): Promise<ItemWithAuthor> {
@@ -622,6 +627,26 @@ export async function postItem(input: NewItem): Promise<ItemWithAuthor> {
     p_photo_path: input.photoPath ?? null,
     p_pinned: input.pinned ?? false,
     p_entries: (input.entries ?? null) as never,
+  } as never);
+  if (error) raise(error);
+  return mapItem(data);
+}
+
+export async function postSharedItem(input: NewItem): Promise<ItemWithAuthor> {
+  const { data, error } = await supabase.rpc('post_shared_item', {
+    p_id: input.id,
+    p_board_id: input.boardId,
+    p_type: input.type,
+    p_color: input.color,
+    p_body: input.body ?? null,
+    p_title: input.title ?? null,
+    p_event_at: input.eventAt ?? null,
+    p_place: input.place ?? null,
+    p_photo_path: input.photoPath ?? null,
+    p_pinned: input.pinned ?? false,
+    p_entries: (input.entries ?? null) as never,
+    p_shared_from_app: input.sharedFromApp ?? null,
+    p_shared_from_author: input.sharedFromAuthor ?? null,
   } as never);
   if (error) raise(error);
   return mapItem(data);

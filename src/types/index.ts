@@ -73,6 +73,9 @@ export type Item = {
   eventAt: string | null;
   place: string | null;
   photoPath: string | null;
+  /** Share-extension attribution ("Shared from WhatsApp · Paul"), or null. */
+  sharedFromApp: string | null;
+  sharedFromAuthor: string | null;
   /** Manual position, or null for the automatic layout. */
   layout: ItemLayout | null;
   pinned: boolean;

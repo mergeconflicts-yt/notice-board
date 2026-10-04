@@ -34,7 +34,14 @@
           "microphonePermission": false
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-sharing",
+        {
+          "ios": { "enabled": true, "activationRule": { "supportsText": true } },
+          "android": { "enabled": true, "singleShareMimeTypes": ["text/plain"] }
+        }
+      ]
     ],
     "extra": {
       "router": {},
