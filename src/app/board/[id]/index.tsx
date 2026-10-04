@@ -446,6 +446,25 @@ export default function BoardScreen() {
             <View style={styles.header}>
               <Pressable
                 hitSlop={8}
+                onPress={() => {
+                  setDecorateMode((v) => !v);
+                  setTrayOpen((v) => !v);
+                }}
+                style={styles.decorateBtn}
+                accessibilityRole="button"
+                accessibilityState={{ selected: decorateMode }}
+                accessibilityLabel={decorateMode ? 'Finish decorating' : 'Decorate the fridge'}
+                testID="decorate-toggle"
+              >
+                <MaterialCommunityIcons
+                  name={decorateMode ? 'check' : 'star-four-points-outline'}
+                  size={20}
+                  color={doorInk(board.color)}
+                />
+              </Pressable>
+
+              <Pressable
+                hitSlop={8}
                 onPress={() => setSwitcherOpen(true)}
                 style={styles.brandBadge}
                 accessibilityRole="button"
@@ -467,25 +486,6 @@ export default function BoardScreen() {
                   {board.name}
                 </Text>
                 <MaterialCommunityIcons name="chevron-down" size={16} color={doorSoft(board.color)} />
-              </Pressable>
-
-              <Pressable
-                hitSlop={8}
-                onPress={() => {
-                  setDecorateMode((v) => !v);
-                  setTrayOpen((v) => !v);
-                }}
-                style={styles.decorateBtn}
-                accessibilityRole="button"
-                accessibilityState={{ selected: decorateMode }}
-                accessibilityLabel={decorateMode ? 'Finish decorating' : 'Decorate the fridge'}
-                testID="decorate-toggle"
-              >
-                <MaterialCommunityIcons
-                  name={decorateMode ? 'check' : 'star-four-points-outline'}
-                  size={20}
-                  color={doorInk(board.color)}
-                />
               </Pressable>
 
               <Pressable
@@ -651,6 +651,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 36,
     height: 36,
+    marginLeft: -16,
     marginRight: 8,
     borderRadius: 18,
   },
