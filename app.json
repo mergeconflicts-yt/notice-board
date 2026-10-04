@@ -9,7 +9,18 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.fridgeboard.app"
+      "bundleIdentifier": "com.fridgeboard.app",
+      "associatedDomains": [
+        "applinks:fridge-board.kranehx.com"
+      ],
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.com.fridgeboard.app.sharing"
+        ]
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -38,8 +49,19 @@
       [
         "expo-sharing",
         {
-          "ios": { "enabled": true, "activationRule": { "supportsText": true } },
-          "android": { "enabled": true, "singleShareMimeTypes": ["text/plain"] }
+          "ios": {
+            "enabled": true,
+            "appGroupId": "group.com.fridgeboard.app.sharing",
+            "activationRule": {
+              "supportsText": true
+            }
+          },
+          "android": {
+            "enabled": true,
+            "singleShareMimeTypes": [
+              "text/plain"
+            ]
+          }
         }
       ]
     ],
