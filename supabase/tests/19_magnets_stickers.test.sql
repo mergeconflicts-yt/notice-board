@@ -1,7 +1,7 @@
 -- Magnets, stickers and packs (docs/prd-magents-stickers.md §6, §9).
 -- Roles: O owner, M member, S stranger.
 begin;
-select plan(25);
+select plan(26);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000091', 'authenticated', 'authenticated'),
@@ -63,6 +63,14 @@ select is(
    order by z desc limit 1),
   2::bigint, 'new magnet is stacked on top');
 
+-- Stickers are flat decorations placed through the same RPC (no reactions).
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000092', true);
+set role authenticated;
+select lives_ok(
+  $$select public.place_magnet('b0000000-0000-0000-0000-000000000091', 'st_love', 0.2, 60, null, 0, null)$$,
+  'member places a sticker decoration');
+reset role;
+
 -- Any member can move any magnet (shared fridge).
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000091', true);
 set role authenticated;
@@ -71,10 +79,11 @@ select lives_ok(
       (select id from public.board_magnets where board_id = 'b0000000-0000-0000-0000-000000000091' and z = 1),
       0.9, 400, null, 1)$$,
   'owner moves a member''s magnet');
--- A stale version is rejected.
+-- A stale version is rejected (the just-moved magnet is on top, version 2).
 select throws_ok(
   $$select public.move_magnet(
-      (select id from public.board_magnets where board_id = 'b0000000-0000-0000-0000-000000000091' and z = 3),
+      (select id from public.board_magnets where board_id = 'b0000000-0000-0000-0000-000000000091'
+       order by z desc limit 1),
       0.1, 10, null, 1)$$,
   'P0001', 'version_conflict', 'stale version rejected');
 

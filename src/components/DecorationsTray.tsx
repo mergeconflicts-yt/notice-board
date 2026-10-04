@@ -27,6 +27,21 @@ export function DecorationsTray({
   onClose,
 }: Props) {
   const magnets = art.filter((a) => a.kind === 'magnet');
+  const stickers = art.filter((a) => a.kind === 'sticker');
+  const cell = (a: PackArt) => (
+    <Pressable
+      key={a.artId}
+      onPress={() => onPlace(a.artId)}
+      style={styles.cell}
+      accessibilityRole="button"
+      accessibilityLabel={`Add ${a.label}`}
+    >
+      <MagnetArt art={a} size={CELL - 12} />
+      <Text numberOfLines={1} style={styles.cellLabel}>
+        {a.label}
+      </Text>
+    </Pressable>
+  );
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.scrim} onPress={onClose} />
@@ -54,27 +69,25 @@ export function DecorationsTray({
         </View>
 
         <Text style={styles.hint}>
-          Tap a magnet to add it, drag it on the fridge to move it, and tap × to take it off.
+          Tap a magnet or sticker to add it, then drag it on the fridge to move it.
         </Text>
 
-        {magnets.length === 0 ? (
-          <Text style={styles.empty}>No magnets yet. The shop is coming soon.</Text>
+        {magnets.length === 0 && stickers.length === 0 ? (
+          <Text style={styles.empty}>Nothing to decorate with yet. The shop is coming soon.</Text>
         ) : (
-          <ScrollView contentContainerStyle={styles.grid} showsVerticalScrollIndicator={false}>
-            {magnets.map((a) => (
-              <Pressable
-                key={a.artId}
-                onPress={() => onPlace(a.artId)}
-                style={styles.cell}
-                accessibilityRole="button"
-                accessibilityLabel={`Add ${a.label}`}
-              >
-                <MagnetArt art={a} size={CELL - 12} />
-                <Text numberOfLines={1} style={styles.cellLabel}>
-                  {a.label}
-                </Text>
-              </Pressable>
-            ))}
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {magnets.length > 0 ? (
+              <>
+                <Text style={styles.section}>Magnets</Text>
+                <View style={styles.grid}>{magnets.map(cell)}</View>
+              </>
+            ) : null}
+            {stickers.length > 0 ? (
+              <>
+                <Text style={styles.section}>Stickers</Text>
+                <View style={styles.grid}>{stickers.map(cell)}</View>
+              </>
+            ) : null}
           </ScrollView>
         )}
       </View>
@@ -130,6 +143,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingBottom: 8 },
+  section: {
+    fontFamily: fonts.ui.bold,
+    fontSize: 13,
+    color: colors.inkSoft,
+    marginTop: 6,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
   cell: {
     width: 80,
     alignItems: 'center',

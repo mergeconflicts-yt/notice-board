@@ -1,6 +1,7 @@
 -- Magnets and packs — local iteration v1 (docs/prd-magents-stickers.md §9).
--- Note-reaction stickers were dropped from the app (2026-10-04); the sticker
--- pack-art kind may remain as catalogue data, but there is no reaction UI.
+-- Packs carry magnets, stickers and papers. Note *reactions* (the old
+-- item_stickers feature) were dropped 2026-10-04; stickers are now flat
+-- decorations placed on the door and stored in board_magnets alongside magnets.
 --
 -- ADD-ONLY migration (freeze in effect since the 2026-09-28 first push).
 -- Local-only until proven out: iterate by adding follow-up migrations, never
@@ -227,10 +228,11 @@ begin
   if p_gift_note is not null and char_length(p_gift_note) > 28 then
     raise exception 'invalid_input';
   end if;
-  -- Art must exist and be a magnet; pack derived server-side (no client invention).
+  -- Art must exist and be placeable decoration (magnet or sticker); pack
+  -- derived server-side (no client invention).
   select pack_id into v_pack
   from public.pack_art
-  where art_id = p_art_id and kind = 'magnet';
+  where art_id = p_art_id and kind in ('magnet', 'sticker');
   if v_pack is null then
     raise exception 'invalid_input';
   end if;
