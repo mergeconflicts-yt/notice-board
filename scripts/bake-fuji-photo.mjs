@@ -14,19 +14,19 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REF = path.join(ROOT, 'art/ref/fuji.jpeg.webp');
 const OUT = path.join(ROOT, 'assets/packs/starter');
 
-// Crop window in the reference photo (px): a narrower, taller slice centred on
-// the cone so the die-cut reads tall, holding snow + rock and excluding the
+// Crop window in the reference photo (px): centred on the apex so the die-cut
+// is a nearly symmetrical cone standing alone. Holds snow + rock, excludes the
 // train and fields below.
-const CROP = { left: 350, top: 100, width: 510, height: 310 };
-// Die-cut cone inside the crop (px), inset a touch so no sky slivers survive.
-// The summit is a gentle curve (Fuji's crater rim), never a point.
-const CONE = { lx: 30, by: 303, rx: 480 };
-const SUMMIT = { lx: 235, ly: 48, cx: 255, cy: 30, rx: 275, ry: 48 };
+const CROP = { left: 355, top: 100, width: 500, height: 310 };
+// Die-cut cone inside the crop (px): symmetric apex + base, inset a touch so
+// no sky slivers survive. The summit is a gentle curve (crater rim).
+const CONE = { lx: 14, by: 303, rx: 486 };
+const SUMMIT = { lx: 230, ly: 48, cx: 250, cy: 30, rx: 270, ry: 48 };
 function cropPath() {
   return `M${CONE.lx},${CONE.by} L${SUMMIT.lx},${SUMMIT.ly} Q${SUMMIT.cx},${SUMMIT.cy} ${SUMMIT.rx},${SUMMIT.ry} L${CONE.rx},${CONE.by} Z`;
 }
 // Placement in the 40-unit art box (36 wide, vertically centred).
-const BOX = { x: 2, y: (40 - (310 * 36) / 510) / 2, w: 36, h: (310 * 36) / 510 };
+const BOX = { x: 2, y: (40 - (CROP.height * 36) / CROP.width) / 2, w: 36, h: (CROP.height * 36) / CROP.width };
 
 const SHADOW_FILTER = `
 <filter id="f" x="-30%" y="-30%" width="160%" height="160%">

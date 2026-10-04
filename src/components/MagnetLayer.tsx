@@ -2,9 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
+  withSequence,
+  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { colors } from '../theme';
@@ -184,6 +187,8 @@ function MagnetItem({
   const posX = useSharedValue(centre.x);
   const posY = useSharedValue(centre.y);
   const lift = useSharedValue(0);
+  // 60 ms drop squash (vertical only); Reduce Motion skips it.
+  const squash = useSharedValue(1);
   const startX = useRef(centre.x);
   const startY = useRef(centre.y);
   const draggingRef = useRef(false);
@@ -228,6 +233,7 @@ function MagnetItem({
         startX.current = posX.value;
         startY.current = posY.value;
         liftTo(lift, 1, props.current.reduceMotion);
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         props.current.onDragStart?.(props.current.magnet);
         props.current.onDraggingChange?.(true);
       })
@@ -249,6 +255,15 @@ function MagnetItem({
           props.current.onLongPress?.(props.current.magnet);
           return;
         }
+        // The 60 ms snap squash + a light haptic on drop.
+        if (!props.current.reduceMotion) {
+          // eslint-disable-next-line react-hooks/immutability -- shared values are motion state
+          squash.value = withSequence(
+            withTiming(0.9, { duration: 60 }),
+            withSpring(1, { damping: 12, stiffness: 260 }),
+          );
+        }
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         props.current.onDropCanvas(props.current.magnet, posX.value, posY.value);
       });
 
@@ -262,12 +277,12 @@ function MagnetItem({
       });
 
     return Gesture.Race(pan, tap);
-  }, [lift, posX, posY]);
+  }, [lift, posX, posY, squash]);
 
   const itemStyle = useAnimatedStyle(() => ({
     left: posX.value - size / 2,
     top: posY.value - size / 2,
-    transform: [{ scale: selected ? 1.12 : 1 }],
+    transform: [{ scale: selected ? 1.12 : 1 }, { scaleY: squash.value }],
   }), [selected, size]);
 
   return (
