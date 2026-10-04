@@ -174,8 +174,15 @@ Done 2026-09-28 (with reasons):
   Confirm signup (`Your Fridge Board code` ← `confirmation.html`),
   Change Email (`Confirm your new email` ← `email_change.html`).
   (`otp_length = 6`, `otp_expiry = 600`.)
-- CAPTCHA: Turnstile ON with secret (`Project Settings → Auth → Bot and
-  Abuse Protection`, provider `turnstile`; secret never in repo).
+- CAPTCHA: Turnstile widget exists (Managed→Non-interactive both tried) with
+  secret in Bot Protection, BUT bot protection is currently OFF in Supabase
+  (2026-10-04): WKWebView issues challenges that never solve (0 solves across
+  all attempts — the WebView can't complete the proof-of-work), blocking all
+  guest/email signup on-device. Abuse cover meanwhile: 30/hour/IP anonymous
+  + signup limits, 30/hour email cap, app 30s resend cooldown. BEFORE the
+  next production build: remove `EXPO_PUBLIC_TURNSTILE_SITE_KEY` from EAS
+  env so the app skips the dead widget entirely (it self-skips without a
+  key). Revisit only with a natively-verifiable captcha.
   Widget decisions: mode **Managed** (invisible for most, challenge only
   high-risk traffic — fits the 320×90 WebView in
   `src/components/Turnstile.tsx`; Non-interactive would spinner every

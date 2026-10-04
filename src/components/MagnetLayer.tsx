@@ -38,8 +38,9 @@ export function magnetCentre(
   return { x: m.x * boardW, y: m.y * scale };
 }
 
-/** Inverse of `magnetCentre`: canvas px → stored coordinates, attaching to a
- *  note when the drop centre lands inside one (M-4). */
+/** Inverse of `magnetCentre`: canvas px → stored door coordinates. Magnets are
+ *  independent of notes — a drop always anchors to the door, never to the
+ *  note underneath, so moving a note never drags its stickers along. */
 export function magnetDropTarget(
   cx: number,
   cy: number,
@@ -47,22 +48,9 @@ export function magnetDropTarget(
   boardW: number,
   scale: number,
 ): { x: number; y: number; itemId: string | null } {
+  void layout;
   const rx = cx / boardW;
   const ry = cy / scale;
-  let attached: string | null = null;
-  layout.forEach((p, id) => {
-    if (attached === null && rx >= p.x && rx <= p.x + p.w && ry >= p.y && ry <= p.y + p.h) {
-      attached = id;
-    }
-  });
-  if (attached) {
-    const p = layout.get(attached)!;
-    return {
-      itemId: attached,
-      x: Math.min(1, Math.max(0, (rx - p.x) / p.w)),
-      y: ry - p.y,
-    };
-  }
   return { itemId: null, x: Math.min(1, Math.max(0, rx)), y: Math.max(0, ry) };
 }
 

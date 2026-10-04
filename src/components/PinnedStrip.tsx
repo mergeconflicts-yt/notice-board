@@ -117,7 +117,7 @@ function PhotoCard({ url, caption }: { url: string | null; caption: string | nul
         <Image
           source={{ uri: url }}
           style={styles.photo}
-          contentFit="cover"
+          contentFit="contain"
           accessible
           accessibilityLabel={caption?.trim() || 'Pinned photo'}
         />
@@ -172,6 +172,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.paperEdge,
     padding: 8,
+    overflow: 'hidden',
   },
   photo: { flex: 1, width: '100%' },
   photoPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },

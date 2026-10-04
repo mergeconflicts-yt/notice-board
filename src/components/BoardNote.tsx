@@ -20,17 +20,26 @@ type Props = {
   onToggleEntry?: (entry: ListEntry) => void;
   /** A note was picked up and is following the finger. */
   onDragStart?: (item: ItemWithAuthor) => void;
-  /** The held note moved; `screenY` is the finger's position in the window. */
-  onDragUpdate?: (item: ItemWithAuthor, screenY: number) => void;
+  /** The held note moved; `screenX`/`screenY` is the finger's position in the window. */
+  onDragUpdate?: (item: ItemWithAuthor, screenX: number, screenY: number) => void;
   /** Called on drop with the note's new top-left corner, in canvas pixels. */
   onMove?: (item: ItemWithAuthor, left: number, top: number) => void;
   /** A drag ended without a real move (e.g. a long-press in place), so the
    *  board can hide the delete zone. `onMove` is not called on this path. */
   onDragEnd?: (item: ItemWithAuthor) => void;
+  /** True for a just-posted note being revealed: replay the entrance pop as
+   *  the reveal scroll lands (the mount animation plays behind the closing
+   *  composer sheet, so without this the user never sees it). */
+  spotlight?: boolean;
   /** Reports the note's rendered height so the layout reserves enough room. */
   onMeasure?: (id: string, heightPx: number) => void;
   /** Bumped by the board when a drop wasn't persisted, to snap the note back. */
   resetKey?: number;
+  /** Shared slot the board uses to keep the held note glued to the finger
+   *  while it auto-scrolls underneath. The active note registers an adjust
+   *  fn on pick-up (cleared on drop); the board calls it with each
+   *  programmatic scroll delta so canvas position tracks the finger. */
+  adjustRef?: { current: ((dy: number) => void) | null };
 };
 
 /** How long a note must be held before it can be picked up and dragged. */
@@ -87,6 +96,8 @@ export function BoardNote({
   onDragEnd,
   onMeasure,
   resetKey = 0,
+  adjustRef,
+  spotlight = false,
 }: Props) {
   const [enter] = useState(() => new Animated.Value(animateIn ? 0 : 1));
   const [posX] = useState(() => new Animated.Value(left));
@@ -97,6 +108,19 @@ export function BoardNote({
   const draggingRef = useRef(false);
   const posRef = useRef({ x: left, y: top });
   const startRef = useRef({ x: left, y: top });
+
+  // Keeps the held note under the finger while the board auto-scrolls:
+  // every programmatic scroll delta shifts both the live position and the
+  // gesture start, so the next onUpdate (start + translation) still holds
+  // the accumulated scroll. Registered only while this note is in hand.
+  const adjustFn = useMemo(() => {
+    return (dy: number) => {
+      startRef.current.y += dy;
+      posRef.current.y = Math.max(0, posRef.current.y + dy);
+      posY.setValue(posRef.current.y);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- stable per note instance
+  }, []);
 
   // Latest props for the (stable) gesture callbacks.
   const handlers = useRef({ item, onPress, onMove, onDragEnd, onDragStart, onDragUpdate, left, top });
@@ -125,8 +149,27 @@ export function BoardNote({
 
   useEffect(() => {
     if (!animateIn) return;
-    Animated.spring(enter, { toValue: 1, friction: 7, tension: 80, useNativeDriver: false }).start();
+    Animated.spring(enter, { toValue: 1, friction: 6, tension: 70, useNativeDriver: false }).start();
   }, [animateIn, enter]);
+
+  // A just-posted note mounts while the composer sheet is still closing, so
+  // its mount pop plays unseen behind the sheet. Replay it once as the
+  // reveal scroll lands, timed just after BoardSection's 250ms scroll kick.
+  const spotlitRef = useRef(false);
+  useEffect(() => {
+    if (!spotlight || spotlitRef.current) return;
+    spotlitRef.current = true;
+    const t = setTimeout(() => {
+      enter.setValue(0);
+      Animated.spring(enter, {
+        toValue: 1,
+        friction: 6,
+        tension: 70,
+        useNativeDriver: false,
+      }).start();
+    }, 450);
+    return () => clearTimeout(t);
+  }, [spotlight, enter]);
 
   const gesture = useMemo(() => {
     const pan = Gesture.Pan()
@@ -136,6 +179,7 @@ export function BoardNote({
       .onStart(() => {
         draggingRef.current = true;
         startRef.current = { ...posRef.current };
+        if (adjustRef) adjustRef.current = adjustFn;
         setDragging(true);
         Animated.spring(lift, { toValue: 1, friction: 7, tension: 90, useNativeDriver: false }).start();
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -150,12 +194,13 @@ export function BoardNote({
         posRef.current = { x, y };
         posX.setValue(x);
         posY.setValue(y);
-        handlers.current.onDragUpdate?.(handlers.current.item, e.absoluteY);
+        handlers.current.onDragUpdate?.(handlers.current.item, e.absoluteX, e.absoluteY);
       })
       // eslint-disable-next-line react-hooks/refs -- gesture callbacks run off-render
       .onFinalize(() => {
         if (!draggingRef.current) return;
         draggingRef.current = false;
+        if (adjustRef?.current === adjustFn) adjustRef.current = null;
         setDragging(false);
         Animated.spring(lift, { toValue: 0, friction: 7, tension: 90, useNativeDriver: false }).start();
         const movedX = Math.abs(posRef.current.x - startRef.current.x);
@@ -193,10 +238,10 @@ export function BoardNote({
       });
 
     return Gesture.Race(pan, tap);
-  }, [posX, posY, lift]);
+  }, [posX, posY, lift, adjustFn, adjustRef]);
 
-  const enterTranslateY = enter.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] });
-  const enterScale = enter.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1] });
+  const enterTranslateY = enter.interpolate({ inputRange: [0, 1], outputRange: [-24, 0] });
+  const enterScale = enter.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] });
   const liftScale = lift.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
 
   return (

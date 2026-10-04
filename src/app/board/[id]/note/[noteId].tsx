@@ -15,6 +15,7 @@ import { friendlyMessage, reportPost } from '../../../../lib/api';
 import { keepUntilLabel } from '../../../../utils/note';
 
 const MAX_SCALE = 2.4;
+const CLOSE_SIZE = 40;
 const noop = () => {};
 
 export default function ItemDetailScreen() {
@@ -187,6 +188,27 @@ export default function ItemDetailScreen() {
               onToggleEntry={item.type === 'list' ? toggleEntry : undefined}
             />
           </View>
+          {/* Straddles the note's top-right corner. The note is shrunk with a
+              centered scale transform (layout stays unscaled), so the visual
+              corner is inset from the layout corner by the scaled-down margin. */}
+          {noteH > 0 ? (
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={8}
+              style={[
+                styles.closeBtn,
+                {
+                  left: (naturalW * (1 + scale)) / 2 - CLOSE_SIZE / 2,
+                  top: (noteH * (1 - scale)) / 2 - CLOSE_SIZE / 2,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              testID="close-viewer"
+            >
+              <MaterialCommunityIcons name="close" size={22} color={colors.ink} />
+            </Pressable>
+          ) : null}
         </Pressable>
 
         {done || expiry ? (
@@ -342,6 +364,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.backdrop,
   },
   center: { alignItems: 'center', justifyContent: 'center' },
+  closeBtn: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: CLOSE_SIZE,
+    height: CLOSE_SIZE,
+    borderRadius: CLOSE_SIZE / 2,
+    backgroundColor: colors.overlay,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap', paddingHorizontal: 24 },
   chip: {
     flexDirection: 'row',

@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   AppState,
-  useWindowDimensions,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,14 +28,12 @@ import { friendlyMessage, keepLonger as apiKeepLonger, uploadPhoto } from '../..
 import { cachedPhotoUri, dropCachedPhoto } from '../../../lib/photoCache';
 import { rememberBoard } from '../../../lib/lastBoard';
 import { REF_W } from '../../../utils/layout';
+import type { BoardLayout } from '../../../utils/layout';
 import { ItemWithAuthor, Magnet } from '../../../types';
 
 /** Share of the board height reserved for the pinned-forever strip. */
 const PINNED_FLEX = 3.2;
 const REST_FLEX = 7;
-
-/** Height of the drag-to-delete target at the bottom of the screen. */
-const DELETE_ZONE_HEIGHT = 96;
 
 /** Fingerprint of a post draft: two submits may share a client id only when
  *  they are the same type with the same content. */
@@ -67,7 +64,6 @@ export default function BoardScreen() {
       return () => setStatusBarStyle('light');
     }, []),
   );
-  const { height: windowH } = useWindowDimensions();
   const {
     board,
     members,
@@ -95,14 +91,34 @@ export default function BoardScreen() {
   // Tapping a magnet selects it (shows ×); tapping anywhere else clears it.
   const [selectedMagnet, setSelectedMagnet] = useState<string | null>(null);
   const [entering, setEntering] = useState<Set<string>>(() => new Set());
+  // Just-posted item to reveal once (BoardSection scrolls it into view, then
+  // reports back so this clears). Pinned posts land in the always-visible
+  // strip, so only unpinned posts need it.
+  const [focusId, setFocusId] = useState<string | null>(null);
+  // Same for a freshly placed magnet (dropped near the door top, which can
+  // be off-screen when scrolled deep). Moves need none — the finger is
+  // already there.
+  const [magnetFocus, setMagnetFocus] = useState<{ x: number; y: number } | null>(null);
+  const clearFocus = useCallback(() => {
+    setFocusId(null);
+    setMagnetFocus(null);
+  }, []);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [dragActive, setDragActive] = useState(false);
-  const [overDelete, setOverDelete] = useState(false);
-  // Bumped when a dropped note's delete fails, so it snaps back to its spot.
-  const [dragReset, setDragReset] = useState(0);
+  const [deleteHover, setDeleteHover] = useState(false);
+  // Bumped when a delete drop fails, so the held note snaps back instead of
+  // staying under the finger at the delete zone.
+  const [resetKey, setResetKey] = useState(0);
+  // Last finger position (window coords) and the delete FAB's window rect,
+  // used to decide whether a drop lands on delete.
+  const fingerRef = useRef<{ x: number; y: number } | null>(null);
+  const deleteRectRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
+  const deleteFabRef = useRef<View | null>(null);
+  // Latest main-door layout, captured from the overlay ctx each render so a
+  // note drop can translate legacy note-attached magnets into door coords.
+  const layoutRef = useRef<BoardLayout | null>(null);
   const seenIdsRef = useRef<Set<string>>(new Set());
   const firstLoadRef = useRef(true);
-  const overDeleteRef = useRef(false);
   // A failed post keeps its client id + uploaded path, so retrying reuses them
   // instead of creating a second item (post_item is idempotent on p_id).
   // The reuse is keyed to the exact draft: a *different* post must get a
@@ -137,8 +153,9 @@ export default function BoardScreen() {
     (m: { placedBy: string | null }) => m.placedBy === (me?.id ?? null),
     [me?.id],
   );
-  // Only magnets on the main door render here: door-anchored ones plus those
-  // attached to a main-door note. Attached to a pinned note is a later pass.
+  // Only magnets on the main door render here: door-anchored ones plus legacy
+  // note-attached ones on a main-door note (new drops never attach, and a
+  // moved/removed note lets its magnets fall to the door).
   const restItemIds = useMemo(() => new Set(restItems.map((i) => i.id)), [restItems]);
   const doorMagnets = useMemo(
     () => decorations.magnets.filter((m) => m.itemId === null || restItemIds.has(m.itemId)),
@@ -147,12 +164,15 @@ export default function BoardScreen() {
 
   const handlePlaceMagnet = useCallback(
     (artId: string) => {
+      // Drop near the top of the main door, fanned out a little — and
+      // remember where, so the door scrolls the fresh magnet into view.
+      const x = 0.25 + Math.random() * 0.5;
+      const y = 40 + Math.random() * 120;
       void decorations
         .place({
           artId,
-          // Drop near the top of the main door, fanned out a little.
-          x: 0.25 + Math.random() * 0.5,
-          y: 40 + Math.random() * 120,
+          x,
+          y,
           itemId: null,
           rotation: Math.round((Math.random() * 20 - 10) * 10) / 10,
         })
@@ -160,6 +180,7 @@ export default function BoardScreen() {
           setSelectedMagnet(null);
           setTrayOpen(false);
           setDecorateMode(false);
+          setMagnetFocus({ x, y });
         })
         .catch(() => {});
     },
@@ -288,50 +309,91 @@ export default function BoardScreen() {
     };
   }, [signPaths]);
 
-  const handleDragStart = () => {
-    setSelectedMagnet(null);
-    overDeleteRef.current = false;
-    setOverDelete(false);
-    setDragActive(true);
-  };
-
-  // A drag ended without a real move (long-press in place): nothing to
-  // persist, just hide the delete zone again.
-  const handleDragEnd = () => {
-    overDeleteRef.current = false;
-    setOverDelete(false);
-    setDragActive(false);
-  };
-
-  // The finger counts as "over delete" once it reaches the bottom zone.
-  const handleDragUpdate = (_item: ItemWithAuthor, screenY: number) => {
-    const over = screenY >= windowH - insets.bottom - DELETE_ZONE_HEIGHT;
-    if (over !== overDeleteRef.current) {
-      overDeleteRef.current = over;
-      setOverDelete(over);
+  const measureDeleteFab = () => {
+    try {
+      const node = deleteFabRef.current as unknown as {
+        measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void;
+      } | null;
+      node?.measureInWindow?.((x, y, w, h) => {
+        deleteRectRef.current = { x, y, w, h };
+      });
+    } catch {
+      // measure can throw during unmount — the last known rect is fine.
     }
   };
 
-  // A held note was dropped: delete it if it landed in the zone (with undo),
-  // otherwise remember the new spot.
-  const handleDrop = (item: ItemWithAuthor, x: number, y: number) => {
-    const shouldDelete = overDeleteRef.current;
-    overDeleteRef.current = false;
-    setOverDelete(false);
-    setDragActive(false);
+  /** Whether a window point lands on the delete FAB (with generous padding). */
+  const isOverDelete = (x: number, y: number) => {
+    const r = deleteRectRef.current;
+    if (!r) return false;
+    const PAD = 24;
+    return x >= r.x - PAD && x <= r.x + r.w + PAD && y >= r.y - PAD && y <= r.y + r.h + PAD;
+  };
 
-    if (shouldDelete) {
+  const handleDragStart = (item: ItemWithAuthor) => {
+    setSelectedMagnet(null);
+    setDragActive(true);
+    setDeleteHover(false);
+    fingerRef.current = null;
+    // The FAB mounts with the drag: measure once it's laid out.
+    setTimeout(measureDeleteFab, 50);
+  };
+
+  const handleDragUpdate = (_item: ItemWithAuthor, x: number, y: number) => {
+    fingerRef.current = { x, y };
+    setDeleteHover((prev) => {
+      const over = isOverDelete(x, y);
+      return prev === over ? prev : over;
+    });
+  };
+
+  // A drag ended without a real move (long-press in place): nothing to persist.
+  const handleDragEnd = () => {
+    setDragActive(false);
+    setDeleteHover(false);
+    fingerRef.current = null;
+  };
+
+  // Magnets are independent of notes: legacy magnets still attached to a
+  // note are converted to door coords at their current on-screen spot, so
+  // the note can move (or be removed) without dragging its stickers along.
+  // Drops never attach (see magnetDropTarget), so this population only shrinks.
+  const detachMagnetsFrom = (itemId: string) => {
+    const layout = layoutRef.current;
+    if (!layout) return;
+    for (const m of decorations.magnets) {
+      if (m.itemId !== itemId) continue;
+      const p = layout.get(itemId);
+      if (!p) continue;
+      const x = Math.min(1, Math.max(0, p.x + m.x * p.w));
+      const y = Math.max(0, p.y + m.y);
+      void decorations.move(m, x, y, null).catch(() => {});
+    }
+  };
+
+  // A held note was dropped: over the delete FAB it removes the post (with
+  // Undo), otherwise it remembers the new spot.
+  const handleDrop = (item: ItemWithAuthor, x: number, y: number) => {
+    setDragActive(false);
+    setDeleteHover(false);
+    const finger = fingerRef.current;
+    fingerRef.current = null;
+    if (finger && isOverDelete(finger.x, finger.y)) {
+      const snapshot = item;
+      detachMagnetsFrom(item.id);
       removeItem(item)
-        .then(() =>
-          useToast.getState().show('Note deleted', {
+        .then(() => {
+          useToast.getState().show('Removed', {
             label: 'Undo',
-            onPress: () => restoreItem(item).catch(() => {}),
-          }),
-        )
-        // useBoard already surfaced the failure; snap the note back.
-        .catch(() => setDragReset((n) => n + 1));
+            onPress: () => restoreItem(snapshot).catch(() => {}),
+          });
+        })
+        .catch(() => {
+          setResetKey((k) => k + 1);
+        });
       return;
     }
+    detachMagnetsFrom(item.id);
     moveItem(item, x, y).catch(() => {});
   };
 
@@ -390,6 +452,7 @@ export default function BoardScreen() {
         }
       }
       pendingDraftRef.current = null;
+      if (!draft.pinned) setFocusId(itemId);
       setSheetOpen(false);
     } catch {
       // createItem already surfaced the error via useBoard; keep the pending
@@ -568,15 +631,18 @@ export default function BoardScreen() {
             ) : (
               <BoardSection
                 items={restItems}
-              entries={entries}
-              photoUrls={photoUrls}
-              entering={entering}
+                entries={entries}
+                photoUrls={photoUrls}
+                entering={entering}
+                focusId={focusId}
+                focusPoint={magnetFocus}
+                onFocusShown={clearFocus}
               onOpen={openItem}
               onMove={handleDrop}
               onDragStart={handleDragStart}
               onDragUpdate={handleDragUpdate}
               onDragEnd={handleDragEnd}
-              resetKey={dragReset}
+              resetKey={resetKey}
               emptyHint="Everything else lives here."
               renderBackdrop={() =>
                 selectedMagnet ? (
@@ -586,59 +652,35 @@ export default function BoardScreen() {
                   />
                 ) : null
               }
-              renderOverlay={({ layout, boardW, scale }) => (
-                <>
-                  {!hideDecorations ? (
-                    <MagnetLayer
-                      magnets={doorMagnets}
-                      artById={artById}
-                      layout={layout}
-                      boardW={boardW}
-                      scale={scale}
-                      decorate={decorateMode}
-                      selectedId={selectedMagnet}
-                      onSelect={setSelectedMagnet}
-                      canRemove={canRemoveMagnet}
-                      onMove={handleMoveMagnet}
-                      onRemove={(m) => void decorations.remove(m).catch(() => {})}
-                      onTap={handleTapMagnet}
+              renderOverlay={({ layout, boardW, scale }) => {
+                layoutRef.current = layout;
+                return (
+                  <>
+                    {!hideDecorations ? (
+                      <MagnetLayer
+                        magnets={doorMagnets}
+                        artById={artById}
+                        layout={layout}
+                        boardW={boardW}
+                        scale={scale}
+                        decorate={decorateMode}
+                        selectedId={selectedMagnet}
+                        onSelect={setSelectedMagnet}
+                        canRemove={canRemoveMagnet}
+                        onMove={handleMoveMagnet}
+                        onRemove={(m) => void decorations.remove(m).catch(() => {})}
+                        onTap={handleTapMagnet}
                       onOpenUnder={handleOpenUnder}
                     />
                   ) : null}
-                </>
-              )}
+                  </>
+                );
+              }}
               />
             )}
           </FridgeDoor>
         </View>
       </View>
-
-      {dragActive ? (
-        <View
-          pointerEvents="none"
-          style={[
-            styles.deleteZone,
-            { backgroundColor: boardColors[board.color] },
-            { bottom: insets.bottom + 20 },
-            overDelete && styles.deleteZoneOver,
-          ]}
-        >
-          <MaterialCommunityIcons
-            name="trash-can-outline"
-            size={22}
-            color={overDelete ? colors.white : doorInk(board.color)}
-          />
-          <Text
-            style={[
-              styles.deleteZoneText,
-              { color: doorInk(board.color) },
-              overDelete && styles.deleteZoneTextOver,
-            ]}
-          >
-            {overDelete ? 'Release to delete' : 'Drag here to delete'}
-          </Text>
-        </View>
-      ) : null}
 
       {!isEmpty && !dragActive ? (
           <Pressable
@@ -647,14 +689,30 @@ export default function BoardScreen() {
             accessibilityLabel="Add to fridge"
             style={({ pressed }) => [
               styles.composerBtn,
-              { backgroundColor: boardColors[board.color] },
+              { backgroundColor: colors.accent },
               pressed && styles.composerPressed,
               { bottom: insets.bottom + 20 },
             ]}
           >
-            <Text style={[styles.composerGlyph, { color: doorInk(board.color) }]}>+</Text>
-            <Text style={[styles.composerText, { color: doorInk(board.color) }]}>Add to Fridge</Text>
+            <MaterialCommunityIcons name="plus" size={32} color={colors.white} />
           </Pressable>
+      ) : null}
+
+      {dragActive ? (
+        <View
+          ref={deleteFabRef}
+          collapsable={false}
+          onLayout={measureDeleteFab}
+          testID="delete-fab"
+          accessibilityLabel="Delete note"
+          style={[
+            styles.deleteBtn,
+            { bottom: insets.bottom + 20 },
+            deleteHover && styles.deleteBtnHover,
+          ]}
+        >
+          <MaterialCommunityIcons name="trash-can-outline" size={28} color={colors.white} />
+        </View>
       ) : null}
 
       <AddNoteSheet
@@ -756,44 +814,15 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   emptyBtnText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.pine },
-  deleteZone: {
-    position: 'absolute',
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 999,
-    backgroundColor: colors.leaf,
-    shadowColor: colors.shadow,
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-  },
-  deleteZoneOver: {
-    backgroundColor: colors.danger,
-    borderColor: colors.danger,
-  },
-  deleteZoneText: {
-    fontFamily: fonts.ui.bold,
-    fontSize: 15,
-    color: colors.pine,
-  },
-  deleteZoneTextOver: {
-    color: colors.white,
-  },
   composerBtn: {
     position: 'absolute',
-    alignSelf: 'center',
-    flexDirection: 'row',
+    right: 20,
     alignItems: 'center',
-    gap: 8,
-    borderRadius: 999,
+    justifyContent: 'center',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: colors.pine,
-    paddingHorizontal: 22,
-    paddingVertical: 14,
     shadowColor: colors.shadow,
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -801,8 +830,22 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   composerPressed: { transform: [{ scale: 0.96 }] },
-  composerGlyph: { fontSize: 22, lineHeight: 24, color: colors.onPine, fontFamily: fonts.ui.bold },
-  composerText: { fontFamily: fonts.ui.bold, fontSize: 16, color: colors.onPine },
+  deleteBtn: {
+    position: 'absolute',
+    left: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.danger,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  deleteBtnHover: { transform: [{ scale: 1.15 }] },
   missingTitle: { fontFamily: fonts.hand.bold, fontSize: 30, color: colors.ink },
   missingSub: { fontFamily: fonts.ui.regular, fontSize: 14, color: colors.inkSoft, marginTop: 6 },
   missingBtn: {
