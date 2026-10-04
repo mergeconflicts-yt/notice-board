@@ -823,6 +823,7 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
     marginTop: 2,
     marginBottom: 6,
+    paddingHorizontal: 16,
   },
   banner: {
     fontFamily: fonts.ui.semibold,
