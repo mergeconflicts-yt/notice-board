@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -74,12 +74,16 @@ type LayerProps = {
   scale: number;
   /** Decorate mode reveals the × on every removable magnet at once. */
   decorate: boolean;
+  /** Currently selected magnet id (tap to select, tap elsewhere to clear). */
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
   /** Whether the current user may remove this magnet (placer or owner). */
   canRemove: (m: Magnet) => boolean;
   onMove: (m: Magnet, x: number, y: number, itemId: string | null) => void;
   onRemove: (m: Magnet) => void;
   onTap: (m: Magnet) => void;
   onOpenUnder: (itemId: string) => void;
+  /** True while a magnet is being dragged, so the board can show the remove zone. */
   onDraggingChange?: (dragging: boolean) => void;
 };
 
@@ -97,6 +101,8 @@ export function MagnetLayer({
   boardW,
   scale,
   decorate,
+  selectedId,
+  onSelect,
   canRemove,
   onMove,
   onRemove,
@@ -106,7 +112,6 @@ export function MagnetLayer({
 }: LayerProps) {
   const size = MAGNET_SIZE * scale;
   const sorted = useMemo(() => [...magnets].sort((a, b) => a.z - b.z), [magnets]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const reduceMotion = useReduceMotion();
 
   const handleDropCanvas = (m: Magnet, cx: number, cy: number) => {
@@ -114,18 +119,20 @@ export function MagnetLayer({
     onMove(m, t.x, t.y, t.itemId);
   };
   const handleTap = (m: Magnet) => {
-    if (canRemove(m)) setSelectedId((prev) => (prev === m.id ? null : m.id));
-    else onTap(m);
+    // Always surface the magnet's name + who placed it; removable ones also
+    // select to reveal the ×.
+    onTap(m);
+    if (canRemove(m)) onSelect(selectedId === m.id ? null : m.id);
   };
   const handleLongPress = (m: Magnet) => {
     if (m.itemId) onOpenUnder(m.itemId);
-    else if (canRemove(m)) setSelectedId((prev) => (prev === m.id ? null : m.id));
+    else if (canRemove(m)) onSelect(selectedId === m.id ? null : m.id);
   };
   const handleRemove = (m: Magnet) => {
-    setSelectedId(null);
+    onSelect(null);
     onRemove(m);
   };
-  const handleDragStart = () => setSelectedId(null);
+  const handleDragStart = () => onSelect(null);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">

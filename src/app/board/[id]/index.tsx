@@ -28,6 +28,7 @@ import { useToast } from '../../../store/toast';
 import { friendlyMessage, keepLonger as apiKeepLonger, uploadPhoto } from '../../../lib/api';
 import { cachedPhotoUri, dropCachedPhoto } from '../../../lib/photoCache';
 import { rememberBoard } from '../../../lib/lastBoard';
+import { REF_W } from '../../../utils/layout';
 import { ItemWithAuthor, Magnet } from '../../../types';
 
 /** Share of the board height reserved for the pinned-forever strip. */
@@ -87,6 +88,12 @@ export default function BoardScreen() {
   const [trayOpen, setTrayOpen] = useState(false);
   const [hideDecorations, setHideDecorations] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // Width of the empty main door, so door-anchored magnets still render when
+  // there are no notes (and therefore no BoardSection canvas).
+  const [emptyDoorW, setEmptyDoorW] = useState(0);
+  const emptyLayout = useMemo(() => new Map(), []);
+  // Tapping a magnet selects it (shows ×); tapping anywhere else clears it.
+  const [selectedMagnet, setSelectedMagnet] = useState<string | null>(null);
   const [entering, setEntering] = useState<Set<string>>(() => new Set());
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [dragActive, setDragActive] = useState(false);
@@ -107,7 +114,10 @@ export default function BoardScreen() {
     key: string;
   } | null>(null);
 
-  const openItem = (item: ItemWithAuthor) => router.push(`/board/${boardId}/note/${item.id}`);
+  const openItem = (item: ItemWithAuthor) => {
+    setSelectedMagnet(null);
+    router.push(`/board/${boardId}/note/${item.id}`);
+  };
 
   // Remember this board so a returning launch reopens it (see index.tsx).
   useEffect(() => {
@@ -123,13 +133,9 @@ export default function BoardScreen() {
     () => new Map(decorations.art.map((a) => [a.artId, a] as const)),
     [decorations.art],
   );
-  const ownerId = useMemo(
-    () => members.find((m) => m.role === 'owner')?.userId ?? null,
-    [members],
-  );
   const canRemoveMagnet = useCallback(
-    (m: { placedBy: string | null }) => m.placedBy === (me?.id ?? null) || ownerId === me?.id,
-    [me?.id, ownerId],
+    (m: { placedBy: string | null }) => m.placedBy === (me?.id ?? null),
+    [me?.id],
   );
   // Only magnets on the main door render here: door-anchored ones plus those
   // attached to a main-door note. Attached to a pinned note is a later pass.
@@ -149,6 +155,11 @@ export default function BoardScreen() {
           y: 40 + Math.random() * 120,
           itemId: null,
           rotation: Math.round((Math.random() * 20 - 10) * 10) / 10,
+        })
+        .then(() => {
+          setSelectedMagnet(null);
+          setTrayOpen(false);
+          setDecorateMode(false);
         })
         .catch(() => {});
     },
@@ -278,6 +289,7 @@ export default function BoardScreen() {
   }, [signPaths]);
 
   const handleDragStart = () => {
+    setSelectedMagnet(null);
     overDeleteRef.current = false;
     setOverDelete(false);
     setDragActive(true);
@@ -447,6 +459,7 @@ export default function BoardScreen() {
               <Pressable
                 hitSlop={8}
                 onPress={() => {
+                  setSelectedMagnet(null);
                   setDecorateMode((v) => !v);
                   setTrayOpen((v) => !v);
                 }}
@@ -515,7 +528,10 @@ export default function BoardScreen() {
         <View style={styles.restSection}>
           <FridgeDoor color={board.color} placement="bottom">
             {isEmpty ? (
-              <View style={styles.empty}>
+              <View
+                style={styles.empty}
+                onLayout={(e) => setEmptyDoorW(e.nativeEvent.layout.width)}
+              >
                 <Text style={styles.emptyHand}>✍️</Text>
                 <Text style={[styles.emptyTitle, { color: doorInk(board.color) }]}>Leave the first note</Text>
                 <Text style={[styles.emptySub, { color: doorSoft(board.color) }]}>Pin something up — everyone here will see it.</Text>
@@ -525,6 +541,29 @@ export default function BoardScreen() {
                 >
                   <Text style={[styles.emptyBtnText, { color: doorInk(board.color) }]}>+ Add note</Text>
                 </Pressable>
+                {emptyDoorW > 0 && !hideDecorations ? (
+                  <MagnetLayer
+                    magnets={doorMagnets}
+                    artById={artById}
+                    layout={emptyLayout}
+                    boardW={emptyDoorW}
+                    scale={emptyDoorW / REF_W}
+                    decorate={decorateMode}
+                    selectedId={selectedMagnet}
+                    onSelect={setSelectedMagnet}
+                    canRemove={canRemoveMagnet}
+                    onMove={handleMoveMagnet}
+                    onRemove={(m) => void decorations.remove(m).catch(() => {})}
+                    onTap={handleTapMagnet}
+                    onOpenUnder={handleOpenUnder}
+                  />
+                ) : null}
+                {selectedMagnet ? (
+                  <Pressable
+                    style={[StyleSheet.absoluteFill, { zIndex: -1 }]}
+                    onPress={() => setSelectedMagnet(null)}
+                  />
+                ) : null}
               </View>
             ) : (
               <BoardSection
@@ -539,6 +578,14 @@ export default function BoardScreen() {
               onDragEnd={handleDragEnd}
               resetKey={dragReset}
               emptyHint="Everything else lives here."
+              renderBackdrop={() =>
+                selectedMagnet ? (
+                  <Pressable
+                    style={StyleSheet.absoluteFill}
+                    onPress={() => setSelectedMagnet(null)}
+                  />
+                ) : null
+              }
               renderOverlay={({ layout, boardW, scale }) => (
                 <>
                   {!hideDecorations ? (
@@ -549,6 +596,8 @@ export default function BoardScreen() {
                       boardW={boardW}
                       scale={scale}
                       decorate={decorateMode}
+                      selectedId={selectedMagnet}
+                      onSelect={setSelectedMagnet}
                       canRemove={canRemoveMagnet}
                       onMove={handleMoveMagnet}
                       onRemove={(m) => void decorations.remove(m).catch(() => {})}

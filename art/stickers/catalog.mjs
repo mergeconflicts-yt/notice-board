@@ -23,8 +23,9 @@ export const STICKERS = [
     pack: 'starter',
     label: 'Got it',
     svg: `
-      <circle ${DIE_CUT} ${o('cx="20" cy="20" r="13"')} fill="#3FA06A"/>
-      <path ${o('d="M13 20.5 L18 25.5 L27 15"')} fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path ${DIE_CUT} ${o('d="M14 33 L14 21 Q14 18.5 15.5 18 C14.8 14 15.5 9.5 18.5 8 C21.5 6.5 23.6 8.6 22.8 11.8 L22 16.5 L26.5 16.5 Q29 16.5 29 19.5 L29 29.5 Q29 33 25 33 Z"')} fill="#F2C79B"/>
+      <rect ${o('x="12" y="29" width="8" height="6" rx="2"')} fill="#3D5A98"/>
+      <path ${o('d="M23 21 h3 M23 25 h3"')} fill="none" stroke-linecap="round"/>
     `,
   },
   {
@@ -57,7 +58,12 @@ export const STICKERS = [
     pack: 'starter',
     label: 'Thanks',
     svg: `
-      <path ${DIE_CUT} ${o('d="M15 33 C11 33 9 29 11 25 L16 15 q1.5 -2.5 3.5 -1 q1.5 1.2 0.5 3.5 L18 22 L28 19 q2.5 -0.5 3 1.5 q0.5 2 -2 3 L18 28"')} fill="#F2C79B"/>
+      <rect ${DIE_CUT} ${o('x="12" y="18" width="16" height="14" rx="2"')} fill="#E4572E"/>
+      <rect ${DIE_CUT} ${o('x="10.5" y="13.5" width="19" height="4.5" rx="2"')} fill="#C9453A"/>
+      <rect x="18.6" y="13.5" width="2.8" height="18.5" fill="#F2B134"/>
+      <path ${o('d="M20 13.5 C16.5 8.5 12.5 8.5 13 11.5 C13.4 14 17 13.8 20 13.5 Z"')} fill="#F2B134"/>
+      <path ${o('d="M20 13.5 C23.5 8.5 27.5 8.5 27 11.5 C26.6 14 23 13.8 20 13.5 Z"')} fill="#F2B134"/>
+      <circle ${o('cx="20" cy="12.8" r="1.9"')} fill="#F2B134"/>
     `,
   },
   {
@@ -76,6 +82,6 @@ export const STICKERS = [
     id: 'st_onit',
     pack: 'starter',
     label: 'On it',
-    svg: `<path ${DIE_CUT} ${o('d="M20 5 C26 13 31 16 29 24 C27.5 30 24 34 20 34 C16 34 12.5 30 11 24 C9 16 14 13 20 5 Z"')} fill="#E4572E"/>`,
+    svg: `<path ${DIE_CUT} ${o('d="M22.5 6 L13.5 22.5 L19.5 22.5 L17.5 34 L26.8 15.5 L20.8 15.5 Z"')} fill="#F2B134"/>`,
   },
 ];

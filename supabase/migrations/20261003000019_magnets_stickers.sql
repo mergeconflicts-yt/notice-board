@@ -337,7 +337,6 @@ security definer
 set search_path = '' as $$
 declare
   v_row public.board_magnets%rowtype;
-  v_role public.member_role;
 begin
   if auth.uid() is null then
     raise exception 'not_authenticated';
@@ -349,11 +348,8 @@ begin
   if not public.is_member(v_row.board_id) then
     raise exception 'not_member';
   end if;
-  select role into v_role
-  from public.board_members
-  where board_id = v_row.board_id and user_id = auth.uid();
-  -- Placer or owner only; others get a stable code for the "Only Lily…" bubble.
-  if v_row.placed_by is distinct from auth.uid() and v_role is distinct from 'owner' then
+  -- Author only: even the board owner cannot take off someone else's magnet.
+  if v_row.placed_by is distinct from auth.uid() then
     raise exception 'not_allowed';
   end if;
   perform public.hit_rate_limit('item_write', 600, interval '1 hour');

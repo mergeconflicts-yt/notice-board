@@ -111,7 +111,7 @@ export function friendlyMessage(error: unknown): string {
     case 'invite_invalid':
       return 'That invite isn\'t working. Ask for a fresh link.';
     case 'not_allowed':
-      return 'Only the person who put it there or the owner can take it off.';
+      return 'Only the person who put it there can take it off.';
     case 'not_entitled':
       return 'Someone on this fridge needs to unlock that pack first.';
     case 'board_full':

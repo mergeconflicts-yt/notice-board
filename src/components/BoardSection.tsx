@@ -24,6 +24,9 @@ type Props = {
   /** Decoration overlay drawn above the notes, in the same canvas space.
    *  Receives the computed layout so attached magnets can find their note. */
   renderOverlay?: (ctx: { layout: BoardLayout; boardW: number; scale: number }) => ReactNode;
+  /** Transparent backdrop drawn behind the notes; taps on empty door space
+   *  land here (used to clear magnet selection). */
+  renderBackdrop?: () => ReactNode;
 };
 
 /**
@@ -44,6 +47,7 @@ export function BoardSection({
   emptyHint,
   resetKey,
   renderOverlay,
+  renderBackdrop,
 }: Props) {
   const [boardW, setBoardW] = useState(0);
   const [measured, setMeasured] = useState<Record<string, number>>({});
@@ -99,6 +103,7 @@ export function BoardSection({
         style={[styles.canvas, { height: Math.max(140, canvasH) }]}
         onLayout={(e) => setBoardW(e.nativeEvent.layout.width)}
       >
+        {renderBackdrop ? renderBackdrop() : null}
         {items.length === 0 && emptyHint ? (
           <Text style={styles.hint}>{emptyHint}</Text>
         ) : null}

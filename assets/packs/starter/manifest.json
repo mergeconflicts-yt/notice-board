@@ -1,14 +1,5 @@
 [
   {
-    "art_id": "st_fuji",
-    "pack_id": "starter",
-    "kind": "magnet",
-    "label": "Mt. Fuji",
-    "path": "assets/packs/starter/st_fuji@3x.webp",
-    "w": 64,
-    "h": 64
-  },
-  {
     "art_id": "st_boba",
     "pack_id": "starter",
     "kind": "magnet",

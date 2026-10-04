@@ -1,7 +1,7 @@
 -- Magnets, stickers and packs (docs/prd-magents-stickers.md §6, §9).
 -- Roles: O owner, M member, S stranger.
 begin;
-select plan(26);
+select plan(27);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000091', 'authenticated', 'authenticated'),
@@ -87,7 +87,7 @@ select throws_ok(
       0.1, 10, null, 1)$$,
   'P0001', 'version_conflict', 'stale version rejected');
 
--- Only the placer or owner can remove (M-10).
+-- Only the author can remove (placer-only).
 reset role;
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000093', true);
 set role authenticated;
@@ -95,13 +95,19 @@ select throws_ok(
   $$select public.remove_magnet(
       (select id from public.board_magnets where board_id = 'b0000000-0000-0000-0000-000000000091' limit 1))$$,
   'P0001', 'not_allowed', 'another member cannot remove a magnet they did not place');
-reset role;
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000091', true);
+set role authenticated;
+select throws_ok(
+  $$select public.remove_magnet(
+      (select id from public.board_magnets where board_id = 'b0000000-0000-0000-0000-000000000091' limit 1))$$,
+  'P0001', 'not_allowed', 'even the owner cannot remove another member''s magnet');
+reset role;
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000092', true);
 set role authenticated;
 select lives_ok(
   $$select public.remove_magnet(
       (select id from public.board_magnets where board_id = 'b0000000-0000-0000-0000-000000000091' limit 1))$$,
-  'owner removes any magnet');
+  'placer removes their own magnet');
 
 -- Entitlement added: the paid pack becomes usable board-wide (P-5).
 reset role;
