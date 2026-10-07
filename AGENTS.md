@@ -4,6 +4,12 @@ This is an Expo/React Native mobile application. Prioritize mobile-first pattern
 
 Single shared backend: `Fridge-Board-dev` serves dev AND early prod — no prod twin exists. First `db push` ran 2026-09-28, so the **migration freeze is in effect**: only ADD new migrations under `supabase/migrations/`, NEVER edit pushed ones, NEVER reset/wipe hosted. Full context + decisions: `docs/hosted-setup.md` (top decision block).
 
+## Hard boundaries — never cross without an explicit new instruction (2026-10-07)
+
+- NEVER `git commit`, `git push`, or open/amend PRs. Leave changes uncommitted in the working tree.
+- NEVER push anything to hosted (`Fridge-Board-dev` is shared early prod): no `supabase db push --db-url`, no Deploy-database workflow dispatch (`gh workflow run`), no EAS build/submit/update, no dashboard edits.
+- "Push" without a qualifier means the LOCAL Supabase stack only (`supabase migration up` / local `db reset`). Verify remotely with read-only commands if needed, change nothing.
+
 ## Expo has changed — do not trust your training data
 
 Expo ships breaking changes every SDK release. APIs you remember are likely renamed, moved, or removed. Before writing any code that touches an Expo, EAS, or React Native API:
