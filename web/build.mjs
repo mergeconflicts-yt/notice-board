@@ -183,6 +183,7 @@ const privacyBody = `
 <p>No advertising identifiers, no location tracking, no contacts access, no behavioural analytics. There is nothing to opt out of because there is nothing to track.</p>
 <h2>How your data is used</h2>
 <p>Your data is used only to run the app: to show your boards to the people you invite, and to keep the service working. We never sell data and never show ads.</p>
+<p>To do that we rely on a small number of third-party providers, who process your data only on our behalf: Supabase (database and authentication hosting), Resend (sending sign-in emails), Cloudflare (bot protection and delivery of the invite pages), and Apple or Google (only if you choose to link one of those sign-ins). They are required to protect your data to a standard equivalent to this policy, and are never permitted to sell it or use it for their own advertising.</p>
 <h2>Retention</h2>
 <ul>
 <li>Notes leave after a week, photos after two weeks, dates the day after the event, lists two days after everything is ticked. Pinned posts stay until unpinned.</li>
@@ -231,7 +232,7 @@ const contactBody = `
 <h2>Response times</h2>
 <p>Safety reports: within 48 hours. Everything else: within 5 working days.</p>`;
 
-writeFileSync(join(out, 'privacy.html'), legalPage('Privacy Policy', 'Last updated: 26 September 2026', privacyBody));
+writeFileSync(join(out, 'privacy.html'), legalPage('Privacy Policy', 'Last updated: 7 October 2026', privacyBody));
 writeFileSync(join(out, 'terms.html'), legalPage('Terms of Service', 'Last updated: 26 September 2026', termsBody));
 writeFileSync(join(out, 'contact.html'), legalPage('Contact', 'We read everything.', contactBody));
 console.log('Wrote public/{privacy,terms,contact}.html');

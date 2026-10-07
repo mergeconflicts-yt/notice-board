@@ -267,7 +267,7 @@ are readable by any signed-in user (only status = 'live' rows); only the service
 |`remove_magnet(id)` | Placer or owner only. |
 |`add_sticker(item, art) / remove_sticker(item, art)` | Member and pack-entitlement checks; max 3 kinds per note. | 
 |`set_board_theme (board, pack)` | Owner only, plus an entitlement check. I
-| `board_can_use (board, pack)` | Returns true if the pack is free or any current member holds an active entitlement. |
+| `board_can_use (board, pack)` | Caller must be a current member (strangers get false). Returns true if the pack is free or any current member holds an active entitlement. |
 
 **Purchases**
 - CLient: RevenueCat (`react-native-purchases`, with a dev build) for product listing, buying and restoring.

@@ -38,7 +38,9 @@ Cover at least:
   (Apple is deferred this release — buttons + entitlement removed; Google is release-gated off iOS in `src/lib/authProviders.ts`)
 - real photo picking through the system picker (permission dialog + library),
   then the upload landing on the board
-- Turnstile
+- Turnstile stood down (no widget expected: bot protection OFF, site key
+  removed from EAS env — email/guest sign-in must proceed with no captcha;
+  see `docs/hosted-setup.md`)
 - invite and board links on a cold start, both platforms
 - backgrounding / relaunching with the phone locked
 - deleting an account

@@ -1,7 +1,7 @@
 -- Magnets, stickers and packs (docs/prd-magents-stickers.md §6, §9).
 -- Roles: O owner, M member, S stranger.
 begin;
-select plan(27);
+select plan(29);
 
 insert into auth.users (id, aud, role) values
   ('a0000000-0000-0000-0000-000000000091', 'authenticated', 'authenticated'),
@@ -87,7 +87,8 @@ select throws_ok(
       0.1, 10, null, 1)$$,
   'P0001', 'version_conflict', 'stale version rejected');
 
--- Only the author can remove (placer-only).
+-- Only the placer or a board owner can remove (migration 22: was
+-- placer-only, which stranded magnets once the placer left).
 reset role;
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000093', true);
 set role authenticated;
@@ -97,10 +98,10 @@ select throws_ok(
   'P0001', 'not_allowed', 'another member cannot remove a magnet they did not place');
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000091', true);
 set role authenticated;
-select throws_ok(
+select lives_ok(
   $$select public.remove_magnet(
       (select id from public.board_magnets where board_id = 'b0000000-0000-0000-0000-000000000091' limit 1))$$,
-  'P0001', 'not_allowed', 'even the owner cannot remove another member''s magnet');
+  'owner removes another member''s magnet');
 reset role;
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000092', true);
 set role authenticated;
@@ -108,6 +109,25 @@ select lives_ok(
   $$select public.remove_magnet(
       (select id from public.board_magnets where board_id = 'b0000000-0000-0000-0000-000000000091' limit 1))$$,
   'placer removes their own magnet');
+
+-- Orphaned magnets (placer gone, placed_by NULL) are owner-only: they can
+-- never become permanent or squat the 24-magnet cap.
+reset role;
+update public.board_magnets
+set placed_by = null
+where placed_by = 'a0000000-0000-0000-0000-000000000092';
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000093', true);
+set role authenticated;
+select throws_ok(
+  $$select public.remove_magnet(
+      (select id from public.board_magnets where board_id = 'b0000000-0000-0000-0000-000000000091' limit 1))$$,
+  'P0001', 'not_allowed', 'another member cannot remove an orphaned magnet');
+select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000091', true);
+set role authenticated;
+select lives_ok(
+  $$select public.remove_magnet(
+      (select id from public.board_magnets where board_id = 'b0000000-0000-0000-0000-000000000091' limit 1))$$,
+  'owner removes an orphaned magnet');
 
 -- Entitlement added: the paid pack becomes usable board-wide (P-5).
 reset role;

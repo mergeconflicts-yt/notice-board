@@ -90,12 +90,12 @@ of any per-action bucket (`post_item`, `add_entry`, invites).
 | `set_done(p_id, p_done)` | member | notes/dates only; first done wins; no-op if already in that state |
 | `keep_longer(p_id)` | member | +7 days, capped at 30 days from now; not pinned/lists |
 | `set_item_position(p_id, p_x, p_y)` | member | hand-place a note (`items.layout`); NULL clears to auto; does **not** bump `version` or stamp `updated_by` |
-| `remove_item(p_id)` | author or owner | soft delete; members otherwise get `not_allowed` |
-| `restore_item(p_id)` | member | restore within 30 days |
+| `remove_item(p_id)` | author or owner | soft delete; members otherwise get `not_allowed`; former-member posts (`created_by` NULL) are owner-only |
+| `restore_item(p_id)` | deleter or owner | restore within 30 days; other members get `not_allowed`; expiry-purge rows (`deleted_by` NULL) are owner-only |
+| `post_shared_item(…, p_shared_from_app?, p_shared_from_author?)` → item | member | wraps `post_item` with all its validation, then stamps attribution only onto the caller's own row; reusing another member's id fails with `invalid_input` |
 | `list_removed_items(p_board_id)` | member | last 30 days |
 
-### List entries
-| Function | Access | Notes |
+### List entries| Function | Access | Notes |
 |---|---|---|
 | `add_entry(p_id, p_item_id, p_text)` | member | idempotent; `position = max+1` |
 | `set_entry_checked(p_id, p_checked)` | member | first tick wins; runs list lifetime |
@@ -104,6 +104,15 @@ of any per-action bucket (`post_item`, `add_entry`, invites).
 
 Ticking/removing an entry locks the parent list first, so two people ticking
 the last two entries can't both recompute `keep_until` from stale state.
+
+### Magnets
+| Function | Access | Notes |
+|---|---|---|
+| `place_magnet(p_board_id, p_art_id, p_x, p_y, p_item_id?, p_rotation?, p_gift_note?)` | member | pack must be usable via `board_can_use`; 24-magnet cap per board; rate limit 600/h |
+| `move_magnet(p_id, p_x, p_y, p_item_id?, p_expected_version?)` | member | any member may move; `version_conflict` on stale version |
+| `remove_magnet(p_id)` | placer or owner | other members get `not_allowed`; orphaned magnets (`placed_by` NULL) are owner-only |
+| `board_can_use(p_board_id, p_pack_id)` | member | `starter` is free; paid packs need a live entitlement from a current member; strangers get `false` |
+| `set_board_theme(p_board_id, p_pack_id)` | owner | pack must be usable via `board_can_use` |
 
 ### Photo uploads
 | Function | Access | Notes |

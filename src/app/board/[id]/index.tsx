@@ -160,9 +160,14 @@ export default function BoardScreen() {
     () => new Map(decorations.art.map((a) => [a.artId, a] as const)),
     [decorations.art],
   );
+  // Magnet moderation mirrors the server (remove_magnet): the placer or a
+  // board owner may take a magnet off, so orphaned magnets (placer gone) can
+  // never become permanent or squat the 24-magnet cap.
   const canRemoveMagnet = useCallback(
-    (m: { placedBy: string | null }) => m.placedBy === (me?.id ?? null),
-    [me?.id],
+    (m: { placedBy: string | null }) =>
+      (me?.id != null && m.placedBy === me.id) ||
+      members.some((mm) => mm.userId === me?.id && mm.role === 'owner'),
+    [me, members],
   );
   // Only magnets on the main door render here: door-anchored ones plus legacy
   // note-attached ones on a main-door note (new drops never attach, and a
@@ -347,11 +352,11 @@ export default function BoardScreen() {
     setDeleteHover(false);
     fingerRef.current = null;
     // The delete FAB is author-or-owner only (the server enforces the same
-    // rule): everyone else just moves the note.
+    // rule): everyone else just moves the note. Former-member posts
+    // (createdBy NULL) are owner-only.
     setCanDeleteDrag(
-      item.createdBy != null &&
-        (item.createdBy === me?.id ||
-          members.some((m) => m.userId === me?.id && m.role === 'owner')),
+      (me?.id != null && item.createdBy === me.id) ||
+        members.some((m) => m.userId === me?.id && m.role === 'owner'),
     );
     // The FAB mounts with the drag: measure once it's laid out.
     setTimeout(measureDeleteFab, 50);

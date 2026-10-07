@@ -32,13 +32,13 @@ Repeat per hosted project (`Fridge-Board-dev` first, then the prod twin).
   CI `check` + `database` green on main 2026-09-28 after the JSR pin fix (see CI fix note).
 - [x] Auth rate limits applied 2026-10-02 (dashboard): emails 30/h, SMS 30/h, refreshes 150/5min (=1800/h), verifications 30/5min (=360/h), anonymous 30/h/IP, sign-ups+sign-ins 30/5min (=360/h), Web3 30/5min — matching `supabase/config.toml`. Anonymous sign-ins ON + manual linking ON confirmed.
 - [x] SMTP via Resend (key + subdomain + sender + 1s interval) + `{{ .Token }}` in 3 templates mirrored + Confirm email ON verified 2026-09-28.
-- [x] Turnstile CAPTCHA on (Managed, pre-clearance OFF, `fridge-board.kranehx.com`) + site key in EAS env (2026-09-28).
+- [x] Turnstile CAPTCHA (Managed, pre-clearance OFF, `fridge-board.kranehx.com`) set up 2026-09-28, then STOOD DOWN 2026-10-07: bot protection is OFF in Supabase (unsolvable WKWebView challenges, 0 solves — see CAPTCHA section below), and the EAS prod `EXPO_PUBLIC_TURNSTILE_SITE_KEY` must be REMOVED before the next production build. A present-but-unsolvable key hard-blocks email sign-in (`captchaNeeded` gates Send in `src/components/EmailCode.tsx`); without a key the app signs in without a captcha by design.
 - [x] Google OAuth: Web ID/secret + callback in Supabase; iOS + Android clients created (EAS SHA-1) — free, no Apple account needed (2026-09-28).
 - [ ] Apple (Services ID + `.p8`) — DEFERRED: no Apple Developer account. Blocks link-site `APPLE_TEAM_ID`/`APP_STORE_ID` too. The Apple buttons and `ios.usesAppleSignIn` were removed from the release (Welcome/Profile/app.json), and Google is now release-gated off iOS (`src/lib/authProviders.ts`); iOS ships email + guest, while Android retains Google + email + guest. Re-enable Google on iOS only together with Apple login. Watch App Store Guideline 4.8 (do not advertise a third-party login on iOS unless Apple login is also offered).
 - [x] Run Deploy workflow → `SUPABASE-Dev` green 2026-09-28 (12 migrations, 4 functions, `JOB_SECRET`, lint, verify posture all pass).
 - [x] CI manual-only (2026-09-28): `ci.yml` is `workflow_dispatch` — nothing runs on push/merge/PR; dispatch `check` + `database` from Actions only when needed.
 - [ ] Link site — PARTIAL: Cloudflare serves `website/` directly, so the invite fallback is merged into it (`website/j.html`, `website/_redirects` `/j/* → /j.html`, and link-scoped rules in `website/_headers`). Still pending Apple IDs: `.well-known/apple-app-site-association` + `.well-known/assetlinks.json` (run `web/build.mjs` and copy `.well-known/*` in once `APPLE_TEAM_ID`/`ANDROID_SHA256`/`APP_STORE_ID` exist). Interim `EXPO_PUBLIC_INVITE_BASE_URL=https://fridge-board.kranehx.com`. `web/vercel.json` is the ignored historical equivalent.
-- [x] EAS project linked (`@mergeconflictss-team/fridge-board`) + prod env 4 vars set (2026-09-28); still to do: `eas build --profile production` → real-device tests.
+- [x] EAS project linked (`@mergeconflictss-team/fridge-board`) + prod env set (2026-09-28; Turnstile site key removed 2026-10-07, leaving 3 vars); still to do: `eas build --profile production` → real-device tests.
 - [ ] Check `http_failures()` the next day.
 - [ ] Prod twin — DEFERRED by the 2026-09-28 single-project decision (see top).
   When revived: repeat all for the prod project + PITR + advisors + rate limits.
@@ -243,10 +243,11 @@ Open:
   secret, `SUPABASE_ACCESS_TOKEN` — never go here):
   `EXPO_PUBLIC_SUPABASE_URL=https://sdnedarmmvcgnkergxri.supabase.co`,
   `EXPO_PUBLIC_SUPABASE_ANON_KEY` set (anon public key — RLS protects
-  data), `EXPO_PUBLIC_INVITE_BASE_URL=https://fridge-board.kranehx.com`
-  (interim, see below),
-  `EXPO_PUBLIC_TURNSTILE_SITE_KEY` set (public half; secret only in
-  Supabase). Verified via `npx eas-cli env:list --environment production`.
+  data),   `EXPO_PUBLIC_INVITE_BASE_URL=https://fridge-board.kranehx.com`
+  (interim, see below).
+  `EXPO_PUBLIC_TURNSTILE_SITE_KEY` REMOVED (see CAPTCHA above — a present key
+  would hard-block email sign-in while the widget cannot solve; the secret
+  stays in Supabase Bot Protection only). Verified via `npx eas-cli env:list --environment production`.
 - Still to do: `eas build --profile production` → real-device tests
   (guest, Google, email codes, Turnstile, custom-scheme invites
   `fridgeboard://j/<token>` + code paste — `https://` auto-open waits
@@ -390,13 +391,15 @@ EAS (`expo.dev`, DONE link + env 2026-09-28): project
 `@mergeconflictss-team/fridge-board` (`8b5574fa-2fe2-4c77-bdd3-b1850938965c`,
 linked via `eas init`); prod env plaintext: `EXPO_PUBLIC_SUPABASE_URL`,
 `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_INVITE_BASE_URL`
-(`https://fridge-board.kranehx.com`, interim), `EXPO_PUBLIC_TURNSTILE_SITE_KEY`.
+(`https://fridge-board.kranehx.com`, interim). `EXPO_PUBLIC_TURNSTILE_SITE_KEY`
+was removed 2026-10-07 (see CAPTCHA above).
 Dashboard path: project → Environment variables → Production. Build not run yet.
 
-Turnstile (Cloudflare, DONE 2026-09-28): widget `Fridge Board dev`, mode
+Turnstile (Cloudflare, DONE 2026-09-28, STOOD DOWN 2026-10-07): widget `Fridge Board dev`, mode
 Managed, pre-clearance OFF, hostnames `fridge-board.kranehx.com` (CNAME
-created first so it appears in the picker); site key → EAS prod env,
-secret → Supabase Bot Protection only.
+created first so it appears in the picker); site key REMOVED from EAS prod env
+(a present-but-unsolvable key hard-blocks email sign-in), secret stays in
+Supabase Bot Protection only. Revisit only with a natively-verifiable captcha.
 
 Google Cloud (DONE 2026-09-28, free): consent External + test user,
 profile/email scopes; Web client (callback
