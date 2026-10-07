@@ -112,8 +112,8 @@ export const memberColors = [
 
 /** Board cover tints — a vivid multi-hue family at brand intensity, not
  *  pastels. Keys are the stored DB enum: rename nothing, only retune hexes.
- *  Pine + ember keep the brand anchor; blue/mint/powder/blush bring back
- *  variety. `darkDoors` below stays {charcoal, sage, blue}. */
+ *  Pine + ember keep the brand anchor; cherry/blue/mint/powder/blush bring
+ *  back variety. `darkDoors` below stays {charcoal, sage, blue, cherry}. */
 export const boardColors: Record<BoardColor, string> = {
   vintage_mint: '#9ED6B8',
   vintage_butter: '#F1D876',
@@ -124,6 +124,7 @@ export const boardColors: Record<BoardColor, string> = {
   blue: '#3B7BD4',
   mint: '#3ECF8E',
   powder: '#9CC3E5',
+  cherry: '#CB2A30',
   cream: '#FFF3D6',
   butter: '#F0C443',
   clay: '#CE7A45',
@@ -132,7 +133,7 @@ export const boardColors: Record<BoardColor, string> = {
 
 /** Doors dark enough to need cream ink instead of ink (badge, chips, id
  *  card). Keep in sync with `boardColors` above. */
-export const darkDoors: ReadonlySet<BoardColor> = new Set(['charcoal', 'sage', 'blue']);
+export const darkDoors: ReadonlySet<BoardColor> = new Set(['charcoal', 'sage', 'blue', 'cherry']);
 
 export function doorInk(color: BoardColor): string {
   return darkDoors.has(color) ? colors.onPine : colors.ink;
@@ -163,6 +164,7 @@ export const boardColorKeys = Object.keys(boardColors) as BoardColor[];
 /** Colors offered in the create/settings pickers, in display order. The rest
  *  stay valid (existing boards keep rendering) — just not offered. */
 export const offeredBoardColors: BoardColor[] = [
+  'cherry',
   'vintage_mint',
   'vintage_powder',
   'powder',
@@ -180,6 +182,7 @@ export const doorTints: Record<BoardColor, { light: string; base: string; shade:
   blue: { light: '#5490DD', base: '#3B7BD4', shade: '#2F63AC' },
   mint: { light: '#5BD9A0', base: '#3ECF8E', shade: '#31A572' },
   powder: { light: '#AED0EB', base: '#9CC3E5', shade: '#82ABCB' },
+  cherry: { light: '#E05256', base: '#CB2A30', shade: '#9E1F26' },
   cream: { light: '#FFFAEA', base: '#FFF3D6', shade: '#EFE1BC' },
   butter: { light: '#F4D169', base: '#F0C443', shade: '#D4A731' },
   clay: { light: '#DB9060', base: '#CE7A45', shade: '#AF6335' },
@@ -190,6 +193,94 @@ export const doorTints: Record<BoardColor, { light: string; base: string; shade:
   vintage_powder: { light: '#B9CFE8', base: '#A8C1DC', shade: '#8FA9C2' },
 };
 
+/** Broad soft reflection swept across the enamel face (white, low alpha).
+ *  Rendered as an absolute LinearGradient from the upper-left toward the
+ *  lower-right; the narrow dark enamel edges (EnamelBase) supply curvature
+ *  while this layer supplies gloss. */
+export const enamelReflection = {
+  colors: [
+    'rgba(255,255,255,0)',
+    'rgba(255,255,255,0.03)',
+    'rgba(255,255,255,0.13)',
+    'rgba(255,255,255,0.05)',
+    'rgba(255,255,255,0)',
+  ],
+  locations: [0, 0.07, 0.16, 0.29, 0.48],
+} as const;
+
+/** Polished-chrome bands for the vertical bar handle, rendered horizontally
+ *  across the handle (start {x:0,y:0.5} → end {x:1,y:0.5}). */
+export const chromeHandle = {
+  colors: [
+    '#52636F',
+    '#B8C8D0',
+    '#F9FFFF',
+    '#FFFFFF',
+    '#E1E7EA',
+    '#A5B5C0',
+    '#607785',
+    '#B8C6CE',
+    '#61717C',
+  ],
+  locations: [0, 0.13, 0.27, 0.34, 0.43, 0.57, 0.78, 0.91, 1],
+} as const;
+
+/** Cast shadows for the chrome handle's unclipped wrapper. Inset feet behind
+ *  the handle add their own darker contact shadows. */
+export const handleShadows = [
+  {
+    offsetX: 3,
+    offsetY: 2,
+    blurRadius: 2,
+    color: 'rgba(0,0,0,0.30)',
+  },
+  {
+    offsetX: 6,
+    offsetY: 4,
+    blurRadius: 6,
+    color: 'rgba(0,0,0,0.18)',
+  },
+] as const;
+
+/** Narrow band sequence around the cabinet's outside edge: dark outer edge →
+ *  bright silver line → grey metal → dark gasket → paint. The middle seam
+ *  between doors stays predominantly dark (no bright horizontal band). */
+export const cabinetMaterial = {
+  edge: '#333B41',
+  highlight: '#F1F2F1',
+  silver: '#A9B2B6',
+  shade: '#434C53',
+  gasket: '#17191D',
+} as const;
+
+/** Inset supplements for the gradient rim geometry (inner top light, side and
+ *  bottom shading). Inset shadows require Android API 29+ and outset shadows
+ *  API 28+ — gate them appropriately and always keep the gradient fallbacks
+ *  for older supported Android versions. */
+export const enamelInsetShadows = [
+  {
+    offsetX: 0,
+    offsetY: 2,
+    blurRadius: 2,
+    color: 'rgba(255,255,255,0.35)',
+    inset: true,
+  },
+  {
+    offsetX: -4,
+    offsetY: 0,
+    blurRadius: 7,
+    color: 'rgba(12,18,25,0.24)',
+    inset: true,
+  },
+  {
+    offsetX: 0,
+    offsetY: -6,
+    blurRadius: 7,
+    color: 'rgba(12,18,25,0.30)',
+    inset: true,
+  },
+] as const;
+
 /** Handle face per door colour: a deeper enamel tone that belongs with the
  *  door instead of generic steel. */
 export const handleTints: Record<BoardColor, [string, string, string]> = {
@@ -198,6 +289,7 @@ export const handleTints: Record<BoardColor, [string, string, string]> = {
   blue: ['#2F63AC', '#244C85', '#1A375D'],
   mint: ['#31A572', '#268058', '#1C5C40'],
   powder: ['#82ABCB', '#64849D', '#475D70'],
+  cherry: ['#9E1F26', '#7A181E', '#571115'],
   cream: ['#D9C491', '#B39D63', '#84744A'],
   butter: ['#D4A731', '#A37F27', '#77601D'],
   clay: ['#AF6335', '#884D2A', '#63381F'],
@@ -220,6 +312,7 @@ export const plateTints: Record<
   blue: { bg: '#6395DB', edge: '#2C5DA3', screw: '#23497F', screwEdge: '#173154' },
   mint: { bg: '#69D8A4', edge: '#2E9A67', screw: '#247852', screwEdge: '#185236' },
   powder: { bg: '#B4D2EC', edge: '#6E9CC4', screw: '#577A99', screwEdge: '#3A5266' },
+  cherry: { bg: '#D65459', edge: '#931D23', screw: '#70161B', screwEdge: '#4C0F13' },
   cream: { bg: '#FBEFCB', edge: '#C9AE72', screw: '#A08A58', screwEdge: '#6C5D3A' },
   butter: { bg: '#F6D878', edge: '#C1932C', screw: '#96712A', screwEdge: '#66501E' },
   clay: { bg: '#DE9A6B', edge: '#9C5A30', screw: '#7A4626', screwEdge: '#523019' },

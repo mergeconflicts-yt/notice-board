@@ -18,6 +18,7 @@ export type BoardColor =
   | 'butter'
   | 'blush'
   | 'powder'
+  | 'cherry'
   | 'vintage_mint'
   | 'vintage_butter'
   | 'vintage_blush'
