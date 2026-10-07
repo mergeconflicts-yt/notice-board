@@ -1,7 +1,9 @@
 // Unit tests for the upload-photo JPEG fast path
 // (supabase/functions/_shared/jpeg.ts): header validation + metadata
 // segment stripping without pixel decode. Guards the EXIF/GPS removal and
-// the fail-closed nulls (malformed input must never reach storage).
+// the fail-closed nulls (malformed or undecodable input must never reach
+// storage — the Edge caller additionally runs a decode-only pass over the
+// exact bytes being stored).
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
@@ -38,6 +40,13 @@ function sosScan() {
 
 function jpeg(parts) {
   return Uint8Array.from(parts.flat());
+}
+
+// Real decoders need quantization + Huffman tables: shared minimal pair
+// for the synthetic valid cases below (a bare SOF/SOS/EOI skeleton with no
+// tables is rejected — see the table-less test).
+function tables() {
+  return [seg(0xdb, [0, 1, 2]), seg(0xc4, [4, 5])];
 }
 
 const EXIF = [...'Exif\0\0GPS:51.5N,0.1W'.split('').map((c) => c.charCodeAt(0))];
@@ -78,7 +87,7 @@ describe('stripJpegMetadata', () => {
   it('parses progressive (SOF2) dimensions', () => {    const sof2 = seg(0xc2, [
       8, 0, 10, 0, 20, 3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1,
     ]); // 20x10
-    const out = stripJpegMetadata(jpeg([SOI, sof2, sosScan(), EOI]));
+    const out = stripJpegMetadata(jpeg([SOI, ...tables(), sof2, sosScan(), EOI]));
     assert.ok(out);
     assert.equal(out.width, 20);
     assert.equal(out.height, 10);
@@ -88,6 +97,7 @@ describe('stripJpegMetadata', () => {
     const scan2 = [...seg(0xda, [1, 1, 0, 0, 0x3f, 0]), 0x44, 0xff, 0xff]; // +FF fills
     const input = jpeg([
       SOI,
+      ...tables(),
       seg(0xc2, [8, 0, 8, 0, 8, 3, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]),
       ...seg(0xda, [1, 1, 0, 0, 0x3f, 0]),
       0x11, 0xff, 0xd0, 0x22, // data + RST0 inside first scan
@@ -103,9 +113,24 @@ describe('stripJpegMetadata', () => {
   });
 
   it('reports oversized dimensions instead of rejecting (caller decides)', () => {
-    const out = stripJpegMetadata(jpeg([SOI, sof0(3000, 2000), sosScan(), EOI]));
+    const out = stripJpegMetadata(jpeg([SOI, ...tables(), sof0(3000, 2000), sosScan(), EOI]));
     assert.ok(out);
     assert.equal(out.width, 3000);
+  });
+
+  it('rejects a table-less SOF/SOS/EOI skeleton (undecodable without DQT/DHT)', () => {
+    // Well-shaped but carrying no quantization or Huffman tables: no real
+    // decoder can render this, so the fast path must fail closed to the full
+    // pipeline (which decode-checks) instead of storing it.
+    assert.equal(stripJpegMetadata(jpeg([SOI, sof0(64, 64), sosScan(), EOI])), null);
+    assert.equal(
+      stripJpegMetadata(jpeg([SOI, seg(0xdb, [0, 1, 2]), sof0(64, 64), sosScan(), EOI])),
+      null, // DQT without DHT is still undecodable
+    );
+    assert.equal(
+      stripJpegMetadata(jpeg([SOI, seg(0xc4, [4, 5]), sof0(64, 64), sosScan(), EOI])),
+      null, // DHT without DQT is still undecodable
+    );
   });
 
   it('rejects non-JPEG input', () => {

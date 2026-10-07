@@ -57,7 +57,7 @@ and prod flows in `flows-prod/`.
 | Flow | Journey |
 | --- | --- |
 | `guest-create-delete` | welcome → guest name → home → create fridge → delete fridge |
-| `note` / `list` / `date` | composer tabs → post appears on board |
+| `note` / `list` / `date` | composer tabs → post appears on board → Edit round-trip verifies saved type + content |
 | `keep` | Keep taps on a note never dead-end, no crash |
 | `join-invite` | owner copies invite code → fresh guest pastes it → joins → leaves |
 | `join-invalid-code` | bogus code shows the invalid-code error |
@@ -67,15 +67,19 @@ and prod flows in `flows-prod/`.
 
 ## Deliberate gaps
 
-- **Rendered card content is not asserted** (note/list/date/keep): the
+- **Rendered card content is not asserted directly** (note/list/date/keep): the
   handwriting glyphs in transformed note cards are invisible to Maestro's
   iOS text channel — exact text, regex, and even the card's single-line
   `accessibilityLabel` all fail to match (verified 2026-10-02), while
   `testID`s match fine. Flows sync on `note-card` (proving the post landed
-  and rendered) and saved-type/content correctness is covered at the data
-  layer by pgTAP `supabase/tests/03_items.test.sql` (body/title round-trips
-  through the RPCs). If card text ever becomes matchable, restore content
-  asserts in `note/list/date/keep.yaml`.
+  and rendered), then verify saved type + content through the Edit round-trip:
+  the edit sheet reuses the composer `TextInput`s (`note-field`,
+  `list-title-field`, `date-title-field`), whose text IS matchable (same
+  mechanism as the caption assert in `photo-composer.yaml`). A wrong saved
+  type shows no matching field; dropped content fails the text assert. The
+  data layer is additionally covered by pgTAP
+  `supabase/tests/03_items.test.sql` (body/title round-trips through the
+  RPCs).
 
 - **Photo upload through the system picker** is not automated: the iOS photo
   permission alert and library grid have no stable selectors. The composer UI
@@ -100,7 +104,7 @@ ambiguous, or shares its row with icons/other text (Maestro matches exact
 element text): `back` (headers), `switch-fridges` (board badge), `pick-date` /
 `pick-time` (composer triggers), `invite-code` (code card), `tab-note` /
 `tab-photo` / `tab-list` / `tab-date` (composer tabs), `row-people` (settings
-row), `action-keep` / `action-remove` (note detail buttons),
+  row), `action-keep` / `action-remove` / `action-edit` (note detail buttons), `edit-cancel` (edit sheet),
 `wheel-Hour-*` / `wheel-Minute-*` (time wheels), `today-btn`, `dt-done`,
 plus `*-field` ids on every text input (placeholders are unreliable
 selectors).

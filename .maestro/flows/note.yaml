@@ -14,10 +14,23 @@ appId: host.exp.Exponent
 # Note cards render in a handwriting font that Maestro's text channel can't
 # match (and extendedWaitUntil takes no id selector), so the card tap itself
 # is the sync point: tapOn waits for testID note-card, then opens the detail
-# screen — which has no back testID, so remove the post (back navigation to
-# the board) and finish on the static composer button like keep.yaml does.
+# screen. Saved type + content are verified through the Edit round-trip: the
+# edit sheet is a system-font TextInput (like the caption field that
+# photo-composer.yaml already asserts), so its text IS matchable. If the post
+# had saved as the wrong type, the note-field would not exist; if the body
+# had been dropped, the text assert would fail.
 - tapOn:
     id: "note-card"
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
+- tapOn:
+    id: "action-edit"
+    retryTapIfNoChange: true
+- assertVisible:
+    id: "note-field"
+- assertVisible: "E2E hello note"
+- tapOn:
+    id: "edit-cancel"
     retryTapIfNoChange: true
 - tapOn:
     id: "action-remove"

@@ -16,12 +16,19 @@
  * decode):
  * - Rejects non-JPEG input (SOI magic) and truncated/malformed structure
  *   (length overruns, missing SOF, missing SOS→EOI scan).
+ * - Requires the quantization (DQT) and Huffman (DHT) tables a real decoder
+ *   needs: a bare SOF/SOS/EOI skeleton with no tables is structurally shaped
+ *   like a JPEG but undecodable, so it is rejected here (and would also fail
+ *   the caller's decode-only pass). Tables may appear in the header or
+ *   between scans (progressive refinements).
  * - Drops APP1 (EXIF/XMP — the GPS carrier), APP13 (Photoshop/IPTC
  *   captions), and COM (free-text comments). Keeps APP0 (JFIF density),
  *   APP2 (ICC profile), APP14 (Adobe flags) and all image-data segments, so
  *   rendering is preserved while personal metadata is gone.
  * - Dimensions come from a real SOF parse, never from client claims; the
- *   caller still routes oversized images to the resizing pipeline.
+ *   caller still routes oversized images to the resizing pipeline, and always
+ *   runs a decode-only pass over the exact bytes being stored (structure
+ *   alone is never proof of decodability).
  */
 export type StrippedJpeg = {
   bytes: Uint8Array;
@@ -64,6 +71,8 @@ export function stripJpegMetadata(input: Uint8Array): StrippedJpeg | null {
   let width = 0;
   let height = 0;
   let sawSOF = false;
+  let sawDQT = false;
+  let sawDHT = false;
 
   const u16 = (p: number): number => (input[p] << 8) | input[p + 1];
 
@@ -142,6 +151,8 @@ export function stripJpegMetadata(input: Uint8Array): StrippedJpeg | null {
           pos = e2; // Drop inter-scan metadata like header metadata.
           continue;
         }
+        if (m2 === 0xdb) sawDQT = true;
+        if (m2 === 0xc4) sawDHT = true;
         keep(pos, e2); // Next scan header, DNL, or table segment.
         pos = e2;
       }
@@ -161,12 +172,19 @@ export function stripJpegMetadata(input: Uint8Array): StrippedJpeg | null {
       continue;
     }
 
+    if (marker === 0xdb) sawDQT = true;
+    if (marker === 0xc4) sawDHT = true;
+
     // Metadata with personal-data potential goes; image-data segments stay.
     if (marker === APP1 || marker === APP13 || marker === COM) continue;
     keep(segStart, end);
   }
 
   if (!sawSOF || width <= 0 || height <= 0 || pos > n) return null;
+  // A decodable JPEG needs its quantization and Huffman tables: without
+  // them even a well-shaped SOF/SOS/EOI skeleton fails every real decoder.
+  // Reject here (fail closed to the full pipeline, which also decode-checks).
+  if (!sawDQT || !sawDHT) return null;
   const out = new Uint8Array(keptLen);
   let at = 0;
   for (const [s, e] of kept) {

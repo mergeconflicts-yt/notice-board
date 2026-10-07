@@ -298,13 +298,14 @@ export default function ItemDetailScreen() {
             <ActionButton
               icon="pencil-outline"
               label="Edit"
+              testID="action-edit"
               onPress={() => {
                 setEditSnapshot(itemEntries);
                 setEditing(true);
               }}
             />
           ) : (
-            <ActionButton icon="flag-outline" label="Report" onPress={handleReport} />
+            <ActionButton icon="flag-outline" label="Report" testID="action-report" onPress={handleReport} />
           )}
           {canRemove ? (
             <ActionButton

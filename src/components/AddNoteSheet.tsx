@@ -688,7 +688,7 @@ export function AddNoteSheet({
             </View>
           ) : (
             <View style={styles.actions}>
-              <Pressable onPress={onClose} style={styles.cancelBtn}>
+              <Pressable onPress={onClose} style={styles.cancelBtn} testID="edit-cancel">
                 <Text style={styles.cancelText}>Cancel</Text>
               </Pressable>
               <Pressable onPress={submit} disabled={!canPost} style={[styles.postBtn, !canPost && styles.postDisabled]}>

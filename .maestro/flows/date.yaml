@@ -36,10 +36,25 @@ appId: host.exp.Exponent
 # Date cards render in a handwriting font that Maestro's text channel can't
 # match (and extendedWaitUntil takes no id selector), so the card tap itself
 # is the sync point: tapOn waits for testID note-card, then opens the detail
-# screen — which has no back testID, so remove the post (back navigation to
-# the board) and finish on the static composer button like keep.yaml does.
+# screen. Saved type + content are verified through the Edit round-trip: the
+# edit sheet reuses the system-font date-title-field input plus the pick-date
+# / pick-time triggers (a wrong saved type would show no date fields; a
+# dropped title would fail the text assert). The exact clock rendering is
+# locale-dependent, so only the title text is asserted — not the time.
 - tapOn:
     id: "note-card"
+    retryTapIfNoChange: true
+- waitForAnimationToEnd
+- tapOn:
+    id: "action-edit"
+    retryTapIfNoChange: true
+- assertVisible:
+    id: "date-title-field"
+- assertVisible: "E2E dentist"
+- assertVisible:
+    id: "pick-date"
+- tapOn:
+    id: "edit-cancel"
     retryTapIfNoChange: true
 - tapOn:
     id: "action-remove"
