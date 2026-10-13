@@ -49,7 +49,9 @@ Cover at least:
 
 ## 3. Production Supabase settings
 `config.toml` only covers your local setup, so the hosted project needs:
-- captcha on (it's `enabled = false` locally)
+- captcha OFF / stood down (it's `enabled = false` locally, and bot
+  protection must stay OFF in the hosted project — see `docs/hosted-setup.md`.
+  To re-enable, flip it back on in the dashboard and in deploy.yml)
 - hosted Auth signup/IP rate limits on (local `config.toml` does not apply to hosted; required before public registration)
 - email confirmations on
 - custom SMTP (the built-in sender only sends a couple of emails an hour)
@@ -57,7 +59,7 @@ Cover at least:
 - the Vault secrets `invite`, `functions_url` and `job_secret`
 - `JOB_SECRET`, `SUPABASE_DB_URL` and the other secrets in GitHub
 - a manual run of deploy.yml (it now ends with a fail-closed
-  "Verify production security posture" step: captcha, confirmations, redirect
+  "Verify production security posture" step: captcha-off, confirmations, redirect
   allowlist, private buckets, Vault secrets and cron health — fix the dashboard
   and re-run if it fails)
 - a check of `http_failures()` the next day to confirm the nightly jobs ran
@@ -78,11 +80,13 @@ Cover at least:
   --profile production`; `build:prod:ios` / `build:prod:android` for one
   platform) and `npm run submit:prod` (`eas submit --platform all`). The
   production profile pins `ios.buildConfiguration: Release` and
-  `android.buildType: app-bundle` with remote credentials. Set the four public env vars
+  `android.buildType: app-bundle` with remote credentials. Set the three public env vars
   (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`,
-  `EXPO_PUBLIC_INVITE_BASE_URL`, `EXPO_PUBLIC_TURNSTILE_SITE_KEY`) as EAS
+  `EXPO_PUBLIC_INVITE_BASE_URL`) as EAS
   project environment variables for the production profile — a production
-  build fails fast in `app.config.ts` when any is absent. The invite base URL
+  build fails fast in `app.config.ts` when any is absent. (`EXPO_PUBLIC_TURNSTILE_SITE_KEY`
+  is stood down: do NOT set it — re-add it only when re-enabling captcha.)
+  The invite base URL
   is the deployed origin of `web/` (see `web/README.md`).
 - Real-device production tests: see §2 above (all on a `production` build,
   not Expo Go).

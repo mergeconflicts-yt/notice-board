@@ -11,14 +11,16 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const inviteBase = process.env.EXPO_PUBLIC_INVITE_BASE_URL ?? '';
   const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
   const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
-  const turnstileSiteKey = process.env.EXPO_PUBLIC_TURNSTILE_SITE_KEY ?? '';
+  // NOTE: Turnstile captcha is stood down (see docs/hosted-setup.md): the
+  // EXPO_PUBLIC_TURNSTILE_SITE_KEY env var is intentionally NOT required
+  // here, so production builds sign in without a captcha. To re-enable,
+  // re-add the `turnstileSiteKey` read + `missing.push` check below.
 
-  // A production build must know its public origin: universal links and the
-  // Turnstile page origin both depend on it, and a silent empty value would
-  // ship a broken invite/captcha flow. Supabase credentials and the Turnstile
-  // site key are equally load-bearing — without them the app cannot sign in
-  // (or can be signed in without any captcha) — so fail the build rather
-  // than shipping a build that can only fail at runtime.
+  // A production build must know its public origin: universal links depend
+  // on it, and a silent empty value would ship a broken invite flow.
+  // Supabase credentials are equally load-bearing — without them the app
+  // cannot sign in — so fail the build rather than shipping a build that
+  // can only fail at runtime.
   const isProdBuild =
     process.env.EAS_BUILD === 'true' && process.env.EAS_BUILD_PROFILE === 'production';
   if (isProdBuild) {
@@ -28,7 +30,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     }
     if (!supabaseUrl) missing.push('EXPO_PUBLIC_SUPABASE_URL');
     if (!supabaseAnonKey) missing.push('EXPO_PUBLIC_SUPABASE_ANON_KEY');
-    if (!turnstileSiteKey) missing.push('EXPO_PUBLIC_TURNSTILE_SITE_KEY');
     if (missing.length > 0) {
       throw new Error(
         `Missing required production config: ${missing.join(', ')}. ` +

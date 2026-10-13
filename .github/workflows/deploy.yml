@@ -95,9 +95,12 @@ jobs:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
       - name: Verify production security posture
-        # Fail-closed post-deployment check: captcha/auth hardening via the
+        # Fail-closed post-deployment check: auth hardening via the
         # Management API (auth config is not visible from Postgres), plus
         # private buckets, Vault secrets and scheduled-job health via SQL.
+        # NOTE: Turnstile captcha is stood down (see docs/hosted-setup.md) —
+        # bot protection must be OFF. To re-enable, flip the
+        # `security_captcha_enabled` check back to `is not True`.
         # DB checks use the session pooler — GitHub runners have no IPv6.
         run: |
           DB_URL="${SUPABASE_DB_URL%%\?*}"
@@ -130,7 +133,7 @@ jobs:
           import json, sys
           cfg = json.load(open('/tmp/auth-config.json'))
           bad = []
-          if cfg.get('security_captcha_enabled') is not True:
+          if cfg.get('security_captcha_enabled') is True:
             bad.append('captcha_enabled')
           if cfg.get('mailer_autoconfirm') is not False:
             bad.append('email_confirmations_on')
