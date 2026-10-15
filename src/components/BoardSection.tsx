@@ -11,11 +11,21 @@ import { ItemWithAuthor, ListEntry } from '../types';
 export type DisplacedMove = { item: ItemWithAuthor; x: number; y: number };
 
 /** Canvas-px keep-out around the lower door's chrome handle (FridgeDoor:
- *  left 12, width 13, top 16, height 130). Breathing room covers a tilted
- *  note's swung corner (~6px at ±4.5°) plus its shadow (~8px), so the paper
- *  lands visibly clear instead of just edge-clear. Notes slide right of it
- *  instead of tucking underneath. */
-const HANDLE_KEEP_OUT = { x: 8, y: 8, w: 32, h: 146 };
+ *  left 12, width 13, top 16, height 130; minus the row's 4px side padding).
+ *  Kept TIGHT to the chrome on purpose: a wider zone shoves the held note so
+ *  far right it collides with its right-column neighbour, collapsing the
+ *  handle band to a single column (the neighbour gets stacked below instead
+ *  of staying beside it). The bar floats above the content (pointerEvents
+ *  none), so a paper edge kissing it reads as tucked behind the handle, like
+ *  a real fridge. Notes slide right of it instead of tucking underneath;
+ *  computePreview nudges a grazed neighbour right so the band stays two-up. */
+const HANDLE_KEEP_OUT = { x: 8, y: 12, w: 13, h: 138 };
+/** Gap kept between a handle-slid note and its nudged neighbour — matches
+ *  COLUMN_GAP in utils/layout. */
+const HANDLE_GAP = 0.02;
+/** Max horizontal graze (fraction of board width, ~10px on a phone) the
+ *  neighbour nudge absorbs; anything more stacks below as before. */
+const HANDLE_NUDGE_MAX = 0.03;
 
 type Props = {
   items: ItemWithAuthor[];
@@ -182,9 +192,12 @@ export function BoardSection({
       const kw = HANDLE_KEEP_OUT.w / boardW;
       const ky = HANDLE_KEEP_OUT.y / scale;
       const kh = HANDLE_KEEP_OUT.h / scale;
+      let slid = false;
       if (dx < kx + kw && dx + base.w > kx && dy < ky + kh && dy + base.h > ky) {
         dx = clampBoardX(kx + kw, base.w);
+        slid = true;
       }
+      const heldRight = dx + base.w;
       placed.push({ x: dx, y: dy, w: base.w, h: base.h });
       next.set(dragId, { ...base, x: dx, y: dy });
       const ordered = [...items].sort(
@@ -194,7 +207,20 @@ export function BoardSection({
         if (it.id === dragId) continue;
         const q = layout.get(it.id);
         if (!q) continue;
-        const s = settleNoOverlap(q.x, q.y, q.w, q.h, placed);
+        let qx = q.x;
+        // The slide shoves the held note a few px into its right-column
+        // neighbour; nudge that neighbour right so the handle band stays
+        // two-up instead of stacking it below. settleNoOverlap below stays
+        // strict, so when the nudge can't fully clear (clamped at the edge)
+        // it still stacks — same as before — and whatever persists is
+        // stable under a later reload's strict settle.
+        if (slid && qx < heldRight && qx + q.w > dx && q.y < dy + base.h && q.y + q.h > dy) {
+          const graze = Math.min(qx + q.w, heldRight) - Math.max(qx, dx);
+          if (graze > 0 && graze < HANDLE_NUDGE_MAX) {
+            qx = clampBoardX(heldRight + HANDLE_GAP, q.w);
+          }
+        }
+        const s = settleNoOverlap(qx, q.y, q.w, q.h, placed);
         placed.push({ x: s.x, y: s.y, w: q.w, h: q.h });
         next.set(it.id, { ...q, ...s });
       }
