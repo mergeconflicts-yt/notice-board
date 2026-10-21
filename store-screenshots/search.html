@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --cream: #FBF5E9;
+    --pine: #0B4F41;
+    --ink-soft: #47645B;
+    --door: #9ED6B8;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  /* Design canvas: captured at deviceScaleFactor 2 → 3840×2560 (3:2). */
+  #search {
+    width: 1920px;
+    height: 1280px;
+    background: var(--cream);
+    position: relative;
+    overflow: hidden;
+    font-family: 'Nunito', Arial, sans-serif;
+  }
+  .door {
+    position: absolute;
+    left: 210px;
+    top: 90px;
+    width: 1500px;
+    height: 640px;
+    background: linear-gradient(180deg, #B5E2C6 0%, var(--door) 30%, var(--door) 100%);
+    border-radius: 90px;
+    box-shadow:
+      inset 0 5px 8px rgba(255,255,255,.55),
+      inset 0 -11px 22px rgba(62,54,46,.16),
+      0 24px 48px rgba(20,70,60,.18);
+  }
+  .handle {
+    position: absolute;
+    left: 38px;
+    top: 150px;
+    width: 36px;
+    height: 340px;
+    border-radius: 18px;
+    background: linear-gradient(90deg, #FAF8F3, #E6E1D4 45%, #9D9787);
+    box-shadow: 0 6px 14px rgba(0,0,0,.22);
+  }
+  .note {
+    position: absolute;
+    width: 560px;
+    border-radius: 12px;
+    padding: 28px 30px 22px;
+    box-shadow: 0 4px 6px rgba(0,0,0,.08), 0 18px 28px -15px rgba(20,30,25,.4);
+  }
+  .note .magnet {
+    position: absolute;
+    top: -22px;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    margin-left: -22px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.75), rgba(255,255,255,0) 55%), var(--mc, #E4572E);
+    box-shadow: 0 4px 8px rgba(0,0,0,.3);
+  }
+  .note h4, .note li, .note .big {
+    font-family: 'Caveat', cursive;
+    font-weight: 600;
+    line-height: 1.12;
+  }
+  .note .meta {
+    margin-top: 10px;
+    text-align: right;
+    font-size: 21px;
+    font-weight: 700;
+    opacity: .55;
+  }
+  .n-butter { background: #FFF3A6; color: #4A3E22; }
+  .n-sage { background: #DDF3D5; color: #2E4330; }
+  .n-sky { background: #DCECF8; color: #263E57; }
+  .n-blush { background: #F8DDE0; color: #53343C; }
+  .wordmark {
+    position: absolute;
+    left: 0; right: 0;
+    top: 790px;
+    text-align: center;
+    font-weight: 900;
+    font-size: 128px;
+    letter-spacing: 18px;
+    color: var(--pine);
+  }
+  .tagline {
+    position: absolute;
+    left: 0; right: 0;
+    top: 975px;
+    text-align: center;
+    font-size: 56px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    color: var(--ink-soft);
+  }
+  .sub {
+    position: absolute;
+    left: 0; right: 0;
+    top: 1075px;
+    text-align: center;
+    font-size: 44px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    opacity: .75;
+  }
+</style>
+</head>
+<body>
+<div id="search">
+  <div class="door">
+    <div class="handle"></div>
+
+    <div class="note n-butter" style="--mc:#E4572E; left:130px; top:60px; transform:rotate(-3deg);">
+      <div class="magnet"></div>
+      <h4 style="font-size:52px;">Buy milk, eggs &amp; bread</h4>
+      <div class="meta">Mom · just now</div>
+    </div>
+
+    <div class="note n-sage" style="--mc:#2A9D8F; left:790px; top:50px; transform:rotate(2deg);">
+      <div class="magnet"></div>
+      <ul style="list-style:none; font-size:48px;">
+        <li style="display:flex; gap:14px; align-items:center; border-bottom:2px solid rgba(20,60,53,.14); padding:6px 0;">
+          <span style="width:30px; height:30px; border-radius:50%; background:#2E4330; color:#DDF3D5; font-size:22px; display:flex; align-items:center; justify-content:center; font-family:Nunito;">✓</span>
+          Trash out Tue
+        </li>
+        <li style="display:flex; gap:14px; align-items:center; padding:6px 0;">
+          <span style="width:30px; height:30px; border-radius:50%; border:4px solid currentColor;"></span>
+          Rent due 1st
+        </li>
+      </ul>
+      <div class="meta">Dad · 1 h</div>
+    </div>
+
+    <div class="note n-sky" style="--mc:#3D5A98; left:130px; top:330px; transform:rotate(2.5deg);">
+      <div class="magnet"></div>
+      <div class="big" style="font-size:56px; font-weight:700;">SAT 4pm ✈</div>
+      <h4 style="font-size:50px;">Grandma lands</h4>
+      <div class="meta">Maya · Yesterday</div>
+    </div>
+
+    <div class="note n-blush" style="--mc:#F2B134; left:790px; top:340px; transform:rotate(-2deg);">
+      <div class="magnet"></div>
+      <h4 style="font-size:52px;">Wi-Fi: sunflower22</h4>
+      <div class="meta">Pinned · always here</div>
+    </div>
+  </div>
+
+  <div class="wordmark">FRIDGE BOARD</div>
+  <div class="tagline">Families, roommates &amp; teams</div>
+  <div class="sub">Notes, lists, dates &amp; photos — always in the same place</div>
+</div>
+</body>
+</html>

@@ -1,7 +1,8 @@
 // Store buttons: links carrying data-placeholder point at listings that do
-// not exist yet (App Store id 6818976344, unpublished Play listing) and
-// would 404. Render them as inert "soon" pills until the attribute is
-// removed at launch (see docs/store-listing.md).
+// not exist yet (the Play listing) and would 404. Render them as inert
+// "soon" pills until the attribute is removed at launch (see
+// docs/store-listing.md). The App Store button links to the live TestFlight
+// beta and therefore carries no data-placeholder.
 document.querySelectorAll('a.store-btn[data-placeholder]').forEach((a) => {
   a.removeAttribute('href');
   a.classList.add('is-soon');

@@ -33,8 +33,8 @@ export const INVITE_PAGE = `<!doctype html>
       <h1>You’re invited</h1>
       <p id="lead">Open this invite in the Fridge Board app.</p>
       <a class="btn" id="open" href="#" style="display:none">Open in the app</a>
-      <a class="secondary" href="https://apps.apple.com/app/id6818976344">Get it on the App Store</a>
-      <a class="secondary" href="https://play.google.com/store/apps/details?id=com.fridgeboard.app">Get it on Google Play</a>
+      <a class="secondary" href="https://testflight.apple.com/join/cmqRzW1k">App Store (TestFlight)</a>
+      <a class="secondary" href="https://play.google.com/store/apps/details?id=com.fridgeboard.app">Google Play</a>
     </main>
     <script>
       (function () {

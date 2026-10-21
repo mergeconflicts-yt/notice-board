@@ -31,12 +31,14 @@ separate zone needed):
 
 ## 2. Store buttons (repo-side DONE — awaiting listings)
 
-All six store buttons (index, families, roommates) carry
-`data-placeholder` and are neutered by JS into inert "(soon)" pills, so
-nothing 404s pre-launch (verified headless). At launch: publish the
-listings, then **remove the `data-placeholder` attributes** (not the CSS
-rule) so the real links activate. The App Store href still carries the
-`id0000000000` placeholder until the numeric App Store ID exists.
+The App Store buttons on index, families and roommates link to the live
+public TestFlight beta (`https://testflight.apple.com/join/cmqRzW1k`). The
+Google Play buttons still carry `data-placeholder` and are neutered by JS
+into inert "(soon)" pills because the Play listing 404s. At Play launch:
+publish the listing, then **remove the `data-placeholder` attribute** (not
+the CSS rule) so the real link activates. Once the iOS listing is live,
+move the App Store buttons off TestFlight and onto
+`https://apps.apple.com/app/id6818976344`.
 
 ## 3. Association files (GATE — needs paid Apple account)
 

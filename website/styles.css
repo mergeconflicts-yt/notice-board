@@ -162,17 +162,17 @@ body {
 .hero-copy .lede { margin-bottom: 1.4rem; max-width: 30rem; }
 .hero-copy .store-row { margin-bottom: 0.2rem; }
 .gn-sep { color: #B8CCB2; margin: 0 0.15rem; }
-.store-row { display: flex; gap: 0.8rem; flex-wrap: wrap; }
+.store-row { display: flex; gap: 0.8rem; flex-wrap: nowrap; }
 .store-row.center { justify-content: center; }
 .store-btn {
   display: inline-flex; align-items: center; gap: 0.6rem;
   background: var(--pine); color: var(--on-pine); text-decoration: none;
-  border-radius: 999px; padding: 0.55rem 1.3rem;
+  border-radius: 999px; padding: 0.5rem 1.1rem;
   box-shadow: 0 4px 10px rgba(11, 79, 65, 0.35);
 }
 .store-btn span { display: flex; flex-direction: column; line-height: 1.15; }
 .store-btn small { font-size: 0.65rem; font-weight: 400; opacity: 0.8; }
-.store-btn strong { font-size: 0.95rem; }
+.store-btn strong { font-size: 0.9rem; }
 /* Pre-launch: placeholder store links are neutered by script.js (or the
    inline snippet on pages without it) so they never 404. Remove the
    data-placeholder attributes — not this rule — when the listings go live. */
@@ -570,7 +570,7 @@ a.tag:hover { transform: translateY(-2px); }
   .nav .btn-small { padding: 0.45rem 0.9rem; font-size: 0.82rem; }
   .brand-name { font-size: 1.25rem; }
   .hero { padding: 1.5rem 1rem 2.5rem; gap: 1.5rem; }
-  .store-row .store-btn { flex: 1 1 100%; justify-content: center; }
+  .store-row .store-btn { flex: 0 1 auto; justify-content: center; }
   /* fridge stays 2-column and compact on phones instead of stacking tall */
   .fridge { flex: none; }
   .fridge-door { padding: 2.6rem 0.6rem 0.6rem 2rem; }
