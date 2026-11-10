@@ -29,16 +29,17 @@ separate zone needed):
   `website/index.html` (JSON-LD), `web/build.mjs` (link-site contact page)
   and below — change all five if the address ever moves.
 
-## 2. Store buttons (repo-side DONE — awaiting listings)
+## 2. Store buttons (repo-side DONE — iOS live, Play pending)
 
-The App Store buttons on index, families and roommates link to the live
-public TestFlight beta (`https://testflight.apple.com/join/cmqRzW1k`). The
-Google Play buttons still carry `data-placeholder` and are neutered by JS
-into inert "(soon)" pills because the Play listing 404s. At Play launch:
-publish the listing, then **remove the `data-placeholder` attribute** (not
-the CSS rule) so the real link activates. Once the iOS listing is live,
-move the App Store buttons off TestFlight and onto
-`https://apps.apple.com/app/id6818976344`.
+The App Store buttons on index, families, roommates, the invite fallback
+page (`j.html`) and its Edge Function twin (`functions/_invitePage.js`)
+point at the live listing
+(`https://apps.apple.com/app/id6818976344`) as of 2026-11-10, when 1.0
+released to 175 storefronts. The Google Play buttons still carry
+`data-placeholder` and are neutered by JS into inert "(soon)" pills
+because the Play listing 404s. At Play launch: publish the listing, then
+**remove the `data-placeholder` attribute** (not the CSS rule) so the real
+link activates.
 
 ## 3. Association files (GATE — needs paid Apple account)
 
