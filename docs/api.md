@@ -114,6 +114,13 @@ the last two entries can't both recompute `keep_until` from stale state.
 | `board_can_use(p_board_id, p_pack_id)` | member | `starter` is free; paid packs need a live entitlement from a current member; strangers get `false` |
 | `set_board_theme(p_board_id, p_pack_id)` | owner | pack must be usable via `board_can_use` |
 
+### Shop / packs
+| Function | Access | Notes |
+|---|---|---|
+| `get_shop(p_renderer, p_region)` → `{categories, packs, hiddenForUpdate}` | any user | server-side visibility/sort; returns live packs plus hidden owned packs (`hidden: true`) for the Owned chip; featured bundles include `bundleItems` |
+| `get_pack_detail(p_pack_id, p_renderer, p_region)` → `{pack, art}` | any user | same visibility as `get_shop` (hidden owned packs open too); adds `spec` and every live/draft-visible art row |
+| `is_shop_tester()` | authenticated | policy helper for the `shop_testers` allow-list; drafts are visible only to these accounts |
+
 ### Photo uploads
 | Function | Access | Notes |
 |---|---|---|

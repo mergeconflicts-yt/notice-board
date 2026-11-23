@@ -25,10 +25,13 @@ import { useBoard, randomId } from '../../../hooks/useBoard';
 import { useDecorations } from '../../../hooks/useDecorations';
 import { useSession } from '../../../store/session';
 import { useToast } from '../../../store/toast';
-import { friendlyMessage, keepLonger as apiKeepLonger, uploadPhoto } from '../../../lib/api';
+import { usePapers } from '../../../store/papers';
+import { friendlyMessage, getPackDetail, keepLonger as apiKeepLonger, uploadPhoto } from '../../../lib/api';
 import { cachedPhotoUri, dropCachedPhoto } from '../../../lib/photoCache';
 import { rememberBoard } from '../../../lib/lastBoard';
 import { consumePinReveal } from '../../../lib/pinReveal';
+import { SHOP_RENDERER } from '../../../lib/shop';
+import { holderStyleFor, type HolderStyle } from '../../../components/Pin';
 import { REF_W } from '../../../utils/layout';
 import type { BoardLayout } from '../../../utils/layout';
 import { ItemWithAuthor, Magnet } from '../../../types';
@@ -50,6 +53,7 @@ function draftKey(draft: NoteDraft): string {
     entries: draft.entries,
     pinned: draft.pinned,
     keepExtra: draft.keepExtra,
+    paper: draft.paperStyle,
   });
 }
 
@@ -84,11 +88,33 @@ export default function BoardScreen() {
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [decorateMode, setDecorateMode] = useState(false);
   const [trayOpen, setTrayOpen] = useState(false);
-  const [hideDecorations, setHideDecorations] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   // Width of the empty main door, so door-anchored magnets still render when
   // there are no notes (and therefore no BoardSection canvas).
   const [emptyDoorW, setEmptyDoorW] = useState(0);
+  // Kitchen uses gingham tape, Starter uses round magnets, etc.
+  const [holderStyle, setHolderStyle] = useState<HolderStyle>('magnet');
+
+  // Refresh the composer's paper palette whenever the board is focused (a pack
+  // may have been bought in the shop while this screen stayed mounted).
+  useFocusEffect(
+    useCallback(() => {
+      void usePapers.getState().load(boardId, 0);
+    }, [boardId]),
+  );
+
+  useEffect(() => {
+    const packId = board?.themePack ?? 'starter';
+    let alive = true;
+    void getPackDetail(packId, SHOP_RENDERER, null)
+      .then((detail) => {
+        if (alive && detail) setHolderStyle(holderStyleFor(detail.pack.spec.holder));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [board?.themePack]);
   const emptyLayout = useMemo(() => new Map(), []);
   // Tapping a magnet selects it (shows ×); tapping anywhere else clears it.
   const [selectedMagnet, setSelectedMagnet] = useState<string | null>(null);
@@ -466,6 +492,7 @@ export default function BoardScreen() {
         boardId,
         type: draft.type,
         color: draft.color,
+        paperStyle: draft.paperStyle,
         body: draft.body || null,
         title: draft.title || null,
         eventAt: draft.eventAt,
@@ -555,25 +582,7 @@ export default function BoardScreen() {
         <View style={styles.pinnedSection}>
           <FridgeDoor color={board.color} placement="top">
             <View style={styles.header}>
-              <Pressable
-                hitSlop={8}
-                onPress={() => {
-                  setSelectedMagnet(null);
-                  setDecorateMode((v) => !v);
-                  setTrayOpen((v) => !v);
-                }}
-                style={styles.decorateBtn}
-                accessibilityRole="button"
-                accessibilityState={{ selected: decorateMode }}
-                accessibilityLabel={decorateMode ? 'Finish decorating' : 'Decorate the fridge'}
-                testID="decorate-toggle"
-              >
-                <MaterialCommunityIcons
-                  name={decorateMode ? 'check' : 'sticker-plus-outline'}
-                  size={20}
-                  color={doorInk(board.color)}
-                />
-              </Pressable>
+              <View style={styles.headerSpacer} />
 
               <Pressable
                 hitSlop={8}
@@ -642,7 +651,7 @@ export default function BoardScreen() {
                 >
                   <Text style={[styles.emptyBtnText, { color: doorInk(board.color) }]}>+ Add note</Text>
                 </Pressable>
-                {emptyDoorW > 0 && !hideDecorations ? (
+                {emptyDoorW > 0 ? (
                   <MagnetLayer
                     magnets={doorMagnets}
                     artById={artById}
@@ -668,6 +677,7 @@ export default function BoardScreen() {
               </View>
             ) : (
               <BoardSection
+                holderStyle={holderStyle}
                 items={restItems}
                 entries={entries}
                 photoUrls={photoUrls}
@@ -693,25 +703,21 @@ export default function BoardScreen() {
               renderOverlay={({ layout, boardW, scale }) => {
                 layoutRef.current = layout;
                 return (
-                  <>
-                    {!hideDecorations ? (
-                      <MagnetLayer
-                        magnets={doorMagnets}
-                        artById={artById}
-                        layout={layout}
-                        boardW={boardW}
-                        scale={scale}
-                        decorate={decorateMode}
-                        selectedId={selectedMagnet}
-                        onSelect={setSelectedMagnet}
-                        canRemove={canRemoveMagnet}
-                        onMove={handleMoveMagnet}
-                        onRemove={(m) => void decorations.remove(m).catch(() => {})}
-                        onTap={handleTapMagnet}
-                      onOpenUnder={handleOpenUnder}
-                    />
-                  ) : null}
-                  </>
+                  <MagnetLayer
+                    magnets={doorMagnets}
+                    artById={artById}
+                    layout={layout}
+                    boardW={boardW}
+                    scale={scale}
+                    decorate={decorateMode}
+                    selectedId={selectedMagnet}
+                    onSelect={setSelectedMagnet}
+                    canRemove={canRemoveMagnet}
+                    onMove={handleMoveMagnet}
+                    onRemove={(m) => void decorations.remove(m).catch(() => {})}
+                    onTap={handleTapMagnet}
+                    onOpenUnder={handleOpenUnder}
+                  />
                 );
               }}
               />
@@ -720,7 +726,7 @@ export default function BoardScreen() {
         </View>
       </View>
 
-      {!isEmpty && !dragActive ? (
+      {!dragActive ? (
           <Pressable
             onPress={() => setSheetOpen(true)}
             accessibilityRole="button"
@@ -734,6 +740,34 @@ export default function BoardScreen() {
           >
             <MaterialCommunityIcons name="plus" size={32} color={colors.white} />
           </Pressable>
+      ) : null}
+
+      {!dragActive ? (
+        <Pressable
+          onPress={() => {
+            setSelectedMagnet(null);
+            setDecorateMode((v) => !v);
+            setTrayOpen((v) => !v);
+          }}
+          accessibilityRole="button"
+          accessibilityState={{ selected: decorateMode }}
+          accessibilityLabel={decorateMode ? 'Finish decorating' : 'Decorate the fridge'}
+          testID="decorate-toggle"
+          style={({ pressed }) => [
+            styles.decorateFab,
+            {
+              bottom: insets.bottom + 20,
+              backgroundColor: decorateMode ? colors.pine : colors.brandYellow,
+            },
+            pressed && styles.composerPressed,
+          ]}
+        >
+          <MaterialCommunityIcons
+            name={decorateMode ? 'check' : 'sticker-plus-outline'}
+            size={24}
+            color={decorateMode ? colors.onPine : colors.pine}
+          />
+        </Pressable>
       ) : null}
 
       {dragActive && canDeleteDrag ? (
@@ -755,6 +789,7 @@ export default function BoardScreen() {
 
       <AddNoteSheet
         visible={sheetOpen}
+        boardId={boardId}
         submitting={submitting}
         onClose={handleSheetClose}
         onSubmit={handleAdd}
@@ -767,9 +802,8 @@ export default function BoardScreen() {
       <DecorationsTray
         visible={trayOpen && decorateMode}
         art={decorations.art}
-        hideDecorations={hideDecorations}
-        onToggleHide={() => setHideDecorations((v) => !v)}
         onPlace={handlePlaceMagnet}
+        onOpenShop={() => router.push(`/shop?boardId=${boardId}`)}
         onClose={() => {
           setTrayOpen(false);
           setDecorateMode(false);
@@ -791,14 +825,11 @@ const styles = StyleSheet.create({
     height: 56,
   },
   profileBtn: { alignItems: 'center', justifyContent: 'center' },
-  decorateBtn: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  headerSpacer: {
     width: 36,
     height: 36,
     marginLeft: -16,
     marginRight: 8,
-    borderRadius: 18,
   },
   // Fridge brand badge: the board name embossed straight onto the door
   // enamel, like an appliance logo — uppercase, letterspaced, no plate.
@@ -869,6 +900,20 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   composerPressed: { transform: [{ scale: 0.96 }] },
+  decorateFab: {
+    position: 'absolute',
+    left: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    shadowColor: colors.shadow,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
   deleteBtn: {
     position: 'absolute',
     left: 20,

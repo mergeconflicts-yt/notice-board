@@ -1,33 +1,81 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, fonts } from '../theme';
+import { getPacks } from '../lib/api';
 import { MagnetArt } from './MagnetArt';
-import { PackArt } from '../types';
+import { Pack, PackArt } from '../types';
 
 type Props = {
   visible: boolean;
   art: PackArt[];
-  /** The pack the board can currently use is already filtered by the caller. */
-  hideDecorations: boolean;
-  onToggleHide: () => void;
   onPlace: (artId: string) => void;
   onClose: () => void;
+  onOpenShop: () => void;
 };
 
 const CELL = 64;
 
+function packLabel(packId: string): string {
+  return packId
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 /** Decorations tray (M-9, §6.1 interaction model): tap a magnet to drop it on
- *  the door, drag placed magnets in decorate mode. */
+ *  the door, drag placed magnets in decorate mode. Items are grouped by pack so
+ *  a long catalogue stays easy to scan. */
 export function DecorationsTray({
   visible,
   art,
-  hideDecorations,
-  onToggleHide,
   onPlace,
   onClose,
+  onOpenShop,
 }: Props) {
-  const magnets = art.filter((a) => a.kind === 'magnet');
-  const stickers = art.filter((a) => a.kind === 'sticker');
+  const [packs, setPacks] = useState<Pack[]>([]);
+  useEffect(() => {
+    if (!visible) return;
+    let alive = true;
+    void getPacks()
+      .then((next) => {
+        if (alive) setPacks(next);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [visible]);
+
+  const groups = useMemo(() => {
+    const order = new Map(packs.map((pack, index) => [pack.id, index]));
+    const byPack = new Map<string, PackArt[]>();
+    art.forEach((item) => {
+      if (item.kind !== 'magnet' && item.kind !== 'sticker') return;
+      const list = byPack.get(item.packId);
+      if (list) list.push(item);
+      else byPack.set(item.packId, [item]);
+    });
+    return [...byPack.entries()]
+      .map(([packId, items]) => ({
+        packId,
+        name: packs.find((pack) => pack.id === packId)?.name ?? packLabel(packId),
+        magnets: items.filter((item) => item.kind === 'magnet'),
+        stickers: items.filter((item) => item.kind === 'sticker'),
+      }))
+      .filter((group) => group.magnets.length + group.stickers.length > 0)
+      .sort((a, b) => {
+        const rankA = order.get(a.packId) ?? Number.MAX_SAFE_INTEGER;
+        const rankB = order.get(b.packId) ?? Number.MAX_SAFE_INTEGER;
+        return rankA === rankB ? a.name.localeCompare(b.name) : rankA - rankB;
+      });
+  }, [art, packs]);
+
+  // Close this sheet before opening the shop: otherwise the modal stays on top
+  // of the pushed shop screen (and the board comes back still in decorate mode).
+  const openShop = () => {
+    onClose();
+    onOpenShop();
+  };
   const cell = (a: PackArt) => (
     <Pressable
       key={a.artId}
@@ -50,18 +98,13 @@ export function DecorationsTray({
         <View style={styles.header}>
           <Text style={styles.title}>Decorate</Text>
           <Pressable
-            onPress={onToggleHide}
-            style={styles.hideBtn}
-            accessibilityRole="switch"
-            accessibilityState={{ checked: hideDecorations }}
-            accessibilityLabel="Hide decorations"
+            onPress={openShop}
+            style={styles.shopBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Get more packs, open the shop"
           >
-            <MaterialCommunityIcons
-              name={hideDecorations ? 'eye-off-outline' : 'eye-outline'}
-              size={18}
-              color={colors.ink}
-            />
-            <Text style={styles.hideText}>{hideDecorations ? 'Hidden' : 'Hide'}</Text>
+            <MaterialCommunityIcons name="storefront-outline" size={16} color={colors.ink} />
+            <Text style={styles.shopText}>Get more</Text>
           </Pressable>
           <Pressable onPress={onClose} hitSlop={8} style={styles.doneBtn}>
             <Text style={styles.doneText}>Done</Text>
@@ -72,22 +115,37 @@ export function DecorationsTray({
           Tap a magnet or sticker to add it, then drag it on the fridge to move it.
         </Text>
 
-        {magnets.length === 0 && stickers.length === 0 ? (
-          <Text style={styles.empty}>Nothing to decorate with yet. The shop is coming soon.</Text>
+        {groups.length === 0 ? (
+          <View style={styles.emptyWrap}>
+            <Text style={styles.empty}>Nothing to decorate with yet.</Text>
+            <Pressable
+              onPress={openShop}
+              style={styles.emptyShop}
+              accessibilityRole="button"
+              accessibilityLabel="Get more packs"
+            >
+              <Text style={styles.emptyShopText}>Get more packs</Text>
+            </Pressable>
+          </View>
         ) : (
           <ScrollView showsVerticalScrollIndicator={false}>
-            {magnets.length > 0 ? (
-              <>
-                <Text style={styles.section}>Magnets</Text>
-                <View style={styles.grid}>{magnets.map(cell)}</View>
-              </>
-            ) : null}
-            {stickers.length > 0 ? (
-              <>
-                <Text style={styles.section}>Stickers</Text>
-                <View style={styles.grid}>{stickers.map(cell)}</View>
-              </>
-            ) : null}
+            {groups.map((group) => (
+              <View key={group.packId}>
+                <Text style={styles.packTitle}>{group.name}</Text>
+                {group.magnets.length > 0 ? (
+                  <>
+                    <Text style={styles.section}>Magnets</Text>
+                    <View style={styles.grid}>{group.magnets.map(cell)}</View>
+                  </>
+                ) : null}
+                {group.stickers.length > 0 ? (
+                  <>
+                    <Text style={styles.section}>Stickers</Text>
+                    <View style={styles.grid}>{group.stickers.map(cell)}</View>
+                  </>
+                ) : null}
+              </View>
+            ))}
           </ScrollView>
         )}
       </View>
@@ -103,7 +161,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     paddingHorizontal: 18,
     paddingBottom: 28,
-    maxHeight: '60%',
+    maxHeight: '75%',
   },
   handle: {
     alignSelf: 'center',
@@ -116,16 +174,16 @@ const styles = StyleSheet.create({
   },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   title: { flex: 1, fontFamily: fonts.hand.bold, fontSize: 26, color: colors.ink },
-  hideBtn: {
+  shopBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    minHeight: 48,
     paddingHorizontal: 10,
-    paddingVertical: 6,
     borderRadius: 999,
-    backgroundColor: colors.accentWash,
+    backgroundColor: colors.selected,
   },
-  hideText: { fontFamily: fonts.ui.semibold, fontSize: 13, color: colors.ink },
+  shopText: { fontFamily: fonts.ui.bold, fontSize: 13, color: colors.ink },
   doneBtn: { paddingHorizontal: 8, paddingVertical: 6 },
   doneText: { fontFamily: fonts.ui.bold, fontSize: 15, color: colors.accentDeep },
   hint: {
@@ -141,6 +199,22 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
     paddingVertical: 24,
     textAlign: 'center',
+  },
+  emptyWrap: { alignItems: 'center', paddingVertical: 12, gap: 4 },
+  emptyShop: {
+    minHeight: 48,
+    borderRadius: 999,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.brandYellow,
+  },
+  emptyShopText: { fontFamily: fonts.ui.extraBold, fontSize: 15, color: colors.ink },
+  packTitle: {
+    marginTop: 12,
+    fontFamily: fonts.ui.extraBold,
+    fontSize: 17,
+    color: colors.ink,
   },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingBottom: 8 },
   section: {

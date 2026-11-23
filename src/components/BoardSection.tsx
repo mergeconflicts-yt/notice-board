@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, type ScrollViewInstance, type ViewInstance } fr
 import { ScrollView } from 'react-native-gesture-handler';
 import { colors, fonts } from '../theme';
 import { BoardNote } from './BoardNote';
+import type { HolderStyle } from './Pin';
 import { boardCanvasHeight, clampBoardX, computeBoardLayout, BoardLayout, REF_W, settleNoOverlap } from '../utils/layout';
 import { ItemWithAuthor, ListEntry } from '../types';
 
@@ -31,6 +32,7 @@ type Props = {
   items: ItemWithAuthor[];
   entries: ListEntry[];
   photoUrls: Record<string, string>;
+  holderStyle?: HolderStyle;
   entering: Set<string>;
   onOpen: (item: ItemWithAuthor) => void;
   /** Called with the drop point in stored coordinates (x = fraction of width,
@@ -84,6 +86,7 @@ export function BoardSection({
   items,
   entries,
   photoUrls,
+  holderStyle = 'magnet',
   entering,
   onOpen,
   onMove,
@@ -413,6 +416,7 @@ export function BoardSection({
                   animateIn={entering.has(item.id)}
                   entries={entries.filter((e) => e.itemId === item.id)}
                   photoUrl={item.photoPath ? photoUrls[item.photoPath] ?? null : null}
+                  holderStyle={holderStyle}
                   onPress={onOpen}
                   onDragStart={handleDragStartInner}
                   onDragUpdate={handleDragUpdateInner}

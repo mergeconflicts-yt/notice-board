@@ -17,6 +17,10 @@ type Props = {
   color: BoardColor;
   /** Top door holds the pinned strip; bottom door holds the rest. */
   placement: 'top' | 'bottom';
+  /** Optional enamel override (a theme pack's door spec in the shop preview). */
+  tintOverride?: { light: string; base: string; shade: string };
+  /** The shop preview can hold the left handle at mid-height. */
+  handlePosition?: 'left' | 'mid';
   children: ReactNode;
 };
 
@@ -28,8 +32,14 @@ type Props = {
  * bar handle. The dark strip between the doors is drawn by the board screen,
  * not here.
  */
-export function FridgeDoor({ color, placement, children }: Props) {
-  const tint = doorTints[color];
+export function FridgeDoor({
+  color,
+  placement,
+  tintOverride,
+  handlePosition = 'left',
+  children,
+}: Props) {
+  const tint = tintOverride ?? doorTints[color];
   return (
     <View
       style={[
@@ -87,7 +97,15 @@ export function FridgeDoor({ color, placement, children }: Props) {
         locations={[0, 0.45, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
-        style={[styles.handle, placement === 'top' ? styles.handleTop : styles.handleBottom]}
+        style={[
+          styles.handle,
+          handlePosition === 'mid' ? styles.handleMid : styles.handleLeft,
+          handlePosition === 'mid'
+            ? null
+            : placement === 'top'
+              ? styles.handleTop
+              : styles.handleBottom,
+        ]}
         pointerEvents="none"
       />
       </View>
@@ -155,7 +173,6 @@ const styles = StyleSheet.create({
   },
   handle: {
     position: 'absolute',
-    left: 12,
     width: 13,
     borderRadius: 7,
     shadowColor: '#000',
@@ -163,6 +180,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.18,
     shadowRadius: 4,
     elevation: 3,
+  },
+  handleLeft: { left: 12 },
+  handleMid: {
+    left: 12,
+    top: '50%',
+    marginTop: -58,
+    height: 116,
   },
   handleTop: { bottom: 12, height: 110 },
   handleBottom: { top: 16, height: 130 },

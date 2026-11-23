@@ -4,6 +4,8 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { ItemWithAuthor, ListEntry } from '../types';
 import { NotePaper } from './NotePaper';
+import { paperStyleFrom, usePaperOption } from '../store/papers';
+import type { HolderStyle } from './Pin';
 
 type Props = {
   item: ItemWithAuthor;
@@ -16,6 +18,7 @@ type Props = {
   animateIn?: boolean;
   entries: ListEntry[];
   photoUrl?: string | null;
+  holderStyle?: HolderStyle;
   onPress: (item: ItemWithAuthor) => void;
   onToggleEntry?: (entry: ListEntry) => void;
   /** A note was picked up and is following the finger. */
@@ -98,6 +101,7 @@ export function BoardNote({
   animateIn = false,
   entries,
   photoUrl,
+  holderStyle = 'magnet',
   onPress,
   onToggleEntry,
   onDragStart,
@@ -115,6 +119,7 @@ export function BoardNote({
   const [posY] = useState(() => new Animated.Value(top));
   const [lift] = useState(() => new Animated.Value(0));
   const [dragging, setDragging] = useState(false);
+  const paperOption = usePaperOption(item.paperStyle);
 
   const draggingRef = useRef(false);
   const posRef = useRef({ x: left, y: top });
@@ -321,6 +326,8 @@ export function BoardNote({
             minHeight={minHeight}
             entries={entries}
             photoUrl={photoUrl}
+            holderStyle={holderStyle}
+            paperStyle={paperStyleFrom(paperOption)}
             onToggleEntry={onToggleEntry}
           />
         </Animated.View>

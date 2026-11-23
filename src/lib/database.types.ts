@@ -481,6 +481,9 @@ export type Database = {
           label: string
           pack_id: string
           path: string
+          sort: number
+          status: string
+          type: string
           w: number | null
         }
         Insert: {
@@ -490,6 +493,9 @@ export type Database = {
           label: string
           pack_id: string
           path: string
+          sort?: number
+          status?: string
+          type?: string
           w?: number | null
         }
         Update: {
@@ -499,6 +505,9 @@ export type Database = {
           label?: string
           pack_id?: string
           path?: string
+          sort?: number
+          status?: string
+          type?: string
           w?: number | null
         }
         Relationships: [
@@ -516,13 +525,24 @@ export type Database = {
           assets_version: number
           available_from: string | null
           available_until: string | null
+          badge_text: string | null
           blurb: string | null
           bundle_of: string[] | null
+          card_art: string[] | null
+          card_bg: string | null
+          card_tag: string | null
+          category_id: string | null
+          featured: boolean
           id: string
           kind: string
           min_renderer: number
           name: string
           price_label: string | null
+          regions: string[] | null
+          sale_from: string | null
+          sale_label: string | null
+          sale_store_product_id: string | null
+          sale_until: string | null
           sort: number
           spec: Json
           status: string
@@ -532,13 +552,24 @@ export type Database = {
           assets_version?: number
           available_from?: string | null
           available_until?: string | null
+          badge_text?: string | null
           blurb?: string | null
           bundle_of?: string[] | null
+          card_art?: string[] | null
+          card_bg?: string | null
+          card_tag?: string | null
+          category_id?: string | null
+          featured?: boolean
           id: string
           kind: string
           min_renderer?: number
           name: string
           price_label?: string | null
+          regions?: string[] | null
+          sale_from?: string | null
+          sale_label?: string | null
+          sale_store_product_id?: string | null
+          sale_until?: string | null
           sort?: number
           spec?: Json
           status?: string
@@ -548,19 +579,38 @@ export type Database = {
           assets_version?: number
           available_from?: string | null
           available_until?: string | null
+          badge_text?: string | null
           blurb?: string | null
           bundle_of?: string[] | null
+          card_art?: string[] | null
+          card_bg?: string | null
+          card_tag?: string | null
+          category_id?: string | null
+          featured?: boolean
           id?: string
           kind?: string
           min_renderer?: number
           name?: string
           price_label?: string | null
+          regions?: string[] | null
+          sale_from?: string | null
+          sale_label?: string | null
+          sale_store_product_id?: string | null
+          sale_until?: string | null
           sort?: number
           spec?: Json
           status?: string
           store_product_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pack_catalog_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "shop_categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       photo_upload_intents: {
         Row: {
@@ -710,6 +760,68 @@ export type Database = {
           window_start?: string
         }
         Relationships: []
+      }
+      shop_categories: {
+        Row: {
+          available_from: string | null
+          available_until: string | null
+          card_tag: string | null
+          chip_label: string | null
+          id: string
+          layout: string
+          regions: string[] | null
+          sort: number
+          status: string
+          title: string
+        }
+        Insert: {
+          available_from?: string | null
+          available_until?: string | null
+          card_tag?: string | null
+          chip_label?: string | null
+          id: string
+          layout?: string
+          regions?: string[] | null
+          sort?: number
+          status?: string
+          title: string
+        }
+        Update: {
+          available_from?: string | null
+          available_until?: string | null
+          card_tag?: string | null
+          chip_label?: string | null
+          id?: string
+          layout?: string
+          regions?: string[] | null
+          sort?: number
+          status?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      shop_testers: {
+        Row: {
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_testers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_entitlements: {
         Row: {
@@ -931,6 +1043,15 @@ export type Database = {
       delete_account: { Args: never; Returns: undefined }
       delete_board: { Args: { p_board_id: string }; Returns: undefined }
       dismiss_reports: { Args: { p_item_id: string }; Returns: undefined }
+      get_shop: {
+        Args: { p_region: string | null; p_renderer: number }
+        Returns: Json
+      }
+      get_pack_detail: {
+        Args: { p_pack_id: string; p_region: string | null; p_renderer: number }
+        Returns: Json
+      }
+      is_shop_tester: { Args: never; Returns: boolean }
       edit_entry: { Args: { p_id: string; p_text: string }; Returns: undefined }
       edit_item: {
         Args: {

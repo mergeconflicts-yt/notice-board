@@ -17,6 +17,16 @@ import {
   MemberRole,
   Pack,
   PackArt,
+  PackArtType,
+  PackDetail,
+  PackDetailPack,
+  PackSpec,
+  PaperOption,
+  ShopBundleItem,
+  ShopCardArt,
+  ShopCategory,
+  ShopData,
+  ShopPack,
   User,
 } from '../types';
 
@@ -184,6 +194,7 @@ function mapItem(row: any): ItemWithAuthor {
     boardId: row.board_id,
     type: row.type as ItemType,
     color: row.color as ItemColor,
+    paperStyle: (row.paper_style as string | null) ?? null,
     body: row.body,
     title: row.title,
     eventAt: row.event_at,
@@ -255,6 +266,9 @@ function mapPackArt(row: any): PackArt {
     path: row.path,
     w: row.w ?? null,
     h: row.h ?? null,
+    status: row.status ?? 'live',
+    sort: row.sort ?? 100,
+    type: (row.type as PackArtType) ?? 'object',
   };
 }
 
@@ -394,9 +408,181 @@ export async function getPacks(): Promise<Pack[]> {
   const { data, error } = await supabase
     .from('pack_catalog')
     .select('*')
-    .order('sort', { ascending: true });
+    .order('sort', { ascending: true })
+    .order('name', { ascending: true });
   if (error) raise(error);
   return (data ?? []).map(mapPack);
+}
+
+/** Every paper a live theme pack offers, with a board-usable flag. Used by the
+ *  composer picker and by the board to resolve a note's stored paper key.
+ *  Unavailable papers stay in the list so existing notes keep rendering. */
+export async function getPaperOptions(boardId: string): Promise<PaperOption[]> {
+  const { data, error } = await supabase
+    .from('pack_catalog')
+    .select('id, name, spec, sort')
+    .eq('status', 'live')
+    .eq('kind', 'theme')
+    .order('sort', { ascending: true })
+    .order('name', { ascending: true });
+  if (error) raise(error);
+
+  const rows = (data ?? []).filter((row: any) => row.id !== 'starter');
+  const usable = await Promise.all(
+    rows.map((row: any) => boardCanUse(boardId, row.id).catch(() => false)),
+  );
+
+  const options: PaperOption[] = [];
+  rows.forEach((row: any, index) => {
+    const papers = Array.isArray(row.spec?.papers) ? row.spec.papers : [];
+    papers.forEach((paper: any) => {
+      if (!paper || typeof paper !== 'object' || typeof paper.bg !== 'string') return;
+      if (typeof paper.id !== 'string' || !paper.id) return;
+      const paperId = paper.id;
+      options.push({
+        key: `${row.id}:${paperId}`,
+        packId: row.id,
+        packName: String(row.name ?? row.id),
+        paperId,
+        name: String(paper.name ?? paperId),
+        bg: paper.bg,
+        ink: typeof paper.ink === 'string' ? paper.ink : '#3E362E',
+        texture: typeof paper.texture === 'string' ? paper.texture : undefined,
+        header: typeof paper.header === 'string' ? paper.header : undefined,
+        available: usable[index] === true,
+      });
+    });
+  });
+  return options;
+}
+
+function mapShopCardArt(row: any): ShopCardArt {
+  return {
+    artId: String(row?.artId ?? ''),
+    packId: String(row?.packId ?? ''),
+    kind: row?.kind as ShopCardArt['kind'],
+    label: String(row?.label ?? ''),
+    path: String(row?.path ?? ''),
+  };
+}
+
+function mapShopBundleItem(row: any): ShopBundleItem {
+  return {
+    id: String(row?.id ?? ''),
+    name: String(row?.name ?? ''),
+    kind: row?.kind as ShopBundleItem['kind'],
+    storeProductId: row?.storeProductId ?? null,
+    saleStoreProductId: row?.saleStoreProductId ?? null,
+    cardArt: Array.isArray(row?.cardArt) ? row.cardArt.map(mapShopCardArt) : [],
+    owned: row?.owned === true,
+  };
+}
+
+function mapShopCategory(row: any): ShopCategory {
+  return {
+    id: String(row?.id ?? ''),
+    title: String(row?.title ?? ''),
+    chipLabel: row?.chipLabel ?? null,
+    cardTag: row?.cardTag ?? null,
+    layout: row?.layout === 'row' ? 'row' : 'grid',
+  };
+}
+
+function mapShopPack(row: any): ShopPack {
+  return {
+    id: String(row?.id ?? ''),
+    categoryId: row?.categoryId ?? null,
+    kind: row?.kind as ShopPack['kind'],
+    name: String(row?.name ?? ''),
+    blurb: row?.blurb ?? null,
+    storeProductId: row?.storeProductId ?? null,
+    saleStoreProductId: row?.saleStoreProductId ?? null,
+    saleUntil: row?.saleUntil ?? null,
+    saleLabel: row?.saleLabel ?? null,
+    priceLabel: row?.priceLabel ?? null,
+    availableUntil: row?.availableUntil ?? null,
+    badgeText: row?.badgeText ?? null,
+    cardArt: Array.isArray(row?.cardArt) ? row.cardArt.map(mapShopCardArt) : [],
+    cardBg: row?.cardBg ?? null,
+    cardTag: row?.cardTag ?? null,
+    itemCount: Number(row?.itemCount ?? 0),
+    bundleOf: Array.isArray(row?.bundleOf)
+      ? row.bundleOf.filter((id: unknown): id is string => typeof id === 'string')
+      : null,
+    bundleItems: Array.isArray(row?.bundleItems) ? row.bundleItems.map(mapShopBundleItem) : [],
+    featured: row?.featured === true,
+    hidden: row?.hidden === true,
+    owned: row?.owned === true,
+  };
+}
+
+/**
+ * Server-filtered shop catalogue (docs/SHOP.md §3). `renderer` is the highest
+ * pack renderer this build understands; `region` is an ISO country code.
+ */
+export async function getShop(renderer: number, region: string | null): Promise<ShopData> {
+  const { data, error } = await supabase.rpc('get_shop', {
+    p_renderer: renderer,
+    p_region: region,
+  } as never);
+  if (error) raise(error);
+  const row = (data ?? {}) as any;
+  return {
+    categories: Array.isArray(row.categories) ? row.categories.map(mapShopCategory) : [],
+    packs: Array.isArray(row.packs) ? row.packs.map(mapShopPack) : [],
+    hiddenForUpdate: Number(row.hiddenForUpdate ?? 0),
+  };
+}
+
+function mapPackArtJson(row: any): PackArt {
+  return {
+    artId: String(row?.artId ?? ''),
+    packId: String(row?.packId ?? ''),
+    kind: row?.kind as PackArt['kind'],
+    label: String(row?.label ?? ''),
+    path: String(row?.path ?? ''),
+    w: row?.w ?? null,
+    h: row?.h ?? null,
+    status: row?.status ?? 'live',
+    sort: row?.sort ?? 100,
+    type: (row?.type as PackArtType) ?? 'object',
+  };
+}
+
+function mapSpec(value: unknown): PackSpec {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as PackSpec)
+    : {};
+}
+
+/** One pack's detail: same visibility/ownership as the shop, plus spec + art. */
+export async function getPackDetail(
+  packId: string,
+  renderer: number,
+  region: string | null,
+): Promise<PackDetail | null> {
+  const { data, error } = await supabase.rpc('get_pack_detail', {
+    p_pack_id: packId,
+    p_renderer: renderer,
+    p_region: region,
+  } as never);
+  if (error) raise(error);
+  if (!data || typeof data !== 'object') return null;
+  const row = data as any;
+  if (!row.pack) return null;
+  const pack: PackDetailPack = {
+    ...mapShopPack(row.pack),
+    spec: mapSpec(row.pack.spec),
+  };
+  const seen = new Set<string>();
+  const art: PackArt[] = (Array.isArray(row.art) ? row.art.map(mapPackArtJson) : []).filter(
+    (item: PackArt) => {
+      if (!item.artId || seen.has(item.artId)) return false;
+      seen.add(item.artId);
+      return true;
+    },
+  );
+  return { pack, art };
 }
 
 export type NewMagnet = {
@@ -600,6 +786,8 @@ export type NewItem = {
   boardId: string;
   type: ItemType;
   color: ItemColor;
+  /** Composer paper pick as '<pack_id>:<paper_id>'; null/absent = plain colour. */
+  paperStyle?: string | null;
   body?: string | null;
   title?: string | null;
   eventAt?: string | null;
@@ -615,6 +803,24 @@ export type NewItem = {
 export async function postItem(input: NewItem): Promise<ItemWithAuthor> {
   // The generated arg types mark nullable columns as non-null strings; cast
   // the payload since the SQL functions accept NULL.
+  if (input.paperStyle) {
+    const { data, error } = await supabase.rpc('post_item_with_paper' as never, {
+      p_id: input.id,
+      p_board_id: input.boardId,
+      p_type: input.type,
+      p_color: input.color,
+      p_body: input.body ?? null,
+      p_title: input.title ?? null,
+      p_event_at: input.eventAt ?? null,
+      p_place: input.place ?? null,
+      p_photo_path: input.photoPath ?? null,
+      p_pinned: input.pinned ?? false,
+      p_entries: (input.entries ?? null) as never,
+      p_paper_style: input.paperStyle,
+    } as never);
+    if (error) raise(error);
+    return mapItem(data);
+  }
   const { data, error } = await supabase.rpc('post_item', {
     p_id: input.id,
     p_board_id: input.boardId,

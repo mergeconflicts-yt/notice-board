@@ -48,6 +48,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   return {
     ...config,
     ...base,
+    plugins: [...(base.plugins ?? []), 'expo-localization'],
     ios: {
       ...base.ios,
       ...(host ? { associatedDomains: [`applinks:${host}`] } : {}),

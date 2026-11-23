@@ -10,6 +10,7 @@ import { AddNoteSheet, NoteDraft } from '../../../../components/AddNoteSheet';
 import { useBoard } from '../../../../hooks/useBoard';
 import { useSession } from '../../../../store/session';
 import { useToast } from '../../../../store/toast';
+import { paperStyleFrom, usePaperOption, usePapers } from '../../../../store/papers';
 import { cachedPhotoUri } from '../../../../lib/photoCache';
 import { friendlyMessage, reportPost } from '../../../../lib/api';
 import { keepUntilLabel } from '../../../../utils/note';
@@ -43,6 +44,11 @@ export default function ItemDetailScreen() {
 
   const item = items.find((i) => i.id === noteId) ?? null;
   const itemEntries = entries.filter((e) => e.itemId === noteId);
+  const paperOption = usePaperOption(item?.paperStyle ?? null);
+
+  useEffect(() => {
+    void usePapers.getState().load(boardId);
+  }, [boardId]);
 
   const isCreator = !!me && me.id === item?.createdBy;
   const isOwner = me ? members.find((m) => m.userId === me.id)?.role === 'owner' : false;
@@ -190,6 +196,7 @@ export default function ItemDetailScreen() {
               showAllEntries
               entries={itemEntries}
               photoUrl={photoUrl}
+              paperStyle={paperStyleFrom(paperOption)}
               onToggleEntry={item.type === 'list' ? toggleEntry : undefined}
             />
           </View>
@@ -321,6 +328,7 @@ export default function ItemDetailScreen() {
 
       <AddNoteSheet
         visible={editing && isCreator}
+        boardId={boardId}
         submitting={saving}
         submitLabel="Save"
         initial={item}

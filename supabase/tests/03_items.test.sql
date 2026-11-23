@@ -268,11 +268,11 @@ select is(
   (select count(*)::integer from public.visible_items where id = 'c0000000-0000-0000-0000-000000000021'),
   1, 'restored item visible again');
 select lives_ok(
-  $$select public.edit_item('c0000000-0000-0000-0000-000000000024', 1, null, 'Party!', '2026-10-05T10:00:00Z', 'Beach', 'sky')$$,
+  $$select public.edit_item('c0000000-0000-0000-0000-000000000024', 1, null, 'Party!', (now() + interval '2 days'), 'Beach', 'sky')$$,
   'edit date');
 select is(
   (select keep_until from public.items where id = 'c0000000-0000-0000-0000-000000000024'),
-  '2026-10-06T00:00:00+00'::timestamptz, 'date edit recomputes keep_until');
+  (date_trunc('day', now() + interval '2 days') + interval '1 day'), 'date edit recomputes keep_until');
 reset role;
 
 -- Pinning & done interactions.

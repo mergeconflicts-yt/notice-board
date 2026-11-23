@@ -39,6 +39,12 @@ export const colors = {
   /** Warm-white paper (list/photo/photo sheets). */
   paper: '#FFFDF7',
   paperEdge: '#EAE0CC',
+  /** Pastel paper patterns (gingham checks, heart dots, diary margin). */
+  paperPattern: {
+    gingham: 'rgba(226, 124, 150, 0.30)',
+    hearts: '#EFA0B2',
+    diaryMargin: '#C3B2D6',
+  },
 
   // Overlays
   /** Modal scrim. */
@@ -80,6 +86,18 @@ export const colors = {
   seam: '#2B2620',
   /** Brushed-steel face of the vertical door handles, light edge to dark. */
   steel: ['#FAF8F3', '#E6E1D4', '#C6C0B0', '#9D9787'],
+
+  // Open-door interior (DoorScene): warm enamel cavity, lamp and shelves.
+  interior: {
+    cavity: '#E9E0CC',
+    lamp: '#FFF3B0',
+    ink: '#3E362E',
+    inkSoft: '#6E6457',
+    shelf: '#F4EBDD',
+    shelfEdge: '#D9CDB8',
+    wash: 'rgba(255, 246, 214, 0.35)',
+    scrim: 'rgba(11, 45, 38, 0.35)',
+  },
 } as const;
 
 /** Paper palettes for the seven item colours: main colour, ink, then the
@@ -99,6 +117,17 @@ export const noteColors: Record<
 };
 
 export const noteColorKeys = Object.keys(noteColors) as ItemColor[];
+
+/** Display names for the plain paper colours (composer + pack contents). */
+export const noteColorNames: Record<ItemColor, string> = {
+  butter: 'Canary',
+  blush: 'Blush',
+  sage: 'Mint',
+  sky: 'Sky',
+  lavender: 'Lavender',
+  peach: 'Meadow',
+  paper: 'Index card',
+};
 
 /** Solid member-dot colours (board header + post attribution), hashed by user. */
 export const memberColors = [
@@ -233,4 +262,6 @@ export const plateTints: Record<
 /** The single fastener everywhere: round magnets in fixed colours (used by Pin). */
 export const fastenerColors = {
   magnets: ['#E4572E', '#F2B134', '#2A9D8F', '#3D5A98', '#D96C95'],
+  /** Cute pack: every note gets the same pastel-pink round magnet. */
+  pink: '#EFA0B2',
 } as const;

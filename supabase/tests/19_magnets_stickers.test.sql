@@ -20,20 +20,20 @@ values ('c0000000-0000-0000-0000-000000000091', 'b0000000-0000-0000-0000-0000000
 
 -- A paid pack + entitlement for M, to exercise board_can_use.
 insert into public.pack_catalog (id, kind, name, status)
-values ('kitchen', 'theme', 'Kitchen', 'live');
+values ('test_kitchen', 'theme', 'Test kitchen', 'live');
 insert into public.pack_art (art_id, pack_id, kind, label, path)
-values ('kt_kettle', 'kitchen', 'magnet', 'Kettle', 'packs/kitchen/v1/kt_kettle@3x.webp'),
-       ('kt_egg', 'kitchen', 'sticker', 'Egg', 'packs/kitchen/v1/kt_egg@3x.webp');
+values ('test_kettle', 'test_kitchen', 'magnet', 'Kettle', 'packs/test_kitchen/v1/test_kettle@3x.webp'),
+       ('test_egg', 'test_kitchen', 'sticker', 'Egg', 'packs/test_kitchen/v1/test_egg@3x.webp');
 
 -- Starter is free and usable with no entitlement.
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000092', true);
 set role authenticated;
 select is(public.board_can_use('b0000000-0000-0000-0000-000000000091', 'starter'),
   true, 'starter is free for any member');
-select is(public.board_can_use('b0000000-0000-0000-0000-000000000091', 'kitchen'),
+select is(public.board_can_use('b0000000-0000-0000-0000-000000000091', 'test_kitchen'),
   false, 'paid pack unusable without an entitlement');
 select throws_ok(
-  $$select public.place_magnet('b0000000-0000-0000-0000-000000000091', 'kt_kettle', 0.5, 50, null, 0, null)$$,
+  $$select public.place_magnet('b0000000-0000-0000-0000-000000000091', 'test_kettle', 0.5, 50, null, 0, null)$$,
   'P0001', 'not_entitled', 'cannot place art from an unowned pack');
 
 -- M places a free starter magnet; z starts at 1.
@@ -132,26 +132,26 @@ select lives_ok(
 -- Entitlement added: the paid pack becomes usable board-wide (P-5).
 reset role;
 insert into public.user_entitlements (user_id, pack_id, source) values
-  ('a0000000-0000-0000-0000-000000000092', 'kitchen', 'app_store');
+  ('a0000000-0000-0000-0000-000000000092', 'test_kitchen', 'app_store');
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000091', true);
 set role authenticated;
-select is(public.board_can_use('b0000000-0000-0000-0000-000000000091', 'kitchen'),
+select is(public.board_can_use('b0000000-0000-0000-0000-000000000091', 'test_kitchen'),
   true, 'co-member entitlement unlocks the pack for the board');
 select lives_ok(
-  $$select public.place_magnet('b0000000-0000-0000-0000-000000000091', 'kt_kettle', 0.2, 60, null, 0, null)$$,
+  $$select public.place_magnet('b0000000-0000-0000-0000-000000000091', 'test_kettle', 0.2, 60, null, 0, null)$$,
   'owner can place art from a pack a co-member owns');
 
 -- Revoked entitlement no longer unlocks the pack.
 reset role;
 update public.user_entitlements
 set revoked_at = now()
-where user_id = 'a0000000-0000-0000-0000-000000000092' and pack_id = 'kitchen';
+where user_id = 'a0000000-0000-0000-0000-000000000092' and pack_id = 'test_kitchen';
 select set_config('request.jwt.claim.sub', 'a0000000-0000-0000-0000-000000000092', true);
 set role authenticated;
-select is(public.board_can_use('b0000000-0000-0000-0000-000000000091', 'kitchen'),
+select is(public.board_can_use('b0000000-0000-0000-0000-000000000091', 'test_kitchen'),
   false, 'revoked entitlement no longer unlocks the pack');
 select throws_ok(
-  $$select public.place_magnet('b0000000-0000-0000-0000-000000000091', 'kt_kettle', 0.3, 70, null, 0, null)$$,
+  $$select public.place_magnet('b0000000-0000-0000-0000-000000000091', 'test_kettle', 0.3, 70, null, 0, null)$$,
   'P0001', 'not_entitled', 'cannot place magnet from a revoked pack');
 
 -- Theme: owner only (H-1).
