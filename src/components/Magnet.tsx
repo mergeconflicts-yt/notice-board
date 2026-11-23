@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AccessibilityInfo, StyleSheet, View, type ImageSourcePropType } from 'react-native';
+import { AccessibilityInfo, StyleSheet, View } from 'react-native';
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -7,13 +7,13 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
-import { Image } from 'expo-image';
+import { Image, type ImageProps } from 'expo-image';
 
 export type MagnetProps = {
   /** Baked body webp (with the 3D lighting). */
-  body: ImageSourcePropType;
+  body: ImageProps['source'];
   /** Baked shadow webp (silhouette; the app offsets it). */
-  shadow: ImageSourcePropType;
+  shadow: ImageProps['source'];
   /** Reference size in points (PRD M-8). Default 56. */
   size?: number;
   /** Degrees, default 0; clamped to ±15. */

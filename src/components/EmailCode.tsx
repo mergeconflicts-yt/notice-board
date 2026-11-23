@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  Platform,
+  type TextInputInstance,
+} from 'react-native';
 import { colors, fonts } from '../theme';
 import { Button } from './Button';
 import { Turnstile } from './Turnstile';
@@ -48,7 +56,7 @@ export function EmailCode({ mode, onSend, onVerify, onDone, onConflict, onBack, 
   const [cooldown, setCooldown] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const refs = useRef<(TextInput | null)[]>([]);
+  const refs = useRef<(TextInputInstance | null)[]>([]);
   const submitting = useRef(false);
 
   const captchaNeeded = Boolean(turnstileSiteKey) && !captchaToken;

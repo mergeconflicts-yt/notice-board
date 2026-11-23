@@ -1,11 +1,11 @@
-import { type ImageSourcePropType } from 'react-native';
+import type { ImageProps } from 'expo-image';
 import { packArtUrl } from './api';
 import type { PackArt } from '../types';
 
 export type ArtSources = {
-  body: ImageSourcePropType;
+  body: ImageProps['source'];
   /** Baked silhouette for magnets; absent for flat stickers. */
-  shadow?: ImageSourcePropType;
+  shadow?: ImageProps['source'];
 };
 
 /**

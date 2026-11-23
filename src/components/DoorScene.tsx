@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type ViewInstance,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -156,14 +157,14 @@ export function DoorScene({
     reduceUI.value = reduceMotion;
   }, [reduceMotion, reduceUI]);
 
-  const handleRef = useRef<View | null>(null);
-  const closeRef = useRef<View | null>(null);
+  const handleRef = useRef<ViewInstance | null>(null);
+  const closeRef = useRef<ViewInstance | null>(null);
   const cbRef = useRef({ onOpened, onClosed, onPhaseChange });
   useEffect(() => {
     cbRef.current = { onOpened, onClosed, onPhaseChange };
   });
 
-  const focusNode = useCallback((ref: { current: View | null }) => {
+  const focusNode = useCallback((ref: { current: ViewInstance | null }) => {
     try {
       const node = ref.current ? findNodeHandle(ref.current) : null;
       if (node) AccessibilityInfo.setAccessibilityFocus(node);

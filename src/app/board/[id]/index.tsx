@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   AppState,
+  type ViewInstance,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -124,7 +125,7 @@ export default function BoardScreen() {
   // used to decide whether a drop lands on delete.
   const fingerRef = useRef<{ x: number; y: number } | null>(null);
   const deleteRectRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
-  const deleteFabRef = useRef<View | null>(null);
+  const deleteFabRef = useRef<ViewInstance | null>(null);
   // Latest main-door layout, captured from the overlay ctx each render so a
   // note drop can translate legacy note-attached magnets into door coords.
   const layoutRef = useRef<BoardLayout | null>(null);

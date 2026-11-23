@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, type ScrollViewInstance, type ViewInstance } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import { colors, fonts } from '../theme';
 import { BoardNote } from './BoardNote';
@@ -104,8 +104,8 @@ export function BoardSection({
   const layout = useMemo(() => computeBoardLayout(items, measured), [items, measured]);
   const scale = boardW > 0 ? boardW / REF_W : 1;
   const canvasH = useMemo(() => boardCanvasHeight(layout, scale), [layout, scale]);
-  const scrollRef = useRef<ScrollView | null>(null);
-  const wrapRef = useRef<View | null>(null);
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
+  const wrapRef = useRef<ViewInstance | null>(null);
   const viewHRef = useRef(0);
   const scrollYRef = useRef(0);
   const contentHRef = useRef(0);
