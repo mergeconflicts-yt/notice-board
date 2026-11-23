@@ -16,9 +16,10 @@ import { liftTo, useReduceMotion } from './Magnet';
 import { BoardLayout } from '../utils/layout';
 import { Magnet, PackArt } from '../types';
 
-/** Reference size of a magnet in points (PRD M-8 says 56; tuned up to read
- *  chunky on the board like the design mockups). */
-export const MAGNET_SIZE = 100;
+/** Reference size of a magnet in points. Tuned down from 100: at the old size
+ *  a magnet covered more than half a note and read oversized on the door. 72
+ *  keeps it chunky while matching the design mockups (~16–18% of the board). */
+export const MAGNET_SIZE = 72;
 
 type Pos = { x: number; y: number };
 

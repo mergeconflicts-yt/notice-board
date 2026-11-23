@@ -13,6 +13,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { MAGNETS } from '../art/magnets/catalog.mjs';
+import { GRADIENTS } from '../art/magnets/gradients.mjs';
 import { STICKERS } from '../art/stickers/catalog.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -33,6 +34,20 @@ const BODY_FILTER = `
   <feMerge><feMergeNode in="e3"/><feMergeNode in="e2"/><feMergeNode in="e1"/><feMergeNode in="face"/></feMerge>
 </filter>`;
 
+// Resin filter (docs/agent-guide-resin-magnet.md §3): keeps the art's own
+// gradients, uses a coloured thickness and a sharper, weaker gloss.
+const RESIN_FILTER = `
+<filter id="f" x="-20%" y="-20%" width="150%" height="150%" color-interpolation-filters="sRGB">
+  <feComponentTransfer in="SourceGraphic" result="dk"><feFuncR type="linear" slope=".62"/><feFuncG type="linear" slope=".62"/><feFuncB type="linear" slope=".62"/></feComponentTransfer>
+  <feOffset in="dk" dx=".45" dy=".7" result="e1"/><feOffset in="dk" dx=".9" dy="1.4" result="e2"/><feOffset in="dk" dx="1.3" dy="2" result="e3"/>
+  <feGaussianBlur in="SourceAlpha" stdDeviation="1.1" result="bump"/>
+  <feSpecularLighting in="bump" surfaceScale="2.6" specularConstant=".75" specularExponent="28" lighting-color="#fff" result="spec"><feDistantLight azimuth="225" elevation="50"/></feSpecularLighting>
+  <feComposite in="spec" in2="SourceAlpha" operator="in" result="specIn"/>
+  <feComposite in="SourceGraphic" in2="specIn" operator="arithmetic" k2="1" k3=".55" result="face0"/>
+  <feComposite in="face0" in2="SourceAlpha" operator="in" result="face"/>
+  <feMerge><feMergeNode in="e3"/><feMergeNode in="e2"/><feMergeNode in="e1"/><feMergeNode in="face"/></feMerge>
+</filter>`;
+
 // Soft black silhouette; the app offsets it (never baked with an offset).
 const SHADOW_FILTER = `
 <filter id="f" x="-30%" y="-30%" width="160%" height="160%">
@@ -47,6 +62,9 @@ const SIZES = [
   { suffix: '@3x', px: 192 },
 ];
 const BUDGET = { body3x: 25 * 1024, shadow3x: 8 * 1024, pack: 400 * 1024 };
+// Art is versioned in Storage: packs/<pack>/v<n>/... Bump this when re-baking
+// a pack that is already cached on devices.
+const ASSETS_VERSION = process.env.PACK_ASSETS_VERSION ?? '1';
 
 function pageHtml(svg, filter) {
   // viewBox pads 4 units so thickness and gloss aren't clipped; CSS 64×64 at
@@ -54,7 +72,7 @@ function pageHtml(svg, filter) {
   return `<!doctype html><html><head><meta charset="utf-8"></head>
 <body style="margin:0;background:transparent">
 <svg id="art" xmlns="http://www.w3.org/2000/svg" viewBox="-4 -4 48 48" width="64" height="64">
-${filter ? `<defs>${filter}</defs>` : ''}
+<defs>${GRADIENTS}${filter ?? ''}</defs>
 <g${filter ? ' filter="url(#f)"' : ''}>${svg}</g>
 </svg></body></html>`;
 }
@@ -62,7 +80,7 @@ ${filter ? `<defs>${filter}</defs>` : ''}
 function outDir(packId) {
   return packId === 'starter'
     ? path.join(ROOT, 'assets/packs/starter')
-    : path.join(ROOT, 'dist/packs', packId, 'v1');
+    : path.join(ROOT, 'dist/packs', packId, `v${ASSETS_VERSION}`);
 }
 
 async function renderArt(page, svg, filter) {
@@ -100,10 +118,11 @@ async function bakePack(page, packId, art) {
   for (const item of art) {
     if (item.pack !== packId) continue;
     const isSticker = item.kind === 'sticker';
+    const bodyFilter = item.style === 'resin' ? RESIN_FILTER : BODY_FILTER;
     // Stickers are baked flat (no lighting/filter); magnets get the body
     // filter plus a separate baked silhouette shadow.
     written.push(
-      ...(await writeVariants(page, dir, item.id, '', item.svg, isSticker ? null : BODY_FILTER, withBase)),
+      ...(await writeVariants(page, dir, item.id, '', item.svg, isSticker ? null : bodyFilter, withBase)),
     );
     if (!isSticker) {
       written.push(
@@ -122,11 +141,12 @@ async function bakePack(page, packId, art) {
       art_id: item.id,
       pack_id: packId,
       kind: item.kind,
+      type: item.type ?? 'object',
       label: item.label,
       path:
         packId === 'starter'
           ? `assets/packs/starter/${item.id}@3x.webp`
-          : `packs/${packId}/v1/${item.id}@3x.webp`,
+          : `packs/${packId}/v${ASSETS_VERSION}/${item.id}@3x.webp`,
       w: 64,
       h: 64,
     });

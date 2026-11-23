@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  Keyboard,
   Modal,
   View,
   Text,
@@ -18,9 +19,11 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { DateTimePopup } from './DateTimePopup';
-import { colors, fonts, noteColors, noteColorKeys } from '../theme';
-import { ItemColor, ItemType, ItemWithAuthor } from '../types';
-import { colorForItem, leaveBoardCopy, parseListItems, projectedLeaveMs } from '../utils/note';
+import { PaperTexture } from './NotePaper';
+import { colors, fonts, noteColorNames, noteColors, noteColorKeys } from '../theme';
+import { usePapers } from '../store/papers';
+import { ItemColor, ItemType, ItemWithAuthor, PaperOption } from '../types';
+import { leaveBoardCopy, parseListItems, projectedLeaveMs } from '../utils/note';
 import { randomId } from '../hooks/useBoard';
 
 type ComposerTab = 'note' | 'photo' | 'list' | 'date';
@@ -38,6 +41,8 @@ const MAX_ROWS = 500;
 export type NoteDraft = {
   type: ItemType;
   color: ItemColor;
+  /** '<packId>:<paperId>' picked in the composer, or null for a plain colour. */
+  paperStyle: string | null;
   body: string;
   title: string;
   eventAt: string | null;
@@ -70,8 +75,46 @@ function tabForItem(item: ItemWithAuthor): ComposerTab {
   return 'note';
 }
 
+/** A miniature paper swatch: plain colour when `option` is null. */
+function PaperThumb({
+  option,
+  color,
+  size,
+  round = false,
+}: {
+  option: PaperOption | null;
+  color: ItemColor;
+  size: number;
+  round?: boolean;
+}) {
+  const bg = option?.bg ?? noteColors[color].bg;
+  const ink = option?.ink ?? noteColors[color].ink;
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: round ? size / 2 : 5,
+        backgroundColor: bg,
+        borderWidth: 1,
+        borderColor: colors.paperEdge,
+        overflow: 'hidden',
+      }}
+    >
+      <PaperTexture
+        texture={option?.texture}
+        ink={ink}
+        header={option?.header}
+        scale={Math.max(0.55, size / 64)}
+      />
+    </View>
+  );
+}
+
 type Props = {
   visible: boolean;
+  /** Board whose packs supply the paper palette. */
+  boardId: string;
   submitting?: boolean;
   submitLabel?: string;
   /** Present when editing; drives the initial tab and fields. */
@@ -85,6 +128,7 @@ type Props = {
 
 export function AddNoteSheet({
   visible,
+  boardId,
   submitting,
   submitLabel = 'Post',
   initial = null,
@@ -103,6 +147,9 @@ export function AddNoteSheet({
   const [eventAt, setEventAt] = useState<Date>(() => defaultEventAt());
   const [pinned, setPinned] = useState(false);
   const [keepExtra, setKeepExtra] = useState(0);
+  const [paperKey, setPaperKey] = useState<string | null>(null);
+  const [paperOpen, setPaperOpen] = useState(false);
+  const paperOptions = usePapers((s) => s.options);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
   const [picking, setPicking] = useState(false);
@@ -144,22 +191,63 @@ export function AddNoteSheet({
         setListTitle(initial.type === 'list' ? (initial.title ?? '') : '');
         setRows(initial.type === 'list' ? entries.map((e) => ({ id: e.id, text: e.text })) : []);
         setEventAt(initial.eventAt ? new Date(initial.eventAt) : defaultEventAt());
+        setPaperKey(initial.paperStyle);
       } else {
         setTab('note');
-        setColor(colorForItem(randomId()));
+        // Starter kit paper: the plain Canary sheet, until another is picked.
+        setColor('butter');
         setText('');
         setListTitle('');
         setRows([]);
         setEventAt(defaultEventAt());
+        setPaperKey(null);
       }
       setPhotoUri(null);
       setPickerOpen(false);
+      setPaperOpen(false);
       setPinned(false);
       setKeepExtra(0);
     }
   }
 
   const cycleKeep = () => setKeepExtra((e) => (e + 1) % KEEP_STOPS);
+
+  useEffect(() => {
+    if (visible) void usePapers.getState().load(boardId);
+  }, [visible, boardId]);
+
+  const availablePapers = useMemo(
+    () => paperOptions.filter((option) => option.available),
+    [paperOptions],
+  );
+  const currentPaper = useMemo(
+    () => (paperKey ? (paperOptions.find((option) => option.key === paperKey) ?? null) : null),
+    [paperKey, paperOptions],
+  );
+  const packSections = useMemo(() => {
+    const map = new Map<string, { packId: string; packName: string; options: PaperOption[] }>();
+    availablePapers.forEach((option) => {
+      const section = map.get(option.packId);
+      if (section) section.options.push(option);
+      else
+        map.set(option.packId, {
+          packId: option.packId,
+          packName: option.packName,
+          options: [option],
+        });
+    });
+    return [...map.values()];
+  }, [availablePapers]);
+  // The variants shown next to the chip: the current paper's pack, or the
+  // starter colour set when the paper is plain.
+  const activePackPapers = useMemo(() => {
+    if (!currentPaper) return [];
+    return (
+      packSections.find((section) => section.packId === currentPaper.packId)?.options ?? [
+        currentPaper,
+      ]
+    );
+  }, [currentPaper, packSections]);
 
   // What tapping Keep currently buys, in the user's own terms: the projected
   // expiry for these exact settings (mirrors the server rules in
@@ -304,11 +392,105 @@ export function AddNoteSheet({
     setTab(next);
   };
 
+  const focusPrimaryField = () => {
+    if (tab === 'photo') captionRef.current?.focus();
+    else if (tab === 'list') listTitleRef.current?.focus();
+    else if (tab === 'date') dateRef.current?.focus();
+    else bodyRef.current?.focus();
+  };
+
+  const openPaperPicker = () => {
+    setPaperOpen(true);
+    Keyboard.dismiss();
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  };
+
+  const closePaperPicker = () => {
+    setPaperOpen(false);
+    setTimeout(focusPrimaryField, 120);
+  };
+
+  const pickPaper = (option: PaperOption) => {
+    setPaperKey(option.key);
+    closePaperPicker();
+  };
+  const pickPlain = (next: ItemColor) => {
+    setColor(next);
+    setPaperKey(null);
+    closePaperPicker();
+  };
+
+  const renderPaperBar = () => {
+    const paperLabel = currentPaper ? currentPaper.packName : noteColorNames[color];
+    const paperDetail = currentPaper ? `, ${currentPaper.name}` : '';
+    return (
+      <View style={styles.paperComposerRow}>
+        <Pressable
+          onPress={openPaperPicker}
+          style={styles.paperChip}
+          accessibilityRole="button"
+          accessibilityLabel={`Paper: ${paperLabel}${paperDetail}. Choose a different paper`}
+        >
+          <PaperThumb option={currentPaper} color={color} size={24} />
+          <Text style={styles.paperName} numberOfLines={1}>
+            {paperLabel}
+          </Text>
+          <MaterialCommunityIcons name="chevron-down" size={16} color={colors.inkSoft} />
+        </Pressable>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.paperVariants}
+        contentContainerStyle={styles.paperVariantRow}
+      >
+        {currentPaper
+          ? activePackPapers.map((option) => (
+              <Pressable
+                key={option.key}
+                onPress={() => setPaperKey(option.key)}
+                hitSlop={4}
+                style={[
+                  styles.paperVariant,
+                  paperKey === option.key && styles.paperVariantSelected,
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: paperKey === option.key }}
+                accessibilityLabel={`${option.name} paper`}
+              >
+                <PaperThumb option={option} color={color} size={23} round />
+              </Pressable>
+            ))
+          : noteColorKeys.map((key) => (
+              <Pressable
+                key={key}
+                onPress={() => {
+                  setColor(key);
+                  setPaperKey(null);
+                }}
+                hitSlop={4}
+                style={[
+                  styles.paperVariant,
+                  paperKey === null && color === key && styles.paperVariantSelected,
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: paperKey === null && color === key }}
+                accessibilityLabel={`${noteColorNames[key]} paper`}
+              >
+                <PaperThumb option={null} color={key} size={23} round />
+              </Pressable>
+            ))}
+      </ScrollView>
+    </View>
+    );
+  };
+
   const submit = () => {
     if (tab === 'list') {
       onSubmit({
         type: 'list',
         color,
+        paperStyle: paperKey,
         body: '',
         title: listTitle.trim(),
         eventAt: null,
@@ -324,6 +506,7 @@ export function AddNoteSheet({
       onSubmit({
         type: 'date',
         color,
+        paperStyle: paperKey,
         body: '',
         title: text.trim(),
         eventAt: eventAt.toISOString(),
@@ -339,6 +522,7 @@ export function AddNoteSheet({
       onSubmit({
         type: 'photo',
         color,
+        paperStyle: paperKey,
         body: text.trim(),
         title: '',
         eventAt: null,
@@ -353,6 +537,7 @@ export function AddNoteSheet({
     onSubmit({
       type: 'note',
       color,
+      paperStyle: paperKey,
       body: text.trim(),
       title: '',
       eventAt: null,
@@ -364,7 +549,9 @@ export function AddNoteSheet({
     });
   };
 
-  const palette = noteColors[color];
+  const palette = currentPaper
+    ? { ...noteColors[color], bg: currentPaper.bg, ink: currentPaper.ink, edge: colors.paperEdge }
+    : noteColors[color];
   // Cream sheet; option pills are white at rest and pine when selected.
   const pillRest = { backgroundColor: colors.surface, borderColor: colors.border };
   const pillActive = { backgroundColor: colors.pine, borderColor: colors.pine };
@@ -411,6 +598,21 @@ export function AddNoteSheet({
             </View>
           ) : null}
 
+          {!editing && paperOpen ? (
+            <View style={styles.paperPickerHead}>
+              <Text style={styles.paperPickerTitle}>Paper</Text>
+              <Pressable
+                onPress={closePaperPicker}
+                hitSlop={8}
+                style={styles.paperClose}
+                accessibilityRole="button"
+                accessibilityLabel="Close paper picker"
+              >
+                <MaterialCommunityIcons name="close" size={20} color={colors.ink} />
+              </Pressable>
+            </View>
+          ) : null}
+
           <ScrollView
             ref={scrollRef}
             keyboardShouldPersistTaps="handled"
@@ -422,8 +624,69 @@ export function AddNoteSheet({
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
           >
+            {paperOpen ? (
+              <View style={styles.paperPicker}>
+                <Text style={styles.paperSection}>Plain</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.paperRow}
+                >
+                  {noteColorKeys.map((key) => (
+                    <Pressable
+                      key={key}
+                      onPress={() => pickPlain(key)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${noteColorNames[key]} paper`}
+                      style={[
+                        styles.paperChoice,
+                        paperKey === null && color === key && styles.paperChoiceSelected,
+                      ]}
+                    >
+                      <PaperThumb option={null} color={key} size={60} />
+                    </Pressable>
+                  ))}
+                </ScrollView>
+
+                {packSections.map((section) => (
+                  <View key={section.packId}>
+                    <Text style={styles.paperSection}>{section.packName}</Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.paperRow}
+                    >
+                      {section.options.map((option) => (
+                        <Pressable
+                          key={option.key}
+                          onPress={() => pickPaper(option)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${option.name} paper`}
+                          style={[
+                            styles.paperChoice,
+                            paperKey === option.key && styles.paperChoiceSelected,
+                          ]}
+                        >
+                          <PaperThumb option={option} color={color} size={60} />
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  </View>
+                ))}
+
+                {availablePapers.length === 0 ? (
+                  <Text style={styles.paperEmpty}>No pack papers available yet.</Text>
+                ) : null}
+              </View>
+            ) : (
+              <>
             {(tab === 'note' || (editing && initial?.type === 'note')) ? (
               <View style={[styles.sticky, { backgroundColor: palette.bg }]}>
+                <PaperTexture
+                  texture={currentPaper?.texture}
+                  ink={palette.ink}
+                  header={currentPaper?.header}
+                />
                 <TextInput
                   style={[styles.stickyInput, { color: palette.ink }]}
                   placeholder="Write something..."
@@ -496,6 +759,11 @@ export function AddNoteSheet({
 
             {tab === 'list' ? (
               <View style={[styles.notepad, { backgroundColor: palette.bg, borderColor: palette.edge }]}>
+                <PaperTexture
+                  texture={currentPaper?.texture}
+                  ink={palette.ink}
+                  header={currentPaper?.header}
+                />
                 <View style={styles.npHoles} pointerEvents="none">
                   {[0, 1, 2, 3, 4].map((i) => (
                     <View key={i} style={styles.npTornHole}>
@@ -563,6 +831,11 @@ export function AddNoteSheet({
             {tab === 'date' ? (
               <View>
                 <View style={[styles.sticky, styles.dateSticky, { backgroundColor: palette.bg }]}>
+                  <PaperTexture
+                    texture={currentPaper?.texture}
+                    ink={palette.ink}
+                    header={currentPaper?.header}
+                  />
                   <TextInput
                     style={[styles.stickyInput, styles.dateInput, { color: palette.ink }]}
                     placeholder="What's happening?"
@@ -619,9 +892,11 @@ export function AddNoteSheet({
                 />
               </View>
             ) : null}
+              </>
+            )}
           </ScrollView>
 
-          <ColorDots color={color} onPick={setColor} />
+          {!editing && !paperOpen ? renderPaperBar() : null}
 
           <View style={styles.footerDivider} />
 
@@ -748,30 +1023,6 @@ function BusyDots({ color }: { color: string }) {
   );
 }
 
-function ColorDots({ color, onPick }: { color: ItemColor; onPick: (c: ItemColor) => void }) {  return (
-    <View style={styles.dots}>
-      {noteColorKeys.map((k) => {
-        const p = noteColors[k];
-        const selected = k === color;
-        return (
-          <Pressable
-            key={k}
-            hitSlop={8}
-            onPress={() => onPick(k)}
-            accessibilityLabel={`${k} colour`}
-            accessibilityState={{ selected }}
-            style={[
-              styles.dot,
-              { backgroundColor: p.bg, borderColor: p.edge },
-              selected && { borderColor: colors.pine, borderWidth: 2.5 },
-            ]}
-          />
-        );
-      })}
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   backdrop: { flex: 1, justifyContent: 'flex-end' },
   scrim: {
@@ -827,7 +1078,7 @@ const styles = StyleSheet.create({
   // colour row or keyboard.
   scroll: { flexGrow: 0, flexShrink: 1 },
   scrollContent: { paddingBottom: 4 },
-  sticky: { borderRadius: 8, padding: 16, minHeight: 300 },
+  sticky: { borderRadius: 8, padding: 16, minHeight: 300, overflow: 'hidden' },
   stickyInput: {
     minHeight: 110,
     fontFamily: fonts.hand.regular,
@@ -837,8 +1088,74 @@ const styles = StyleSheet.create({
   },
   dateSticky: { minHeight: 130 },
   dateInput: { minHeight: 64, fontSize: 24 },
-  dots: { flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 12 },
-  dot: { width: 26, height: 26, borderRadius: 13, borderWidth: 1 },
+  paperComposerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 },
+  paperChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 40,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  paperName: {
+    flexShrink: 1,
+    fontFamily: fonts.ui.bold,
+    fontSize: 14,
+    color: colors.ink,
+  },
+  paperVariants: { flex: 1 },
+  paperVariantRow: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingRight: 8 },
+  paperVariant: {
+    padding: 1,
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  paperVariantSelected: { borderColor: colors.pine },
+  paperPickerHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 36,
+    marginBottom: 4,
+  },
+  paperPickerTitle: {
+    fontFamily: fonts.ui.extraBold,
+    fontSize: 18,
+    color: colors.ink,
+  },
+  paperClose: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paperPicker: { paddingBottom: 4 },
+  paperSection: {
+    marginTop: 10,
+    marginBottom: 8,
+    fontFamily: fonts.ui.extraBold,
+    fontSize: 16,
+    color: colors.ink,
+  },
+  paperRow: { flexDirection: 'row', gap: 12, paddingRight: 8, paddingBottom: 2 },
+  paperEmpty: {
+    paddingVertical: 20,
+    fontFamily: fonts.ui.regular,
+    fontSize: 14,
+    color: colors.inkSoft,
+  },
+  paperChoice: {
+    padding: 3,
+    borderRadius: 9,
+    borderWidth: 2.5,
+    borderColor: 'transparent',
+  },
+  paperChoiceSelected: { borderColor: colors.pine },
   footerDivider: {
     height: 1,
     backgroundColor: colors.border,
@@ -897,6 +1214,7 @@ const styles = StyleSheet.create({
     paddingTop: 32,
     paddingHorizontal: 16,
     paddingBottom: 12,
+    overflow: 'hidden',
   },
   npHoles: {
     position: 'absolute',

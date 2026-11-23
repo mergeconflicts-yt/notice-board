@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { ItemWithAuthor, ListEntry } from '../types';
 import { colors, noteColors, fonts } from '../theme';
-import { FastenerView, fastenerForItem } from './Pin';
+import { FastenerView, fastenerForItem, type HolderStyle } from './Pin';
 import {
   formatEventTime,
   ticketDay,
@@ -29,6 +29,10 @@ type Props = {
   onToggleEntry?: (entry: ListEntry) => void;
   /** Resolved signed URL for a photo item. */
   photoUrl?: string | null;
+  /** Pack paper palette override (shop paper previews). */
+  paperStyle?: { bg?: string; ink?: string; edge?: string; texture?: string; header?: string } | null;
+  /** The pack's note holder style (round magnet, gingham tape, clip, hazard). */
+  holderStyle?: HolderStyle;
 };
 
 const TITLE_LINES = 3;
@@ -37,6 +41,127 @@ const ENTRY_LIMIT = 6;
 /** Scale type down for the pinned strip (~75%, floored at 10). */
 function compactFont(full: number, compact: boolean): number {
   return compact ? Math.max(10, Math.round(full * 0.75)) : full;
+}
+
+/** Texture drawn under the note text. Shared by the board, shop previews and
+ *  the paper swatches so a paper looks identical everywhere. */
+export function PaperTexture({
+  texture,
+  ink,
+  header,
+  scale = 1,
+}: {
+  texture?: string;
+  ink: string;
+  header?: string;
+  /** Shrinks fixed-size details (heart dots) for small shop/composer thumbs. */
+  scale?: number;
+}) {
+  if (!texture || texture === 'plain') return null;
+  const rows = Array.from({ length: 5 }, (_, index) => 22 + index * 16);
+  if (texture === 'gingham') {
+    return (
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+          <View
+            key={`gc${i}`}
+            style={[styles.ginghamCol, { left: `${i * 12.5}%` }]}
+          />
+        ))}
+        {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+          <View
+            key={`gr${i}`}
+            style={[styles.ginghamRow, { top: `${i * 12.5}%` }]}
+          />
+        ))}
+      </View>
+    );
+  }
+  if (texture === 'hearts') {
+    const spots: [number, number][] = [];
+    [8, 22, 36, 50, 64, 78, 92].forEach((top) => {
+      [10, 30, 50, 70, 90].forEach((left) => spots.push([left, top]));
+    });
+    return (
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        {spots.map(([left, top]) => (
+          <Text
+            key={`h${left}-${top}`}
+            style={[
+              styles.heartDot,
+              {
+                left: `${left}%`,
+                top: `${top}%`,
+                fontSize: 8.5 * scale,
+                lineHeight: 11 * scale,
+                marginLeft: -5 * scale,
+                marginTop: -6 * scale,
+              },
+            ]}
+          >
+            ♥
+          </Text>
+        ))}
+      </View>
+    );
+  }
+  if (texture === 'diary') {
+    return (
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        {rows.map((top) => (
+          <View
+            key={top}
+            style={[styles.textureLine, { top: `${top}%`, backgroundColor: ink }]}
+          />
+        ))}
+        <View style={styles.diaryMargin} />
+      </View>
+    );
+  }
+  if (texture === 'ruled') {
+    return (
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        {rows.map((top) => (
+          <View
+            key={top}
+            style={[styles.textureLine, { top: `${top}%`, backgroundColor: ink }]}
+          />
+        ))}
+      </View>
+    );
+  }
+  if (texture === 'recipe') {
+    return (
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        {rows.map((top) => (
+          <View
+            key={top}
+            style={[styles.textureLine, { top: `${top}%`, backgroundColor: ink }]}
+          />
+        ))}
+        <View style={styles.textureMargin} />
+      </View>
+    );
+  }
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {texture === 'reward' && header ? (
+        <View style={[styles.textureHeader, { backgroundColor: header }]} />
+      ) : null}
+      {rows.map((top) => (
+        <View
+          key={`h${top}`}
+          style={[styles.textureLine, { top: `${top}%`, backgroundColor: ink }]}
+        />
+      ))}
+      {[18, 36, 54, 72, 90].map((left) => (
+        <View
+          key={`v${left}`}
+          style={[styles.textureColumn, { left: `${left}%`, backgroundColor: ink }]}
+        />
+      ))}
+    </View>
+  );
 }
 
 export function NotePaper({
@@ -50,9 +175,19 @@ export function NotePaper({
   entries = [],
   onToggleEntry,
   photoUrl,
+  paperStyle,
+  holderStyle = 'magnet',
 }: Props) {
   const variant = paperVariantFor(item.type);
-  const palette = noteColors[item.color];
+  const basePalette = noteColors[item.color];
+  const palette = paperStyle
+    ? {
+        bg: paperStyle.bg ?? basePalette.bg,
+        ink: paperStyle.ink ?? basePalette.ink,
+        edge: paperStyle.edge ?? basePalette.edge,
+        shadow: basePalette.shadow,
+      }
+    : basePalette;
   const done = Boolean(item.doneAt);
   const age = timeAgo(item.createdAt);
 
@@ -69,8 +204,12 @@ export function NotePaper({
     imgAspect && Number.isFinite(imgAspect) && imgAspect > 0
       ? Math.min(16 / 9, Math.max(2 / 3, imgAspect))
       : 4 / 3;
-  const cardBg = item.color === 'paper' ? colors.paper : palette.bg;
-  const borderColor = item.color === 'paper' ? colors.paperEdge : palette.edge;
+  const cardBg = paperStyle ? palette.bg : item.color === 'paper' ? colors.paper : palette.bg;
+  const borderColor = paperStyle
+    ? palette.edge
+    : item.color === 'paper'
+      ? colors.paperEdge
+      : palette.edge;
 
   const bodyTrimmed = item.type === 'note' ? (item.body ?? '').trim() : '';
   const bodyLen = bodyTrimmed.length;
@@ -98,7 +237,7 @@ export function NotePaper({
         {
           backgroundColor: cardBg,
           borderColor,
-          borderWidth: item.color === 'paper' ? 1 : 0,
+          borderWidth: paperStyle || item.color === 'paper' ? 1 : 0,
           borderTopLeftRadius: 3,
           borderTopRightRadius: 5,
           borderBottomRightRadius: 3,
@@ -111,9 +250,14 @@ export function NotePaper({
         flat ? { boxShadow: undefined } : styles.raised,
       ]}
     >
+      <PaperTexture
+        texture={paperStyle?.texture}
+        ink={palette.ink}
+        header={paperStyle?.header}
+      />
       {!flat ? (
         <View accessible={false}>
-          <FastenerView fastener={fastenerForItem(item.id)} />
+          <FastenerView fastener={fastenerForItem(item.id, holderStyle)} />
         </View>
       ) : null}
 
@@ -378,6 +522,67 @@ function ListBody({
 const styles = StyleSheet.create({
   paper: {
     borderWidth: 1,
+  },
+  textureLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: StyleSheet.hairlineWidth,
+    opacity: 0.18,
+  },
+  textureColumn: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: StyleSheet.hairlineWidth,
+    opacity: 0.14,
+  },
+  textureHeader: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: '18%',
+    opacity: 0.85,
+  },
+  textureMargin: {
+    position: 'absolute',
+    left: '18%',
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: '#C9453A',
+    opacity: 0.45,
+  },
+  ginghamCol: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: '6.25%',
+    backgroundColor: colors.paperPattern.gingham,
+  },
+  ginghamRow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: '6.25%',
+    backgroundColor: colors.paperPattern.gingham,
+  },
+  heartDot: {
+    position: 'absolute',
+    fontSize: 8.5,
+    lineHeight: 11,
+    color: colors.paperPattern.hearts,
+    opacity: 0.9,
+  },
+  diaryMargin: {
+    position: 'absolute',
+    left: '16%',
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: colors.paperPattern.diaryMargin,
+    opacity: 0.7,
   },
   // Two layers like real paper on a surface: a tight contact shadow where it
   // touches, and a soft drop that falls below it. boxShadow draws on both

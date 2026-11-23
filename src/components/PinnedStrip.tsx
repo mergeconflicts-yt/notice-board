@@ -4,6 +4,7 @@ import { Image } from 'expo-image';
 import { ScrollView } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, doorSoft, fonts, noteColors } from '../theme';
+import { paperStyleFrom, usePaperOption } from '../store/papers';
 import type { BoardColor } from '../types';
 import { NotePaper } from './NotePaper';
 import { ItemWithAuthor, ListEntry } from '../types';
@@ -158,6 +159,7 @@ function PinnedCard({
 }) {
   const [enter] = useState(() => new Animated.Value(1));
   const playedRef = useRef(false);
+  const paperOption = usePaperOption(item.paperStyle);
   useEffect(() => {
     if (!spotlight || playedRef.current) return;
     playedRef.current = true;
@@ -201,6 +203,7 @@ function PinnedCard({
                 compact
                 maxEntries={maxEntries}
                 entries={entries}
+                paperStyle={paperStyleFrom(paperOption)}
                 // Small posts stretch to fill the whole card height.
                 minHeight={cardH != null && naturalH <= cardH ? cardH : undefined}
               />

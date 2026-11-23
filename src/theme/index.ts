@@ -12,6 +12,7 @@ export {
   memberColors,
   noteColors,
   noteColorKeys,
+  noteColorNames,
   offeredBoardColors,
   onTint,
 } from './colors';

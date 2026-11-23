@@ -283,3 +283,185 @@ implemented slightly differently. Appended as work proceeds.
     warning step for guest, and email → code → one-time name sheet), and
     Profile now leads with "Guest on this phone" and a Save card.
 
+
+## Shop page
+
+33. **No tester allow-list existed.** `docs/SHOP.md` §2 says to use the
+    existing allow-list for draft catalogue rows, or ask if there is none.
+    This repo had none. Migration `20261123000023_shop_flags.sql` adds
+    `public.shop_testers (user_id)`: no client grants, populated by an admin
+    script / service role. Decision needed: who administers it, and whether
+    it should be replaced by an auth `app_metadata` flag.
+34. **`shop_categories` had no `regions` column, but §3.2 applies rule 4
+    (regions) to categories.** Added `regions text[]` to the table so the
+    stated visibility rule is implementable. If categories should never be
+    region-scoped, drop the column and rule 4 for categories.
+35. **RevenueCat is installed but no public SDK keys are configured.** The
+    shop reads prices and starts purchases through `react-native-purchases`;
+    without `EXPO_PUBLIC_REVENUECAT_IOS_API_KEY` /
+    `EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY` the store is unavailable, so
+    paid packs are hidden (per §4.1). Add the keys (Test Store locally) and
+    create a development build; Expo Go cannot test real purchases.
+36. **Collection-offer bundle contents are not expanded server-side beyond
+    `bundle_of`.** `get_shop` returns `bundleItems` (id, name, store product,
+    active sale product, first art) for the featured bundle so the app can
+    price the saving without leaking hidden catalogue rows. If bundles should
+    expand to individual pack entitlements, that remains a separate webhook /
+    admin task (the original migration also left `bundle_of` expansion out).
+37. **Pack detail display comes from `spec` + `pack_art`.** The detail screen
+    renders `spec.door` (colour/handle/name), `spec.papers` and the pack's live
+    magnet/sticker/paper/fastener art. Starter only stores paper IDs, so
+    unnamed papers fall back to a neutral swatch and a humanised ID; richer
+    mock-style names/colours need those fields added to admin seed data. Door
+    names likewise come from `spec.door.name` when present, otherwise the UI
+    says "Door finish".
+
+## Resin magnets
+
+38. **Source art and helper docs are missing.** The resin brief references
+    `design-mockups/pack-shop-collection.html`, `docs/agent-brief-magnet-3d.md`,
+    `art/magnets/gradients.mjs`, `art/magnets/helpers.mjs` and the Kitchen ART
+    entries. None of those files exist in this repo, so the Kitchen resin port
+    and the exact gradient library cannot be copied without guessing. What was
+    added: `RESIN_FILTER` in `scripts/bake-pack.mjs`, a `style` field on every
+    catalog entry (`cartoon` for current art), and filter selection by style.
+    The Kitchen pack stays cartoon until the mockup is provided.
+39. **Stickers still exist in the current data.** The resin brief says every
+    item is a magnet, but the app/database still have `pack_art.kind =
+    'sticker'` and `art/stickers/catalog.mjs`. Deleting the sticker bake path
+    now would break Starter and the shop detail. Needs one migration/backfill
+    plan that ports each sticker to a magnet type before removing `sticker`.
+
+## Magnet types
+
+40. **The magnet-types guide references missing files.** Missing:
+    `docs/agent-brief-resin-magnets.md` (the repo file is
+    `docs/agent-guide-resin-magnet.md`), `docs/agent-brief-magnet-3d.md`,
+    `design-mockups/magnet-types.html`, `design-mockups/pack-shop-collection.html`,
+    `art/magnets/helpers.mjs`, `art/magnets/gradients.mjs` and
+    `art/magnets/words.md`. Without the mockup the object/word/badge/place/
+    holder art cannot be ported or checked. Added the database/catalog spine:
+    `pack_art.type` (object, word, badge, place, team, letter, photo, holder,
+    live) with `object` as the default, plus catalog `type`/`style` defaults.
+41. **Team magnets — plan only.** Add per-board `team_color_1`, `team_color_2`,
+    `team_name` (≤9 chars) and `team_number` (0–99) in a new migration. Bake
+    three layers per team magnet: a flat white main-colour mask, a flat white
+    trim-colour mask, and a mid-grey light/dark shading layer. In the app stack
+    tinted mask 1 + tinted mask 2 + shading + native name/number text + shadow.
+    Limit colours to the 12-colour KIT picker so text contrast is stable.
+42. **Letter magnets — plan only.** 36 glyphs (A–Z, 0–9) as masks plus shading
+    layers, tinted in-app with the six allowed colours; default 40 pt. Convert
+    each licensed font glyph to a path before baking. Owner decision required.
+43. **Photo magnets — plan only.** Bake the resin frame with a transparent
+    window (and a heart mask variant); render the user's photo under it using
+    the existing `photos.ts` / `photoCache.ts` pipeline. Reuse photo-note
+    storage, quota and moderation, member-only visibility, and decide what
+    happens to a photo magnet when its author leaves the board.
+44. **Holder magnets — planned, not built.** Each pack gets one holder style
+    from its spec (round magnet, washi/tape image, or clip). Holders are drawn
+    by the note component, move with the note and are not counted as magnets.
+45. **Add-ons and live magnets.** Gift tag: native kraft tag using
+    `board_magnets.gift_note` (already present), plus a `from_member` column in
+    a new migration. Visited stamp: needs board/plaque/user/time rows; design
+    in a future migration. Live magnets are later only; they would need event
+    date + timezone (countdown) and presence/home data, refreshed on foreground
+    and Realtime. Heritage-site image rules need a country-by-country check
+    (Mexico and Peru called out explicitly).
+
+46. **Design board received, exact vector source still missing.** The three
+    design-board photos are saved as
+    `docs/assets/magnet-types-design-6213.jpg`, `-6214.jpg` and `-6215.jpg`.
+    They confirm the type set and build status: object, word, badge, place and
+    holder are Build now; team is Build next (jersey prototype only); letter
+    and photo need a decision; live is later; gift tag/visited stamp are
+    add-ons for after travel data. They are printed references, not the SVG
+    source, so the exact Kitchen, word, badge and place art still cannot be
+    ported without guessing. The guide also names a "Star chart" pack that is
+    not in `art/magnets/catalog.mjs`, and the app currently renders every
+    magnet in a fixed square box, so wide word/place magnets need an explicit
+    default size + crop decision. Holder styles (gingham/brass/hazard) also
+    need pack-spec fields and note-component support beyond the current
+    seeded round holders.
+47. **Star chart pack built from the design board.** No vector prototypes were
+    provided, so the 10 magnets and the four paper styles are original SVG art
+    following the board (Family category, sunny-yellow door, reward jar, star,
+    badges, chore timer, crown and +1). The bake contact sheet is
+    `dist/packs/preview.html`; the baked files are in
+    `dist/packs/star_chart/v2` (assets_version 2) and were uploaded to the local
+    `packs` bucket. Use `PACK_ASSETS_VERSION=2 npm run bake:packs -- --pack
+    star_chart` when re-baking.
+    The catalogue/category rows live in `supabase/seed.sql` only (not hosted).
+    RevenueCat/App Store still needs the product `com.fridgeboard.star_chart`;
+    local dev falls back to `price_label` so the pack is visible without a
+    store key.
+48. **Kitchen pack built from the design board.** 14 resin magnets (egg
+    tray, fried/cracked egg, kettle, breakfast basket, tomato/bread sacks,
+    toaster, coffee, candied fruit, espresso, milk, done tick, heart), butter
+    enamel door, Mint/Pink/Canary/Recipe-card papers and gingham tape holders.
+    Baked to `dist/packs/kitchen/v1` and uploaded to the local `packs` bucket;
+    the catalogue/category rows are in `supabase/seed.sql` only (not hosted).
+    The magnets are high-detail SVG art plus the resin filter; the photoreal
+    raster route could not be used because image-generation credits were
+    unavailable. If a closer match to the reference photo is required, provide
+    generated source images and run `scripts/build-resin-magnets.mjs`.
+    RevenueCat/App Store still needs `com.fridgeboard.kitchen`; local dev uses
+    the `price_label` fallback. The old cartoon `kt_tomato` entry was removed,
+    and pgTAP test 19 now uses `test_kitchen` so the seeded Kitchen row cannot
+    collide with test fixtures.
+49. **Cute originals pack built from the design board.** 10 resin magnets
+    (Mochi the cat, strawberry, satin bow, bunny plush, squishy cat bread,
+    heart sunglasses, sparkle mic, rainbow, butterfly clip, LOVE bracelet),
+    16 flat die-cut stickers (heart, Mochi, strawberry, bow, bunny, rainbow,
+    mic, sunglasses, butterfly, cherries, flower, star, strawberry milk,
+    cookie, sleepy cloud, sparkles), four pastel papers (Pink gingham, Heart
+    dots, Sticker sheet, Diary), a pink "Strawberry milk" door and pink round
+    magnet holders. Ids are `cu_*` for magnets/holders and `cs_*` for stickers
+    so both live in one bundle without colliding. Baked to
+    `dist/packs/cute/v1` (assets_version 1, 286 KB) and uploaded to the local
+    `packs` bucket; the catalogue/category rows live in `supabase/seed.sql`
+    only (not hosted). Renderer v2 adds the `gingham`, `hearts` and `diary`
+    paper textures and the `pink` holder, so the pack's `min_renderer` is 2 and
+    `SHOP_RENDERER` is now 2; the spec also uses `preview.papers` to match the
+    design's sample board (gingham note, grid list, diary date, heart-dots
+    photo). RevenueCat/App Store still needs `com.fridgeboard.cute`; local dev
+    uses the `price_label` fallback.
+50. **Local testing: every account owns every pack.** Ownership is enforced in
+    the database (`board_can_use`, `set_board_theme`, `place_magnet`), so a
+    client flag cannot unlock packs. `supabase/seed.sql` therefore grants a
+    `promo` entitlement for every non-bundle pack to every profile, and installs
+    `dev_grant_all_packs()` + an `after insert on public.profiles` trigger so a
+    new guest account is unlocked too. This lives only in `seed.sql` (never run
+    by `db push`). Do not promote the function or trigger into a migration and
+    never run the seed against hosted. Undo locally with
+    `delete from public.user_entitlements where source = 'promo';`. The shop
+    test's `hiddenForUpdate` check now asks for renderer 2 because the seeded
+    Cute pack (`min_renderer` 2) is owned by every local test account.
+51. **Paper picker in the note composer.** The composer shows the selected
+    paper as a chip (swatch + pack name + chevron; starter colours keep the
+    colour name), defaulting to the starter plain Canary sheet. Next to it are
+    that paper's pack variants (or the seven starter colours when the paper is
+    plain), tappable directly like the old colour dots. Tapping the chip opens the grouped picker (`Plain` plus one
+    section per live, board-usable pack); choosing a paper or plain colour closes
+    the picker and returns to the editor (the header X closes without a change).
+    Plain choices set the existing
+    item colour; pack choices store `paper_style` as a composite
+    `<pack_id>:<paper_id>` because paper ids such as `canary` repeat across
+    packs. Create goes through the new
+    `post_item_with_paper(...)` RPC (migration `20261123000026_item_paper.sql`),
+    which validates the paper against the pack's spec and calls
+    `board_can_use` before inserting, then bumps the item to version 2.
+    Reading is data-driven: `getPaperOptions(boardId)` loads every live theme
+    pack's papers with a `boardCanUse` flag, `src/store/papers.ts` caches them,
+    and `BoardNote`, `PinnedStrip` and the note detail resolve stored keys from
+    that cache so an old note keeps its paper even if the pack is no longer
+    available. Editing a post does not change its paper yet; the bar is only
+    shown for new posts. Renderer v2's heart-dots and gingham densities were
+    increased (35 hearts, 8×8 checks) and heart dots scale down for the small
+    quick swatches.
+52. **Decorate tray is pack-wise and no longer has Hide.** Items are grouped by
+    pack (Starter, then the catalogue order) with small `Magnets` / `Stickers`
+    sub-labels under each pack name; the tray fetches live pack names via
+    `getPacks()` and falls back to a humanized id. The `Hide` button was removed
+    at the owner's request, and the now-unreachable `hideDecorations` state and
+    rendering guards were deleted. The sheet can grow to 75% of the screen for
+    the longer grouped list.
