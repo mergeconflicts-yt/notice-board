@@ -11,6 +11,8 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  type ScrollViewInstance,
+  type TextInputInstance,
 } from 'react-native';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
@@ -110,14 +112,14 @@ export function AddNoteSheet({
   // mid-visit cannot visibly shift it.
   // eslint-disable-next-line react-hooks/purity -- wall-clock anchor, see above
   const nowMs = Date.now();
-  const rowInputRefs = useRef(new Map<string, TextInput | null>());
+  const rowInputRefs = useRef(new Map<string, TextInputInstance | null>());
   const pendingFocusRowId = useRef<string | null>(null);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
   const scrollYRef = useRef(0);
-  const bodyRef = useRef<TextInput | null>(null);
-  const captionRef = useRef<TextInput | null>(null);
-  const listTitleRef = useRef<TextInput | null>(null);
-  const dateRef = useRef<TextInput | null>(null);
+  const bodyRef = useRef<TextInputInstance | null>(null);
+  const captionRef = useRef<TextInputInstance | null>(null);
+  const listTitleRef = useRef<TextInputInstance | null>(null);
+  const dateRef = useRef<TextInputInstance | null>(null);
   const todayStart = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -249,7 +251,7 @@ export function AddNoteSheet({
   // viewport, so a focused field near the bottom would otherwise tuck under
   // them. Once the keyboard animation has settled, scroll just enough to
   // bring the whole field into view with a little breathing room.
-  const revealInput = (node: TextInput | null) => {
+  const revealInput = (node: TextInputInstance | null) => {
     if (!node) return;
     setTimeout(() => {
       const sv = scrollRef.current as unknown as {

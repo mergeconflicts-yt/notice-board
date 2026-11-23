@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, View, Text, Pressable, StyleSheet } from 'react-native';
+import { Animated, View, Text, Pressable, StyleSheet, type ScrollViewInstance } from 'react-native';
 import { Image } from 'expo-image';
 import { ScrollView } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -60,7 +60,7 @@ export function PinnedStrip({
   const maxEntries =
     cardH != null ? Math.max(1, Math.min(4, Math.floor((cardH - 76) / 24))) : 4;
 
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
   const shownRef = useRef<string | null>(null);
 
   // A freshly pinned card can land off-screen to the right: scroll it into
